@@ -193,6 +193,7 @@ ipcMain.handle('get-app-root', () => {
 });
 
 ipcMain.handle('check-environment', async () => {
+  ensureSubmodule();
   return checkEnvironment();
 });
 
@@ -221,6 +222,25 @@ ipcMain.handle('start-backend', async () => {
 // ════════════════════════════════════════
 
 let backendProcess: ChildProcess | null = null;
+
+/** 确保后端子模块已初始化 */
+function ensureSubmodule(): void {
+  const submodDir = path.join(appRoot(), 'autowsgr');
+  const marker = path.join(submodDir, 'pyproject.toml');
+  if (fs.existsSync(marker)) return; // 子模块已就绪
+
+  try {
+    execSync('git submodule update --init', {
+      cwd: appRoot(),
+      encoding: 'utf-8',
+      windowsHide: true,
+      timeout: 60000,
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+  } catch {
+    // 无 git 或网络问题，后续 checkEnvironment 会报缺少 autowsgr
+  }
+}
 
 /** 查找可用的 Python 可执行文件 */
 function findPython(): string | null {
