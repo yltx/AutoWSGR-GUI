@@ -1,0 +1,3 @@
+[submodule "autowsgr"]
+	path = autowsgr
+	url = https://github.com/OpenWSGR/AutoWSGR.git

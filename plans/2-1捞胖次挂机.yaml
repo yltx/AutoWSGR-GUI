@@ -1,0 +1,7 @@
+# 2-1 捞胖次 — 简单的低耗图，适合挂机
+# 对应后端 API: POST /api/task/start { type: "normal_fight", plan_id: "2-1捞胖次" }
+# 使用内置战斗方案 2-1捞胖次
+
+task_type: normal_fight
+plan_id: 2-1捞胖次
+times: 10

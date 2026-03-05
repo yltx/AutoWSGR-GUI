@@ -1,0 +1,21 @@
+{
+  "name": "wsgrgui",
+  "version": "0.1.0",
+  "description": "AutoWSGR 图形界面 — MVP",
+  "main": "dist/electron/main.js",
+  "scripts": {
+    "build": "tsc && node scripts/bundle.js",
+    "start": "chcp 65001 >nul && npm run build && electron .",
+    "dev": "chcp 65001 >nul && tsc && node scripts/bundle.js && electron ."
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "electron": "^33.0.0",
+    "esbuild": "^0.27.3",
+    "typescript": "^5.6.0"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  }
+}

@@ -1,0 +1,6 @@
+# 困难潜艇战役 — 刷 3 次困难潜艇
+# 对应后端 API: POST /api/task/start { type: "campaign" }
+
+task_type: campaign
+campaign_name: 困难潜艇
+times: 3

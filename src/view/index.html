@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:8000 ws://localhost:8000">
+  <title>WSGR GUI</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- ═══ 顶部导航栏 ═══ -->
+  <nav class="nav-bar">
+    <div class="nav-title">WSGR GUI</div>
+    <div class="nav-tabs">
+      <button class="nav-tab active" data-page="main">主页</button>
+      <button class="nav-tab" data-page="plan">方案预览</button>
+      <button class="nav-tab" data-page="config">配置</button>
+    </div>
+  </nav>
+
+  <!-- ═══ 页面容器 ═══ -->
+  <main class="page-container">
+
+    <!-- 主页面 -->
+    <section id="page-main" class="page active">
+      <div class="main-layout">
+        <!-- 左侧：状态 & 任务 -->
+        <div class="main-left">
+          <div class="status-card">
+            <div class="status-indicator" id="status-dot"></div>
+            <span id="status-text">未连接</span>
+          </div>
+
+          <div class="card" id="current-task-card" style="display:none">
+            <h3>当前任务</h3>
+            <div class="task-info">
+              <span class="task-name" id="task-name"></span>
+              <span class="task-progress" id="task-progress"></span>
+            </div>
+            <button class="btn btn-danger btn-small" id="btn-stop-task">停止任务</button>
+          </div>
+
+          <div class="card" id="idle-card">
+            <p class="idle-text">当前无运行任务</p>
+            <div class="idle-actions">
+              <button class="btn btn-primary" id="btn-import-plan">导入战斗方案 (.yaml)</button>
+            </div>
+          </div>
+
+          <div class="card" id="task-queue-card" style="display:none">
+            <h3>任务队列</h3>
+            <div class="task-queue-list" id="task-queue-list"></div>
+            <div class="queue-actions">
+              <button class="btn btn-primary btn-small" id="btn-start-queue">开始执行</button>
+              <button class="btn btn-small" id="btn-clear-queue">清空队列</button>
+            </div>
+          </div>
+
+          <div class="expedition-bar">
+            <span>远征检查倒计时：</span>
+            <span id="expedition-timer">--:--</span>
+          </div>
+        </div>
+
+        <!-- 右侧：日志 -->
+        <div class="main-right">
+          <div class="card log-card">
+            <h3>日志</h3>
+            <div class="log-container" id="log-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 方案预览页面 -->
+    <section id="page-plan" class="page">
+      <div id="plan-empty" class="empty-state">
+        <p>尚未导入方案</p>
+        <button class="btn btn-primary" id="btn-import-plan-2">选择 yaml 文件</button>
+      </div>
+
+      <div id="plan-detail" class="plan-layout" style="display:none">
+        <!-- 左列：方案信息 + 节点路线 + 操作 -->
+        <div class="plan-left">
+          <div class="card plan-header">
+            <h2 id="plan-map-name"></h2>
+            <span class="badge" id="plan-file-name"></span>
+            <div class="plan-meta">
+              <span>修理策略：<strong id="plan-repair"></strong></span>
+              <span>战况：<strong id="plan-fight-cond"></strong></span>
+            </div>
+            <p class="plan-comment" id="plan-comment"></p>
+          </div>
+
+          <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
+          <div class="node-list" id="node-list">
+            <!-- 由 View 动态渲染 -->
+          </div>
+
+          <div class="plan-actions">
+            <button class="btn btn-primary" id="btn-execute-plan">加入队列</button>
+            <label>
+              次数：<input type="number" id="plan-times" value="1" min="1" max="99" class="input-small">
+            </label>
+          </div>
+        </div>
+
+        <!-- 右列：节点编辑面板 -->
+        <div class="plan-right">
+          <div id="node-editor-placeholder" class="card node-editor-placeholder">
+            <p>← 点击左侧节点查看/编辑设置</p>
+          </div>
+          <div id="node-editor" class="card node-editor" style="display:none">
+            <div class="node-editor-header">
+              <h3>节点 <span id="node-editor-id"></span></h3>
+              <button class="btn btn-small" id="btn-node-editor-close">✕</button>
+            </div>
+            <div class="form-group">
+              <label>阵型</label>
+              <select id="node-edit-formation" class="input">
+                <option value="1">单纵阵</option>
+                <option value="2">复纵阵</option>
+                <option value="3">轮型阵</option>
+                <option value="4">梯形阵</option>
+                <option value="5">单横阵</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label><input type="checkbox" id="node-edit-night"> 夜战</label>
+            </div>
+            <div class="form-group">
+              <label><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
+            </div>
+            <div class="form-group">
+              <label>索敌规则</label>
+              <textarea id="node-edit-rules" class="input node-rules-textarea" rows="3"
+                placeholder="每行一条，如: DD + CL <= 1, 4"></textarea>
+            </div>
+            <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 配置页面 -->
+    <section id="page-config" class="page">
+      <div class="card">
+        <h3>模拟器配置</h3>
+        <div class="form-group">
+          <label>模拟器类型</label>
+          <select id="cfg-emu-type" class="input">
+            <option value="雷电">雷电</option>
+            <option value="蓝叠">蓝叠</option>
+            <option value="MuMu">MuMu</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>模拟器路径</label>
+          <div class="input-row">
+            <input type="text" id="cfg-emu-path" class="input" placeholder="留空自动检测">
+            <button class="btn btn-small" id="btn-browse-emu">浏览</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>ADB 端口 (serial)</label>
+          <input type="text" id="cfg-emu-serial" class="input" placeholder="如 127.0.0.1:16384，留空自动检测">
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>游戏账号</h3>
+        <div class="form-group">
+          <label>渠道服</label>
+          <select id="cfg-game-app" class="input">
+            <option value="官服">官服</option>
+            <option value="小米服">小米服</option>
+            <option value="应用宝服">应用宝服</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>日常自动化</h3>
+        <div class="form-group">
+          <label><input type="checkbox" id="cfg-auto-expedition" checked> 自动远征</label>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="cfg-auto-battle"> 自动战役</label>
+        </div>
+        <div class="form-group">
+          <label>战役类型</label>
+          <select id="cfg-battle-type" class="input">
+            <option value="困难潜艇">困难潜艇</option>
+            <option value="困难航母">困难航母</option>
+            <option value="困难驱逐">困难驱逐</option>
+            <option value="困难巡洋">困难巡洋</option>
+            <option value="困难战列">困难战列</option>
+            <option value="简单航母">简单航母</option>
+            <option value="简单潜艇">简单潜艇</option>
+            <option value="简单驱逐">简单驱逐</option>
+            <option value="简单巡洋">简单巡洋</option>
+            <option value="简单战列">简单战列</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" id="cfg-auto-exercise"> 自动演习</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>界面设置</h3>
+        <div class="form-group">
+          <label>颜色主题</label>
+          <select id="cfg-theme-mode" class="input">
+            <option value="dark">暗色</option>
+            <option value="light">浅色</option>
+            <option value="system">跟随系统</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>主色调</label>
+          <div class="input-row" style="align-items:center">
+            <input type="color" id="cfg-accent-color" value="#0f7dff" class="color-picker">
+            <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
+            <button class="btn btn-small" id="btn-reset-accent">重置</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="config-actions">
+        <button class="btn btn-primary" id="btn-save-config">保存配置</button>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="../../dist/renderer.bundle.js"></script>
+</body>
+</html>

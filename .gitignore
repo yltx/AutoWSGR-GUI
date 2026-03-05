@@ -1,0 +1,27 @@
+# ═══ WSGR GUI (Electron 前端) ═══
+
+# 依赖
+node_modules/
+
+# 构建输出
+dist/
+
+# 环境 & 编辑器
+.env
+.vscode/
+.idea/
+
+# 日志
+logs/
+log/
+*.log
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 用户配置 (本地)
+usersettings.yaml
+
+# 测试包
+test_pkg/

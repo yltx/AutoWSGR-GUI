@@ -1,0 +1,5 @@
+# 自动演习 — 使用第 4 舰队挑战所有可用对手
+# 对应后端 API: POST /api/task/start { type: "exercise" }
+
+task_type: exercise
+fleet_id: 4

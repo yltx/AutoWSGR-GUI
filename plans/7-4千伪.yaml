@@ -1,0 +1,28 @@
+# 功能: 7-4 漂流捞胖次
+# 推荐配置: 6 鱼, 选择 1-2 个三级后备弹, 其余大角度
+
+chapter: 7
+map: 4
+selected_nodes: [A, B, C, E, D, F, G, H, I, J, L, M, K]
+fight_condition: 4
+repair_mode: 1
+fleet_id: 3
+
+node_defaults:
+  enemy_rules:
+    - [DD + CL <= 1, 4]
+    - [CVL == 1 and CV == 0, 4]
+  formation: 2
+  night: false
+  proceed: true
+  proceed_stop: [2, 2, 2, 2, 2, 2]
+
+node_args:
+  M:
+    enemy_rules:
+      - [SAP < 1, retreat]
+    formation: 4
+    night: true
+  I:
+    enemy_rules:
+      - [SAP < 1, retreat]

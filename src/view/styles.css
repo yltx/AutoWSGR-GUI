@@ -1,0 +1,584 @@
+/* ════════ WSGR GUI — MVP Stylesheet ════════ */
+
+:root,
+[data-theme="dark"] {
+  --bg: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-hover: #1f3060;
+  --accent: #0f7dff;
+  --accent-hover: #3498ff;
+  --text: #e0e0e0;
+  --text-muted: #8892a4;
+  --success: #2ecc71;
+  --warning: #f39c12;
+  --danger: #e74c3c;
+  --border: #2a3a5c;
+  --radius: 8px;
+}
+
+[data-theme="light"] {
+  --bg: #f0f2f5;
+  --bg-card: #ffffff;
+  --bg-hover: #e8ecf1;
+  --accent: #0f7dff;
+  --accent-hover: #3498ff;
+  --text: #1a1a2e;
+  --text-muted: #5a6577;
+  --success: #27ae60;
+  --warning: #e67e22;
+  --danger: #c0392b;
+  --border: #d0d7e2;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  user-select: none;
+}
+
+/* ═══ 导航栏 ═══ */
+.nav-bar {
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  height: 48px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.nav-title {
+  font-weight: bold;
+  font-size: 16px;
+  margin-right: 32px;
+  color: var(--accent);
+}
+
+.nav-tabs {
+  display: flex;
+  gap: 4px;
+  -webkit-app-region: no-drag;
+}
+
+.nav-tab {
+  padding: 8px 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: var(--radius) var(--radius) 0 0;
+  transition: all 0.2s;
+}
+
+.nav-tab:hover {
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.nav-tab.active {
+  color: var(--accent);
+  background: var(--bg);
+  border-bottom: 2px solid var(--accent);
+}
+
+/* ═══ 页面容器 ═══ */
+.page-container {
+  padding: 24px;
+  margin: 0 auto;
+}
+
+.page {
+  display: none;
+}
+
+.page.active {
+  display: block;
+}
+
+/* ═══ 主页面双栏布局 ═══ */
+.main-layout {
+  display: flex;
+  gap: 16px;
+  height: calc(100vh - 48px - 48px); /* 减去导航栏高度和padding */
+}
+
+.main-left {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.main-right {
+  width: 380px;
+  min-width: 300px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-right .log-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.main-right .log-card .log-container {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+/* ═══ 通用卡片 ═══ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.card h3 {
+  font-size: 15px;
+  margin-bottom: 14px;
+  color: var(--accent);
+}
+
+/* ═══ 状态指示 ═══ */
+.status-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  margin-bottom: 16px;
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-muted);
+}
+
+.status-indicator.idle { background: var(--success); }
+.status-indicator.running { background: var(--warning); animation: pulse 1.5s infinite; }
+.status-indicator.error { background: var(--danger); }
+.status-indicator.not_connected { background: var(--text-muted); }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ═══ 任务卡片 ═══ */
+.task-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.task-name {
+  font-size: 15px;
+}
+
+.task-progress {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* ═══ 空闲状态 ═══ */
+.idle-text {
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-muted);
+}
+
+.empty-state p {
+  margin-bottom: 20px;
+  font-size: 15px;
+}
+
+/* ═══ 远征倒计时 ═══ */
+.expedition-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+#expedition-timer {
+  font-family: "Consolas", monospace;
+  color: var(--text);
+}
+
+/* ═══ Plan 预览 ═══ */
+.plan-header h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.badge {
+  display: inline-block;
+  background: var(--bg-hover);
+  color: var(--text-muted);
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 12px;
+  margin-bottom: 10px;
+}
+
+.plan-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.plan-meta strong {
+  color: var(--text);
+}
+
+.plan-comment {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  white-space: pre-line;
+}
+
+/* ═══ 节点列表 ═══ */
+.node-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.node-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.node-chip:hover {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+}
+
+.node-chip.selected {
+  border-color: var(--accent);
+  background: var(--bg-hover);
+  box-shadow: 0 0 6px rgba(15, 125, 255, 0.3);
+}
+
+.node-chip .node-id {
+  font-weight: bold;
+  color: var(--accent);
+}
+
+.node-chip .node-detail {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.node-chip.has-custom {
+  border-color: var(--warning);
+}
+
+.node-chip .night-icon {
+  color: var(--warning);
+  font-size: 11px;
+}
+
+/* ═══ Plan 操作 ═══ */
+.plan-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.plan-actions label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ═══ 按钮 ═══ */
+.btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text);
+  background: var(--bg-hover);
+}
+
+.btn:hover {
+  background: var(--border);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: var(--accent-hover);
+}
+
+.btn-small {
+  padding: 4px 12px;
+  font-size: 12px;
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  background: #c0392b;
+}
+
+/* ═══ 空闲操作栏 ═══ */
+.idle-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* ═══ 任务队列 ═══ */
+.task-queue-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+
+.task-queue-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.task-queue-item:last-child {
+  border-bottom: none;
+}
+
+.task-queue-item .tq-name {
+  flex: 1;
+}
+
+.task-queue-item .tq-priority {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-left: 12px;
+}
+
+.task-queue-item .tq-remove {
+  margin-left: 8px;
+  background: none;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+/* ═══ 日志面板 ═══ */
+.log-container {
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--bg);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.log-entry {
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.log-entry.level-debug { color: var(--text-muted); }
+.log-entry.level-info  { color: var(--text); }
+.log-entry.level-warning { color: var(--warning); }
+.log-entry.level-error { color: var(--danger); }
+.log-entry.level-critical { color: #ff6b6b; font-weight: bold; }
+
+.log-entry .log-time {
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.log-entry .log-channel {
+  color: var(--accent);
+  margin-right: 6px;
+}
+
+/* ═══ 表单 ═══ */
+.form-group {
+  margin-bottom: 14px;
+}
+
+.form-group > label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.input-small {
+  width: 60px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.input-row .input {
+  flex: 1;
+}
+
+select.input {
+  appearance: auto;
+}
+
+.config-actions {
+  margin-top: 20px;
+}
+
+/* ═══ 调色盘 ═══ */
+.color-picker {
+  width: 40px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 4px;
+}
+
+.accent-label {
+  font-family: "Consolas", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ═══ 方案预览双栏布局 ═══ */
+.plan-layout {
+  display: flex;
+  gap: 20px;
+  height: calc(100vh - 48px - 48px);
+}
+
+.plan-left {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+.plan-right {
+  width: 320px;
+  min-width: 280px;
+  flex-shrink: 0;
+}
+
+/* ═══ 节点编辑面板 ═══ */
+.node-editor-placeholder {
+  color: var(--text-muted);
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.node-editor {
+  border-color: var(--accent);
+}
+
+.node-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.node-editor-header h3 {
+  margin-bottom: 0;
+}
+
+.node-rules-textarea {
+  resize: vertical;
+  font-family: "Consolas", "Courier New", monospace;
+  min-height: 60px;
+}
