@@ -1,0 +1,24 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      705.2234740467446,
+      730.3625111200122
+    ],
+    "next": [
+      "A"
+    ]
+  },
+  "A": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      1177.7281429463299,
+      495.0953889716992
+    ],
+    "next": []
+  }
+}

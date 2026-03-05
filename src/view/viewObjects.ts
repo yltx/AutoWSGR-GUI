@@ -48,6 +48,9 @@ export interface LogEntryVO {
 // Plan 预览页 ViewObject
 // ════════════════════════════════════════
 
+/** 地图节点类型 */
+export type MapNodeType = 'Start' | 'Normal' | 'Boss' | 'Resource' | 'Penalty' | 'Suppress' | 'Aerial' | 'Hard';
+
 /** 节点信息 */
 export interface NodeViewObject {
   id: string;                     // 节点名，如 "A", "B", "M"
@@ -56,6 +59,8 @@ export interface NodeViewObject {
   proceed: boolean;
   hasCustomRules: boolean;        // 是否有自定义 enemy_rules
   note: string;                   // 简要备注
+  nodeType: MapNodeType;          // 地图数据中的节点类型
+  detour: boolean;                // 是否为迂回点
 }
 
 /** Plan 预览 VO */

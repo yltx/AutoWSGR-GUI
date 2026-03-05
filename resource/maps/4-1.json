@@ -1,0 +1,132 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      1514.9077233538283,
+      255.07357416592274
+    ],
+    "next": [
+      "A",
+      "B"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1283.3078330106098,
+      523.8548917233569
+    ],
+    "next": [
+      "C"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1216.401603945872,
+      351.9252394581006
+    ],
+    "next": [
+      "D"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1169.7146124116894,
+      749.4365981405716
+    ],
+    "next": [
+      "E",
+      "F"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      975.8658363398279,
+      435.06313213741976
+    ],
+    "next": [
+      "F",
+      "G"
+    ]
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1320.2255060309703,
+      915.5318653769235
+    ],
+    "next": [
+      "H"
+    ]
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      892.4583762583416,
+      614.8659048914967
+    ],
+    "next": [
+      "I"
+    ]
+  },
+  "G": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      495.95115762491963,
+      525.3937705535767
+    ],
+    "next": [
+      "I",
+      "J"
+    ]
+  },
+  "H": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      1588.685328973883,
+      884.6731884765442
+    ],
+    "next": []
+  },
+  "I": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      524.8446407610601,
+      915.5884326423525
+    ],
+    "next": []
+  },
+  "J": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      181.2731217990133,
+      613.5162493748934
+    ],
+    "next": []
+  }
+}

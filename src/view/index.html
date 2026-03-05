@@ -83,7 +83,10 @@
         <!-- 左列：方案信息 + 节点路线 + 操作 -->
         <div class="plan-left">
           <div class="card plan-header">
-            <h2 id="plan-map-name"></h2>
+            <div class="plan-header-top">
+              <h2 id="plan-map-name"></h2>
+              <button class="btn btn-small btn-close-plan" id="btn-close-plan" title="关闭方案">✕</button>
+            </div>
             <span class="badge" id="plan-file-name"></span>
             <div class="plan-meta">
               <span>修理策略：<strong id="plan-repair"></strong></span>
@@ -109,6 +112,9 @@
         <div class="plan-right">
           <div id="node-editor-placeholder" class="card node-editor-placeholder">
             <p>← 点击左侧节点查看/编辑设置</p>
+          </div>
+          <div id="node-info" class="card node-info" style="display:none">
+            <!-- 由 PlanPreviewView.showNodeInfo() 动态填充 -->
           </div>
           <div id="node-editor" class="card node-editor" style="display:none">
             <div class="node-editor-header">

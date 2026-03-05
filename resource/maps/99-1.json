@@ -1,0 +1,65 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [100, 400],
+    "next": ["A", "B"]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [300, 250],
+    "next": ["C", "D"]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": true,
+    "night": false,
+    "position": [300, 550],
+    "next": ["D"]
+  },
+  "C": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [500, 150],
+    "next": ["E"]
+  },
+  "D": {
+    "type": "Penalty",
+    "detour": false,
+    "night": false,
+    "position": [500, 400],
+    "next": ["E", "F"]
+  },
+  "E": {
+    "type": "Aerial",
+    "detour": false,
+    "night": false,
+    "position": [700, 200],
+    "next": ["G"]
+  },
+  "F": {
+    "type": "Suppress",
+    "detour": false,
+    "night": true,
+    "position": [700, 500],
+    "next": ["G", "H"]
+  },
+  "G": {
+    "type": "Hard",
+    "detour": false,
+    "night": true,
+    "position": [900, 300],
+    "next": ["H"]
+  },
+  "H": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [1100, 400],
+    "next": []
+  }
+}

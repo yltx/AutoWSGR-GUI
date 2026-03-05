@@ -355,11 +355,27 @@ body {
 }
 
 /* ═══ Plan 预览 ═══ */
+.plan-header-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
 .plan-header h2 {
   font-size: 22px;
   font-weight: 700;
   margin-bottom: 10px;
   letter-spacing: -0.02em;
+}
+
+.btn-close-plan {
+  flex-shrink: 0;
+  margin-left: 12px;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.btn-close-plan:hover {
+  opacity: 1;
 }
 
 .badge {
@@ -451,6 +467,180 @@ body {
 .node-chip .night-icon {
   color: var(--warning);
   font-size: 11px;
+}
+
+/* ═══ 节点类型徽章 ═══ */
+.node-type-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.node-type-badge svg {
+  width: 12px;
+  height: 12px;
+}
+
+.detour-icon {
+  color: #8b5cf6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stop-icon {
+  font-size: 11px;
+}
+
+/* ── Boss 节点 ── */
+.node-chip.node-type-boss {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.08);
+}
+.node-chip.node-type-boss .node-id {
+  color: #ef4444;
+}
+.node-chip.node-type-boss .node-type-badge {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ── 资源节点 ── */
+.node-chip.node-type-resource {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.node-chip.node-type-resource .node-id {
+  color: #d97706;
+}
+.node-chip.node-type-resource .node-type-badge {
+  background: #f59e0b;
+  color: #fff;
+}
+
+/* ── 起始节点 ── */
+.node-chip.node-type-start {
+  border-color: #10b981;
+  background: rgba(16, 185, 129, 0.08);
+}
+.node-chip.node-type-start .node-id {
+  color: #10b981;
+}
+.node-chip.node-type-start .node-type-badge {
+  background: #10b981;
+  color: #fff;
+}
+
+/* ── 罚节点 ── */
+.node-chip.node-type-penalty {
+  border-color: #6b7280;
+  background: rgba(107, 114, 128, 0.08);
+}
+.node-chip.node-type-penalty .node-id {
+  color: #6b7280;
+}
+.node-chip.node-type-penalty .node-type-badge {
+  background: #6b7280;
+  color: #fff;
+}
+
+/* ── 航空制压 ── */
+.node-chip.node-type-suppress {
+  border-color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.08);
+}
+.node-chip.node-type-suppress .node-id {
+  color: #8b5cf6;
+}
+.node-chip.node-type-suppress .node-type-badge {
+  background: #8b5cf6;
+  color: #fff;
+}
+
+/* ── 空袭节点 ── */
+.node-chip.node-type-aerial {
+  border-color: #06b6d4;
+  background: rgba(6, 182, 212, 0.08);
+}
+.node-chip.node-type-aerial .node-id {
+  color: #06b6d4;
+}
+.node-chip.node-type-aerial .node-type-badge {
+  background: #06b6d4;
+  color: #fff;
+}
+
+/* ── 精英节点 ── */
+.node-chip.node-type-hard {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.08);
+}
+.node-chip.node-type-hard .node-id {
+  color: #dc2626;
+}
+.node-chip.node-type-hard .node-type-badge {
+  background: #dc2626;
+  color: #fff;
+}
+
+/* ── 迂回标记 ── */
+.node-chip.is-detour {
+  border-style: dashed;
+}
+
+/* ═══ 非战斗节点信息面板 ═══ */
+.node-info {
+  padding: 24px;
+}
+.node-info-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.node-info-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.node-info-header .btn {
+  margin-left: auto;
+}
+.node-info-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.node-info-badge svg {
+  width: 22px;
+  height: 22px;
+}
+.node-info-badge.node-type-start { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.node-info-badge.node-type-resource { background: rgba(245, 158, 11, 0.15); color: #d97706; }
+.node-info-badge.node-type-penalty { background: rgba(107, 114, 128, 0.15); color: #6b7280; }
+.node-info-badge.node-type-boss { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.node-info-badge.node-type-suppress { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+.node-info-badge.node-type-aerial { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+.node-info-badge.node-type-hard { background: rgba(220, 38, 38, 0.15); color: #dc2626; }
+.node-info-type {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.node-info-desc {
+  margin: 16px 0 8px;
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.7;
+}
+.node-info-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 /* ═══ Plan 操作 ═══ */

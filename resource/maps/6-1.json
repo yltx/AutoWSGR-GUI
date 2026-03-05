@@ -1,0 +1,154 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      1343.6121209658752,
+      943.5915974916717
+    ],
+    "next": [
+      "A",
+      "B",
+      "C"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      779.1252479997423,
+      930.6722888875564
+    ],
+    "next": [
+      "D"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1049.8094175629847,
+      704.6818322020947
+    ],
+    "next": [
+      "E"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1261.6854535238924,
+      674.9212916441194
+    ],
+    "next": [
+      "F"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      465.36203850669347,
+      734.6327116409936
+    ],
+    "next": [
+      "G",
+      "H"
+    ]
+  },
+  "E": {
+    "type": "Normal",
+    "detour": true,
+    "night": false,
+    "position": [
+      779.7238074282558,
+      733.1632417820185
+    ],
+    "next": [
+      "D"
+    ]
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      930.7679155112329,
+      448.505845587762
+    ],
+    "next": [
+      "H",
+      "I"
+    ]
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      276.5902029308818,
+      944.8158372702519
+    ],
+    "next": []
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      495.6992709468046,
+      451.03172843322625
+    ],
+    "next": [
+      "J",
+      "K",
+      "L"
+    ]
+  },
+  "I": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      885.9367320014402,
+      224.38611264210996
+    ],
+    "next": []
+  },
+  "J": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      164.98617133663652,
+      629.9888423986445
+    ],
+    "next": []
+  },
+  "K": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      285.5854940668296,
+      301.69759898361383
+    ],
+    "next": []
+  },
+  "L": {
+    "type": "Penalty",
+    "detour": false,
+    "night": false,
+    "position": [
+      658.2147121680047,
+      194.76074579300723
+    ],
+    "next": []
+  }
+}

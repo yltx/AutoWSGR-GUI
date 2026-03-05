@@ -32,6 +32,8 @@ import {
   type TaskPreset,
   type EnemyRule,
 } from '../model/types';
+import { loadMapData, getNodeType, isDetourNode } from '../model/MapDataLoader';
+import type { MapData } from '../model/MapDataLoader';
 
 /** 通过 preload 注入的 IPC 桥 */
 interface ElectronBridge {
@@ -87,6 +89,7 @@ export class AppController {
 
   private configModel: ConfigModel;
   private currentPlan: PlanModel | null = null;
+  private currentMapData: MapData | null = null;
 
   // ── 调度相关 ──
   private api: ApiClient;
@@ -343,6 +346,7 @@ export class AppController {
     // 导入 Plan 按钮 (主页 + 预览页各一个)
     document.getElementById('btn-import-plan')?.addEventListener('click', () => this.importPlan());
     document.getElementById('btn-import-plan-2')?.addEventListener('click', () => this.importPlan());
+    document.getElementById('btn-close-plan')?.addEventListener('click', () => this.closePlan());
 
     // 执行 Plan
     document.getElementById('btn-execute-plan')?.addEventListener('click', () => this.executePlan());
@@ -371,9 +375,20 @@ export class AppController {
       this.renderMain();
     };
 
-    // 节点编辑：点击节点 chip → 打开编辑面板
+    // 节点编辑：点击节点 chip → 打开编辑或信息面板
     this.planView.onNodeClick = (nodeId) => {
       if (!this.currentPlan) return;
+
+      // 检查节点类型，非战斗节点显示信息面板
+      const mapData = this.currentMapData;
+      const nodeType = mapData ? getNodeType(mapData, nodeId) : 'Normal';
+      const NON_COMBAT: Set<string> = new Set(['Start', 'Resource', 'Penalty']);
+      if (NON_COMBAT.has(nodeType)) {
+        this.editingNodeId = null;
+        this.planView.showNodeInfo(nodeId, nodeType);
+        return;
+      }
+
       this.editingNodeId = nodeId;
       const args = this.currentPlan.getNodeArgs(nodeId);
       const rulesText = (args.enemy_rules ?? [])
@@ -497,6 +512,8 @@ export class AppController {
 
       // 否则当作战斗方案
       this.currentPlan = PlanModel.fromYaml(result.content, result.path);
+      // 加载对应的地图数据
+      this.currentMapData = await loadMapData(this.currentPlan.data.chapter, this.currentPlan.data.map);
       this.renderPlanPreview();
       this.switchPage('plan');
     } catch (e) {
@@ -662,6 +679,14 @@ export class AppController {
     this.mainView.render(vo);
   }
 
+  private closePlan(): void {
+    this.currentPlan = null;
+    this.currentMapData = null;
+    this.editingNodeId = null;
+    this.planView.render(null);
+    this.planView.hideNodeEditor();
+  }
+
   private renderPlanPreview(): void {
     if (!this.currentPlan) {
       this.planView.render(null);
@@ -669,6 +694,7 @@ export class AppController {
     }
 
     const plan = this.currentPlan;
+    const mapData = this.currentMapData;
     const nodes: NodeViewObject[] = plan.data.selected_nodes.map((nodeId) => {
       const args = plan.getNodeArgs(nodeId);
       return {
@@ -678,6 +704,8 @@ export class AppController {
         proceed: args.proceed ?? true,
         hasCustomRules: plan.hasCustomArgs(nodeId),
         note: '',
+        nodeType: mapData ? getNodeType(mapData, nodeId) : 'Normal',
+        detour: mapData ? isDetourNode(mapData, nodeId) : false,
       };
     });
 

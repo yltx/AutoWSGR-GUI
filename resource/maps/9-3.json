@@ -1,0 +1,192 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      660.7576451855128,
+      239.2546903431207
+    ],
+    "next": [
+      "A",
+      "B",
+      "C"
+    ]
+  },
+  "A": {
+    "type": "Aerial",
+    "detour": false,
+    "night": false,
+    "position": [
+      990.3928738208414,
+      149.92066557993223
+    ],
+    "next": [
+      "D"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      856.4146552369215,
+      570.2257234052728
+    ],
+    "next": [
+      "H",
+      "I"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1124.771848528775,
+      360.8990699770466
+    ],
+    "next": [
+      "I",
+      "K"
+    ]
+  },
+  "D": {
+    "type": "Aerial",
+    "detour": false,
+    "night": false,
+    "position": [
+      1320.0909757770173,
+      165.15858724921964
+    ],
+    "next": [
+      "E",
+      "F",
+      "G"
+    ]
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1738.5166872107109,
+      165.21145382775268
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1664.2945958227717,
+      299.89221727902594
+    ],
+    "next": [
+      "J"
+    ]
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1486.5396544787404,
+      434.1722973772852
+    ],
+    "next": [
+      "J",
+      "K"
+    ]
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      524.9228164287343,
+      734.6789237493449
+    ],
+    "next": []
+  },
+  "I": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1184.9531468100024,
+      690.6064326047033
+    ],
+    "next": [
+      "N"
+    ]
+  },
+  "J": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1830.0256687837914,
+      629.4570843999924
+    ],
+    "next": [
+      "L"
+    ]
+  },
+  "K": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1425.9470431410734,
+      751.7609990266517
+    ],
+    "next": [
+      "M",
+      "N"
+    ]
+  },
+  "L": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1693.9113475704348,
+      884.6267005367259
+    ],
+    "next": []
+  },
+  "M": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1290.3172509026801,
+      1019.4507322735534
+    ],
+    "next": []
+  },
+  "N": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      1065.072756953479,
+      960.129559463695
+    ],
+    "next": [
+      "O"
+    ]
+  },
+  "O": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      614.385228760604,
+      915.8265664166115
+    ],
+    "next": []
+  }
+}

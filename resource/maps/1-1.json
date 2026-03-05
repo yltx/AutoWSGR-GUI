@@ -1,0 +1,47 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      342.0496268013302,
+      623.8015088901824
+    ],
+    "next": [
+      "A"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      568.8014005840529,
+      564.4882165006527
+    ],
+    "next": [
+      "B",
+      "C"
+    ]
+  },
+  "B": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      780.1705691983113,
+      356.0096039033276
+    ],
+    "next": []
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      790.5479138661225,
+      628.4413764122166
+    ],
+    "next": []
+  }
+}
