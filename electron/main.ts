@@ -237,12 +237,11 @@ ipcMain.handle('get-app-root', () => {
 });
 
 ipcMain.handle('check-environment', async () => {
-  await ensureSubmodule();
   return await checkEnvironment();
 });
 
 ipcMain.handle('check-updates', async () => {
-  return checkForUpdates();
+  return await checkForUpdates();
 });
 
 ipcMain.handle('install-deps', async () => {
@@ -280,69 +279,7 @@ function sendProgress(msg: string): void {
   mainWindow?.webContents.send('backend-log', msg);
 }
 
-/** 确保后端代码已就绪 (git submodule 或 curl 下载) */
-async function ensureSubmodule(): Promise<void> {
-  const submodDir = path.join(appRoot(), 'autowsgr');
-  const marker = path.join(submodDir, 'pyproject.toml');
-  if (fs.existsSync(marker)) {
-    sendProgress('后端代码已就绪 ✓');
-    return;
-  }
 
-  sendProgress('正在下载后端代码…');
-
-  // 先尝试 git submodule
-  try {
-    await execAsync('git --version', { windowsHide: true });
-    const gitDir = path.join(appRoot(), '.git');
-    if (fs.existsSync(gitDir)) {
-      await execAsync('git submodule update --init', {
-        cwd: appRoot(),
-        windowsHide: true,
-        timeout: 60000,
-      });
-      if (fs.existsSync(marker)) {
-        sendProgress('后端代码下载完成 ✓');
-        return;
-      }
-    }
-  } catch { /* git 不可用, 使用 curl 下载 */ }
-
-  // 降级: 用 curl 下载 zip (spawn 避免 exec 超时限制)
-  try {
-    const zipPath = path.join(app.getPath('temp'), 'autowsgr.zip');
-    const extractDir = path.join(app.getPath('temp'), 'autowsgr_extract');
-    await new Promise<void>((resolve, reject) => {
-      const curl = spawn('curl', [
-        '-L', '-o', zipPath,
-        '--connect-timeout', '30',
-        '--max-time', '600',
-        'https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip',
-      ], { windowsHide: true, stdio: 'pipe' });
-      curl.stderr?.on('data', (d: Buffer) => {
-        const line = d.toString().trim();
-        if (line) sendProgress(`  下载: ${line.slice(-80)}`);
-      });
-      curl.on('close', (code) => code === 0 ? resolve() : reject(new Error(`curl exit ${code}`)));
-      curl.on('error', reject);
-    });
-    sendProgress('正在解压后端代码…');
-    await execAsync(
-      `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`,
-      { windowsHide: true, timeout: 60000 },
-    );
-    const entries = fs.readdirSync(extractDir);
-    const autoDir = entries.find(e => e.startsWith('AutoWSGR-'));
-    if (autoDir) {
-      fs.renameSync(path.join(extractDir, autoDir), submodDir);
-    }
-    try { fs.unlinkSync(zipPath); } catch { /* ignore */ }
-    try { fs.rmSync(extractDir, { recursive: true }); } catch { /* ignore */ }
-    sendProgress('后端代码下载完成 ✓');
-  } catch (e) {
-    sendProgress(`WARNING 后端代码下载失败: ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
 
 /** 查找可用的 Python 可执行文件 (优先本地便携版) */
 async function findPython(): Promise<string | null> {
@@ -444,16 +381,18 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   } catch { /* ignore */ }
 
   sendProgress('正在检查依赖包…');
-  const requiredPackages = ['uvicorn', 'fastapi', 'autowsgr.server.main'];
+  const requiredPackages = ['uvicorn', 'fastapi', 'autowsgr'];
   const missingPackages: string[] = [];
   for (const pkg of requiredPackages) {
-    const displayName = pkg.split('.')[0];
     try {
-      await execAsync(`"${pythonCmd}" -c "import ${pkg}"`, { windowsHide: true });
-      sendProgress(`  ${displayName} ✓`);
+      await execAsync(`"${pythonCmd}" -c "import ${pkg}"`, {
+        windowsHide: true,
+        env: pipEnv(),
+      });
+      sendProgress(`  ${pkg} ✓`);
     } catch {
-      missingPackages.push(displayName);
-      sendProgress(`  ${displayName} ✗`);
+      missingPackages.push(pkg);
+      sendProgress(`  ${pkg} ✗`);
     }
   }
   // 去重 (autowsgr 可能被多次加入)
@@ -479,42 +418,40 @@ interface UpdateCheckResult {
   remoteUrl: string;
 }
 
-/** 检查 git 仓库是否有可用更新 (检查后端 submodule) */
-function checkForUpdates(): UpdateCheckResult {
-  const cwd = path.join(appRoot(), 'autowsgr');
+/** 检查 autowsgr 包是否有可用更新 (对比本地已安装版本与 PyPI 最新版) */
+async function checkForUpdates(): Promise<UpdateCheckResult> {
   const result: UpdateCheckResult = {
     gitAvailable: false,
     hasUpdates: false,
     currentBranch: '',
     behindCount: 0,
-    remoteUrl: '',
+    remoteUrl: 'https://pypi.org/project/autowsgr/',
   };
 
-  try {
-    // 检查 git 可用性
-    execSync('git --version', { cwd, encoding: 'utf-8', windowsHide: true });
-    result.gitAvailable = true;
-  } catch {
-    return result;
-  }
+  const pythonCmd = await findPython();
+  if (!pythonCmd) return result;
+
+  result.gitAvailable = true; // reuse field: means "can check updates"
 
   try {
-    result.currentBranch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf-8', windowsHide: true }).trim();
-    result.remoteUrl = execSync('git remote get-url origin', { cwd, encoding: 'utf-8', windowsHide: true }).trim();
+    // 获取已安装版本
+    const { stdout: localVer } = await execAsync(
+      `"${pythonCmd}" -c "import autowsgr; print(autowsgr.__version__)"`,
+      { windowsHide: true, env: pipEnv() },
+    );
+    result.currentBranch = localVer.trim(); // reuse field: current version
 
-    // fetch (静默失败, 可能无网络)
-    try {
-      execSync('git fetch origin --quiet', { cwd, encoding: 'utf-8', windowsHide: true, timeout: 10000 });
-    } catch { /* 无网络时跳过 */ }
-
-    // 比较本地与远端
-    const behindStr = execSync(
-      `git rev-list --count HEAD..origin/${result.currentBranch}`,
-      { cwd, encoding: 'utf-8', windowsHide: true },
-    ).trim();
-    result.behindCount = parseInt(behindStr, 10) || 0;
-    result.hasUpdates = result.behindCount > 0;
-  } catch { /* 非 git 仓库或其他错误 */ }
+    // 获取 PyPI 最新版本
+    const { stdout: pipOut } = await execAsync(
+      `"${pythonCmd}" -m pip index versions autowsgr`,
+      { windowsHide: true, timeout: 15000, env: pipEnv() },
+    );
+    const m = pipOut.match(/LATEST:\s*(\S+)/i) || pipOut.match(/versions:\s*(\S+)/i);
+    if (m) {
+      const latestVer = m[1].replace(/,$/,'');
+      result.hasUpdates = latestVer !== result.currentBranch;
+    }
+  } catch { /* ignore */ }
 
   return result;
 }
@@ -524,7 +461,30 @@ function isLocalPython(pythonCmd: string): boolean {
   return path.isAbsolute(pythonCmd) && pythonCmd.startsWith(appRoot());
 }
 
-/** 自动安装依赖 (pip install -e ./autowsgr)，依赖保存在项目目录 */
+/** pip 命令的公共环境变量 */
+function pipEnv(): NodeJS.ProcessEnv {
+  return {
+    ...process.env,
+    PYTHONUSERBASE: path.join(appRoot(), 'python'),
+  };
+}
+
+/** 同步查找 Python (用于非 async 上下文) */
+function findPythonSync(): string | null {
+  const localPython = path.join(appRoot(), 'python', 'python.exe');
+  if (fs.existsSync(localPython)) return localPython;
+  try {
+    execSync('python --version', { windowsHide: true });
+    return 'python';
+  } catch { /* continue */ }
+  try {
+    execSync('python3 --version', { windowsHide: true });
+    return 'python3';
+  } catch { /* continue */ }
+  return null;
+}
+
+/** 自动安装依赖 (pip install autowsgr)，依赖保存在项目目录 */
 function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
     const cwd = appRoot();
@@ -538,7 +498,7 @@ function installDependencies(pythonCmd: string): Promise<{ success: boolean; out
       // 全局 Python: 用 --user 配合 PYTHONUSERBASE 装到项目目录
       pipArgs.push('--user');
     }
-    pipArgs.push('-e', './autowsgr');
+    pipArgs.push('autowsgr');
     const proc = spawn(pythonCmd, pipArgs, {
       cwd,
       windowsHide: true,
@@ -563,17 +523,33 @@ function installDependencies(pythonCmd: string): Promise<{ success: boolean; out
   });
 }
 
-/** 拉取更新 (更新后端 submodule) */
+/** 更新 autowsgr 包 (pip install --upgrade) */
 function pullUpdates(): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
-    const cwd = path.join(appRoot(), 'autowsgr');
-    try {
-      const branch = execSync('git rev-parse --abbrev-ref HEAD', { cwd, encoding: 'utf-8', windowsHide: true }).trim();
-      const output = execSync(`git pull origin ${branch}`, { cwd, encoding: 'utf-8', windowsHide: true, timeout: 30000 });
-      resolve({ success: true, output: output.trim() });
-    } catch (e) {
-      resolve({ success: false, output: e instanceof Error ? e.message : String(e) });
+    const pythonCmd = findPythonSync();
+    if (!pythonCmd) {
+      resolve({ success: false, output: '找不到 Python' });
+      return;
     }
+    const useLocal = isLocalPython(pythonCmd);
+    const pipArgs = ['-m', 'pip', 'install', '--upgrade'];
+    pipArgs.push(useLocal ? '--no-user' : '--user');
+    pipArgs.push('autowsgr');
+    const proc = spawn(pythonCmd, pipArgs, {
+      cwd: appRoot(),
+      windowsHide: true,
+      stdio: 'pipe',
+      env: pipEnv(),
+    });
+    let output = '';
+    proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
+    proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
+    proc.on('close', (code) => {
+      resolve({ success: code === 0, output: output.slice(-500) });
+    });
+    proc.on('error', (err) => {
+      resolve({ success: false, output: err.message });
+    });
   });
 }
 

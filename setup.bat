@@ -3,8 +3,6 @@ setlocal EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
 set "PYTHON_VERSION=3.12.8"
-set "BACKEND_REPO=OpenWSGR/AutoWSGR"
-set "BACKEND_BRANCH=main"
 
 set "IS_PACKAGED=0"
 if exist "%SCRIPT_DIR%..\AutoWSGR-GUI.exe" (
@@ -86,35 +84,11 @@ echo       OK: Python %PYTHON_VERSION% portable installed
 
 :python_ok
 
-:: --- Backend Code ---
-echo [2/3] Checking backend code...
-
-set "BACKEND_DIR=%APP_DIR%\autowsgr"
-if exist "%BACKEND_DIR%\pyproject.toml" (
-    echo       OK: backend code exists
-) else (
-    set "BACKEND_ZIP_URL=https://github.com/%BACKEND_REPO%/archive/refs/heads/%BACKEND_BRANCH%.zip"
-    echo       Downloading from: !BACKEND_ZIP_URL!
-    curl -L -o "%TEMP_DIR%\autowsgr.zip" "!BACKEND_ZIP_URL!"
-    if !errorlevel! neq 0 (
-        echo       FAILED: download backend failed, check network
-        goto :error
-    )
-    echo       Extracting...
-    if exist "%BACKEND_DIR%" rmdir /s /q "%BACKEND_DIR%"
-    powershell -NoProfile -Command "Expand-Archive -Path '%TEMP_DIR%\autowsgr.zip' -DestinationPath '%TEMP_DIR%\backend_extract' -Force"
-    for /d %%d in ("%TEMP_DIR%\backend_extract\AutoWSGR-*") do (
-        move "%%d" "%BACKEND_DIR%" >nul
-    )
-    echo       OK: backend code downloaded
-)
-
 :: --- Python Dependencies ---
-echo [3/3] Installing Python dependencies...
+echo [2/2] Installing Python dependencies...
 
 :: Keep all deps local via PYTHONUSERBASE
 set "PYTHONUSERBASE=%APP_DIR%\python"
-pushd "%APP_DIR%"
 
 :: Determine pip install mode: local Python uses --no-user, system Python uses --user
 set "PIP_SCOPE=--no-user"
@@ -124,14 +98,12 @@ if !errorlevel! neq 0 (
 )
 
 "!PYTHON_EXE!" -m pip install !PIP_SCOPE! --upgrade pip 2>nul
-"!PYTHON_EXE!" -m pip install !PIP_SCOPE! -e "./autowsgr"
+"!PYTHON_EXE!" -m pip install !PIP_SCOPE! autowsgr
 if !errorlevel! neq 0 (
-    echo       FAILED: pip install failed
-    popd
+    echo       FAILED: pip install autowsgr failed
     goto :error
 )
-echo       OK: Python dependencies installed
-popd
+echo       OK: autowsgr installed
 
 :: --- Cleanup ---
 echo.

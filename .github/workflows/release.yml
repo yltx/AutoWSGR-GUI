@@ -23,21 +23,6 @@ jobs:
       - name: Checkout frontend
         uses: actions/checkout@v4
 
-      - name: Download backend source
-        shell: pwsh
-        run: |
-          $zipUrl = "https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip"
-          $zipFile = "$env:TEMP\autowsgr.zip"
-          $extractDir = "$env:TEMP\autowsgr_extract"
-          Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile
-          Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
-          $srcDir = Get-ChildItem -Path $extractDir -Directory | Where-Object { $_.Name -like "AutoWSGR-*" } | Select-Object -First 1
-          if ($srcDir) {
-            Move-Item -Path $srcDir.FullName -Destination "autowsgr" -Force
-          }
-          Remove-Item $zipFile -ErrorAction SilentlyContinue
-          Remove-Item $extractDir -Recurse -ErrorAction SilentlyContinue
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
