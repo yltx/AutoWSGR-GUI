@@ -567,6 +567,13 @@ export class AppController {
     let req: TaskRequest;
     const times = preset.times ?? 1;
 
+    // 将相对 plan_id 解析为绝对路径 (相对于预设文件所在目录)
+    let resolvedPlanId = preset.plan_id ?? null;
+    if (resolvedPlanId && !/^[A-Za-z]:[/\\]/.test(resolvedPlanId) && !resolvedPlanId.startsWith('/')) {
+      const dir = filePath.replace(/[\\/][^\\/]+$/, '');
+      resolvedPlanId = dir + '\\' + resolvedPlanId.replace(/\//g, '\\');
+    }
+
     switch (preset.task_type) {
       case 'exercise':
         req = { type: 'exercise', fleet_id: preset.fleet_id ?? 1 };
@@ -586,7 +593,7 @@ export class AppController {
       case 'event_fight':
         req = {
           type: 'event_fight',
-          plan_id: preset.plan_id ?? null,
+          plan_id: resolvedPlanId,
           times: 1,
           gap: preset.gap ?? 0,
           fleet_id: preset.fleet_id ?? null,
@@ -596,24 +603,33 @@ export class AppController {
       default:
         req = {
           type: 'normal_fight',
-          plan_id: preset.plan_id ?? null,
+          plan_id: resolvedPlanId,
           times: 1,
           gap: preset.gap ?? 0,
         };
         break;
     }
 
+    const effectiveTimes = preset.task_type === 'exercise' || preset.task_type === 'decisive' ? 1 : times;
+    const stopCondition = preset.stop_condition;
+
     this.scheduler.addTask(
       name,
       preset.task_type,
       req,
       TaskPriority.USER_TASK,
-      preset.task_type === 'exercise' || preset.task_type === 'decisive' ? 1 : times,
+      effectiveTimes,
+      stopCondition,
     );
 
     this.switchPage('main');
     this.renderMain();
-    this.appendLocalLog('info', `任务「${name}」已加入队列 (×${preset.task_type === 'exercise' || preset.task_type === 'decisive' ? 1 : times})`);
+
+    const parts: string[] = [];
+    if (effectiveTimes > 1 || stopCondition) parts.push(`×${effectiveTimes}`);
+    if (stopCondition?.loot_count_ge) parts.push(`战利品≥${stopCondition.loot_count_ge}时停止`);
+    if (stopCondition?.ship_count_ge) parts.push(`舰船≥${stopCondition.ship_count_ge}时停止`);
+    this.appendLocalLog('info', `任务「${name}」已加入队列${parts.length ? ' (' + parts.join(', ') + ')' : ''}`);
   }
 
   // ════════════════════════════════════════

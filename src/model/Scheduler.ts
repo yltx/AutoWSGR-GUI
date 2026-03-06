@@ -20,6 +20,7 @@ import {
   type WsTaskCompleted,
   type TaskResult,
 } from './ApiClient';
+import type { StopCondition } from './types';
 
 // ════════════════════════════════════════
 // 任务队列项
@@ -50,6 +51,8 @@ export interface SchedulerTask {
   remainingTimes: number;
   /** 后端返回的 task_id (仅当前正在运行的任务有值) */
   backendTaskId?: string;
+  /** 可选的停止条件: 每轮完成后检查，满足则不再后触发 */
+  stopCondition?: StopCondition;
 }
 
 // ════════════════════════════════════════
@@ -183,6 +186,7 @@ export class Scheduler {
     request: TaskRequest,
     priority: TaskPriority = TaskPriority.USER_TASK,
     times: number = 1,
+    stopCondition?: StopCondition,
   ): string {
     const id = generateTaskId();
     const task: SchedulerTask = {
@@ -192,6 +196,7 @@ export class Scheduler {
       priority,
       request,
       remainingTimes: times,
+      stopCondition,
     };
 
     // 按优先级插入队列
@@ -263,7 +268,7 @@ export class Scheduler {
   }
 
   /** 任务完成后的后触发处理 */
-  private handleTaskFinished(success: boolean, result?: TaskResult | null, error?: string | null): void {
+  private async handleTaskFinished(success: boolean, result?: TaskResult | null, error?: string | null): Promise<void> {
     const finished = this.currentTask;
     if (!finished) return;
 
@@ -271,6 +276,17 @@ export class Scheduler {
 
     // 后触发: 如果还有剩余次数，追加一个新任务回队列
     if (success && finished.remainingTimes > 1) {
+      // 检查停止条件
+      if (finished.stopCondition) {
+        const shouldStop = await this.checkStopCondition(finished.stopCondition, finished.name);
+        if (shouldStop) {
+          this.emitLog('info', `任务「${finished.name}」满足停止条件，不再继续`);
+          this.currentTask = null;
+          this.consumeNext();
+          return;
+        }
+      }
+
       const followUp: SchedulerTask = {
         id: generateTaskId(),
         name: finished.name,
@@ -278,6 +294,7 @@ export class Scheduler {
         priority: finished.priority,
         request: finished.request,
         remainingTimes: finished.remainingTimes - 1,
+        stopCondition: finished.stopCondition,
       };
       this.insertByPriority(followUp);
     }
@@ -285,6 +302,27 @@ export class Scheduler {
     this.currentTask = null;
     // 继续消费下一个任务
     this.consumeNext();
+  }
+
+  /** 检查停止条件是否满足 */
+  private async checkStopCondition(cond: StopCondition, taskName: string): Promise<boolean> {
+    try {
+      const resp = await this.api.gameAcquisition();
+      if (!resp.success || !resp.data) return false;
+      const data = resp.data;
+
+      if (cond.loot_count_ge != null && data.loot_count != null && data.loot_count >= cond.loot_count_ge) {
+        this.emitLog('info', `战利品已达 ${data.loot_count}/${data.loot_max ?? '?'}，满足停止条件 (≥${cond.loot_count_ge})`);
+        return true;
+      }
+      if (cond.ship_count_ge != null && data.ship_count != null && data.ship_count >= cond.ship_count_ge) {
+        this.emitLog('info', `舰船获取已达 ${data.ship_count}/${data.ship_max ?? '?'}，满足停止条件 (≥${cond.ship_count_ge})`);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   // ── 内部: 优先级插入 ──

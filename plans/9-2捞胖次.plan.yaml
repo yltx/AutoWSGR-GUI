@@ -1,0 +1,47 @@
+# 作战计划: 9-2 捞胖次
+# 编队 1, 梯形阵
+# 迂回点 (A D G H M): 有活动补给舰(AP)梯形阵战斗, 无则迂回
+# E K O: 无活动补给舰撤退, 有则梯形阵战斗
+
+chapter: 9
+map: 2
+selected_nodes: [A, D, G, H, M, O, E, K]
+fight_condition: 1
+repair_mode: 1
+fleet_id: 1
+
+node_defaults:
+  formation: 4
+  night: false
+  proceed: true
+
+node_args:
+  A:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  D:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  G:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  H:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  M:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  E:
+    enemy_rules:
+      - [AP < 1, retreat]
+  K:
+    enemy_rules:
+      - [AP < 1, retreat]
+  O:
+    enemy_rules:
+      - [AP < 1, retreat]

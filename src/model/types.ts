@@ -87,6 +87,18 @@ export const REPAIR_MODE_NAMES: Record<number, string> = {
 };
 
 // ════════════════════════════════════════
+// 停止条件 (Stop Condition)
+// ════════════════════════════════════════
+
+/** 停止条件: 满足时自动终止任务循环 */
+export interface StopCondition {
+  /** 战利品数量达到上限时停止 */
+  loot_count_ge?: number;
+  /** 舰船获取数量达到上限时停止 */
+  ship_count_ge?: number;
+}
+
+// ════════════════════════════════════════
 // 任务预设 (Task Preset)
 // ════════════════════════════════════════
 
@@ -105,4 +117,6 @@ export interface TaskPreset {
   level1?: string[];
   level2?: string[];
   flagship_priority?: string[];
+  // 停止条件
+  stop_condition?: StopCondition;
 }

@@ -59,6 +59,20 @@ export interface SystemStatus {
   current_task: string | null;
 }
 
+export interface GameContextData {
+  dropped_ship_count: number;
+  dropped_loot_count: number;
+  quick_repair_used: number;
+  current_page: string | null;
+}
+
+export interface GameAcquisitionData {
+  ship_count: number | null;
+  ship_max: number | null;
+  loot_count: number | null;
+  loot_max: number | null;
+}
+
 // ════════════════════════════════════════
 // 请求体类型
 // ════════════════════════════════════════
@@ -241,6 +255,16 @@ export class ApiClient {
 
   async expeditionCheck(): Promise<ApiResponse> {
     return this.request('POST', '/api/expedition/check');
+  }
+
+  // ── 游戏状态查询 ──
+
+  async gameContext(): Promise<ApiResponse<GameContextData>> {
+    return this.request('GET', '/api/game/context');
+  }
+
+  async gameAcquisition(): Promise<ApiResponse<GameAcquisitionData>> {
+    return this.request('GET', '/api/game/acquisition');
   }
 
   // ── WebSocket ──

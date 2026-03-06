@@ -1,0 +1,10 @@
+# 任务预设: 9-2 捞胖次 (自动循环直到战利品 50/50)
+# 导入此文件后将自动开始循环，直到战利品达到 50 个
+
+task_type: normal_fight
+plan_id: 9-2捞胖次.plan.yaml
+times: 9999
+gap: 0
+
+stop_condition:
+  loot_count_ge: 50
