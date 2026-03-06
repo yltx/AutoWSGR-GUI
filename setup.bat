@@ -112,9 +112,11 @@ if exist "%BACKEND_DIR%\pyproject.toml" (
 :: --- Python Dependencies ---
 echo [3/3] Installing Python dependencies...
 
+:: Keep all deps local, never install to user/global dirs
+set "PYTHONUSERBASE=%APP_DIR%\python"
 pushd "%APP_DIR%"
-"!PYTHON_EXE!" -m pip install --upgrade pip 2>nul
-"!PYTHON_EXE!" -m pip install -e "./autowsgr"
+"!PYTHON_EXE!" -m pip install --no-user --upgrade pip 2>nul
+"!PYTHON_EXE!" -m pip install --no-user -e "./autowsgr"
 if !errorlevel! neq 0 (
     echo       FAILED: pip install failed
     popd

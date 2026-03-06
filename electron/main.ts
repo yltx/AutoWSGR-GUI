@@ -344,7 +344,11 @@ async function findPython(): Promise<string | null> {
       return localPython;
     } catch { /* local Python broken */ }
   }
-  // 回退到系统 Python
+  // 打包模式下仅使用本地 Python，避免污染用户全局环境
+  if (isPackaged()) {
+    return null;
+  }
+  // 开发模式回退到系统 Python
   for (const cmd of ['python', 'python3']) {
     try {
       await execAsync(`${cmd} --version`, { windowsHide: true });
@@ -509,20 +513,32 @@ function checkForUpdates(): UpdateCheckResult {
   return result;
 }
 
-/** 自动安装依赖 (pip install -e ./autowsgr) */
+/** 自动安装依赖 (pip install -e ./autowsgr)，依赖保存在本地 Python 目录 */
 function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
     const cwd = appRoot();
-    const proc = spawn(pythonCmd, ['-m', 'pip', 'install', '-e', './autowsgr'], {
+    sendProgress('正在安装后端依赖…');
+    const proc = spawn(pythonCmd, [
+      '-m', 'pip', 'install',
+      '--no-user',           // 不安装到用户目录
+      '-e', './autowsgr',
+    ], {
       cwd,
       windowsHide: true,
       stdio: 'pipe',
+      env: {
+        ...process.env,
+        // 将用户级别包目录也限定到项目内
+        PYTHONUSERBASE: path.join(cwd, 'python'),
+      },
     });
 
     let output = '';
     proc.stdout?.on('data', (data: Buffer) => { output += data.toString(); });
     proc.stderr?.on('data', (data: Buffer) => { output += data.toString(); });
     proc.on('close', (code) => {
+      if (code === 0) sendProgress('后端依赖安装完成 ✓');
+      else sendProgress('ERROR 依赖安装失败');
       resolve({ success: code === 0, output: output.slice(-500) });
     });
     proc.on('error', (err) => {
@@ -602,7 +618,12 @@ async function startBackend(): Promise<void> {
     cwd,
     windowsHide: true,
     stdio: 'pipe',
-    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+    env: {
+      ...process.env,
+      PYTHONUTF8: '1',
+      PYTHONIOENCODING: 'utf-8',
+      PYTHONUSERBASE: path.join(cwd, 'python'),
+    },
   });
 
   // ANSI 颜色码
