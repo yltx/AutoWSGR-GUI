@@ -385,7 +385,8 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   const missingPackages: string[] = [];
   for (const pkg of requiredPackages) {
     try {
-      await execAsync(`"${pythonCmd}" -c "import ${pkg}"`, {
+      // 用 pip show 检测安装状态，避免 import 时触发子模块加载失败
+      await execAsync(`"${pythonCmd}" -m pip show ${pkg}`, {
         windowsHide: true,
         env: pipEnv(),
       });
