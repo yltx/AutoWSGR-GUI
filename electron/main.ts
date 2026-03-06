@@ -308,18 +308,28 @@ async function ensureSubmodule(): Promise<void> {
     }
   } catch { /* git 不可用, 使用 curl 下载 */ }
 
-  // 降级: 用 curl 下载 zip
+  // 降级: 用 curl 下载 zip (spawn 避免 exec 超时限制)
   try {
     const zipPath = path.join(app.getPath('temp'), 'autowsgr.zip');
     const extractDir = path.join(app.getPath('temp'), 'autowsgr_extract');
-    await execAsync(
-      `curl -L -o "${zipPath}" "https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip"`,
-      { windowsHide: true, timeout: 120000 },
-    );
+    await new Promise<void>((resolve, reject) => {
+      const curl = spawn('curl', [
+        '-L', '-o', zipPath,
+        '--connect-timeout', '30',
+        '--max-time', '600',
+        'https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip',
+      ], { windowsHide: true, stdio: 'pipe' });
+      curl.stderr?.on('data', (d: Buffer) => {
+        const line = d.toString().trim();
+        if (line) sendProgress(`  下载: ${line.slice(-80)}`);
+      });
+      curl.on('close', (code) => code === 0 ? resolve() : reject(new Error(`curl exit ${code}`)));
+      curl.on('error', reject);
+    });
     sendProgress('正在解压后端代码…');
     await execAsync(
       `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`,
-      { windowsHide: true, timeout: 30000 },
+      { windowsHide: true, timeout: 60000 },
     );
     const entries = fs.readdirSync(extractDir);
     const autoDir = entries.find(e => e.startsWith('AutoWSGR-'));
@@ -329,8 +339,8 @@ async function ensureSubmodule(): Promise<void> {
     try { fs.unlinkSync(zipPath); } catch { /* ignore */ }
     try { fs.rmSync(extractDir, { recursive: true }); } catch { /* ignore */ }
     sendProgress('后端代码下载完成 ✓');
-  } catch {
-    sendProgress('WARNING 后端代码下载失败');
+  } catch (e) {
+    sendProgress(`WARNING 后端代码下载失败: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
@@ -344,11 +354,7 @@ async function findPython(): Promise<string | null> {
       return localPython;
     } catch { /* local Python broken */ }
   }
-  // 打包模式下仅使用本地 Python，避免污染用户全局环境
-  if (isPackaged()) {
-    return null;
-  }
-  // 开发模式回退到系统 Python
+  // 回退到系统全局 Python (依赖通过 PYTHONUSERBASE + --no-user 确保安装到项目目录)
   for (const cmd of ['python', 'python3']) {
     try {
       await execAsync(`${cmd} --version`, { windowsHide: true });
@@ -513,22 +519,32 @@ function checkForUpdates(): UpdateCheckResult {
   return result;
 }
 
-/** 自动安装依赖 (pip install -e ./autowsgr)，依赖保存在本地 Python 目录 */
+/** 判断是否使用本地便携版 Python */
+function isLocalPython(pythonCmd: string): boolean {
+  return path.isAbsolute(pythonCmd) && pythonCmd.startsWith(appRoot());
+}
+
+/** 自动安装依赖 (pip install -e ./autowsgr)，依赖保存在项目目录 */
 function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
   return new Promise((resolve) => {
     const cwd = appRoot();
+    const useLocal = isLocalPython(pythonCmd);
     sendProgress('正在安装后端依赖…');
-    const proc = spawn(pythonCmd, [
-      '-m', 'pip', 'install',
-      '--no-user',           // 不安装到用户目录
-      '-e', './autowsgr',
-    ], {
+    const pipArgs = ['-m', 'pip', 'install'];
+    if (useLocal) {
+      // 本地 Python: 直接装到其自带 site-packages
+      pipArgs.push('--no-user');
+    } else {
+      // 全局 Python: 用 --user 配合 PYTHONUSERBASE 装到项目目录
+      pipArgs.push('--user');
+    }
+    pipArgs.push('-e', './autowsgr');
+    const proc = spawn(pythonCmd, pipArgs, {
       cwd,
       windowsHide: true,
       stdio: 'pipe',
       env: {
         ...process.env,
-        // 将用户级别包目录也限定到项目内
         PYTHONUSERBASE: path.join(cwd, 'python'),
       },
     });
@@ -608,6 +624,9 @@ async function startBackend(): Promise<void> {
   }
 
   const cwd = appRoot();
+  // 全局 Python 时需通过 PYTHONPATH 找到 user-site 包
+  const userSiteDir = path.join(cwd, 'python');
+  const existingPyPath = process.env.PYTHONPATH || '';
   backendProcess = spawn(pythonCmd, [
     '-X', 'utf8',
     '-m', 'uvicorn',
@@ -622,7 +641,10 @@ async function startBackend(): Promise<void> {
       ...process.env,
       PYTHONUTF8: '1',
       PYTHONIOENCODING: 'utf-8',
-      PYTHONUSERBASE: path.join(cwd, 'python'),
+      PYTHONUSERBASE: userSiteDir,
+      PYTHONPATH: existingPyPath
+        ? `${existingPyPath}${path.delimiter}${userSiteDir}`
+        : userSiteDir,
     },
   });
 
