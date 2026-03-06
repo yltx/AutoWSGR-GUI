@@ -487,16 +487,23 @@ function findPythonSync(): string | null {
 
 /** 自动安装依赖 (pip install autowsgr)，依赖保存在项目目录 */
 function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
-  return new Promise((resolve) => {
+  return new Promise(async (resolve) => {
     const cwd = appRoot();
     const useLocal = isLocalPython(pythonCmd);
     sendProgress('正在安装后端依赖…');
+
+    // 先卸载可能存在的旧版/可编辑安装，确保从 PyPI 干净安装
+    try {
+      await execAsync(`"${pythonCmd}" -m pip uninstall -y autowsgr`, {
+        cwd, windowsHide: true, env: pipEnv(),
+      });
+      sendProgress('已清除旧版 autowsgr');
+    } catch { /* 未安装时忽略 */ }
+
     const pipArgs = ['-m', 'pip', 'install'];
     if (useLocal) {
-      // 本地 Python: 直接装到其自带 site-packages
       pipArgs.push('--no-user');
     } else {
-      // 全局 Python: 用 --user 配合 PYTHONUSERBASE 装到项目目录
       pipArgs.push('--user');
     }
     pipArgs.push('autowsgr');
@@ -504,10 +511,7 @@ function installDependencies(pythonCmd: string): Promise<{ success: boolean; out
       cwd,
       windowsHide: true,
       stdio: 'pipe',
-      env: {
-        ...process.env,
-        PYTHONUSERBASE: path.join(cwd, 'python'),
-      },
+      env: pipEnv(),
     });
 
     let output = '';
