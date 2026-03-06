@@ -58,7 +58,9 @@ interface ElectronBridge {
   installDeps: () => Promise<{ success: boolean; output: string }>;
   pullUpdates: () => Promise<{ success: boolean; output: string }>;
   startBackend: () => Promise<{ success: boolean; message: string }>;
+  runSetup: () => Promise<{ success: boolean; output: string }>;
   onBackendLog: (callback: (line: string) => void) => void;
+  onSetupLog: (callback: (text: string) => void) => void;
 }
 
 declare global {
@@ -175,15 +177,25 @@ export class AppController {
     this.waitForBackendAndConnect();
   }
 
-  /** 检查 Python 环境, 缺失依赖时自动安装 */
+  /** 检查 Python 环境, 缺失时自动运行 setup.bat */
   private async checkAndPrepareEnv(bridge: ElectronBridge): Promise<boolean> {
     this.appendLocalLog('info', '正在检查运行环境…');
 
     let env = await bridge.checkEnvironment();
 
     if (!env.pythonCmd) {
-      this.appendLocalLog('error', '未找到 Python，请安装 Python 3.12+ 并确保加入 PATH');
-      return false;
+      this.appendLocalLog('warn', '未找到 Python，正在运行环境安装脚本…');
+      const setupOk = await this.runSetupScript(bridge);
+      if (!setupOk) {
+        this.appendLocalLog('error', '环境安装失败，请手动运行 setup.bat 或安装 Python 3.12+');
+        return false;
+      }
+      // 重新检查
+      env = await bridge.checkEnvironment();
+      if (!env.pythonCmd) {
+        this.appendLocalLog('error', '安装后仍未检测到 Python，请重启应用重试');
+        return false;
+      }
     }
 
     this.appendLocalLog('info', `${env.pythonVersion} ✓`);
@@ -212,6 +224,31 @@ export class AppController {
 
     this.appendLocalLog('info', '依赖安装完成 ✓');
     return true;
+  }
+
+  /** 运行 setup.bat 安装环境 */
+  private async runSetupScript(bridge: ElectronBridge): Promise<boolean> {
+    if (!bridge.runSetup) return false;
+
+    // 监听安装日志
+    if (bridge.onSetupLog) {
+      bridge.onSetupLog((text) => {
+        for (const line of text.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          if (trimmed.startsWith('√')) {
+            this.appendLocalLog('info', trimmed);
+          } else if (trimmed.startsWith('×')) {
+            this.appendLocalLog('error', trimmed);
+          } else if (trimmed.includes('下载') || trimmed.includes('安装') || trimmed.includes('检测')) {
+            this.appendLocalLog('info', trimmed);
+          }
+        }
+      });
+    }
+
+    const result = await bridge.runSetup();
+    return result.success;
   }
 
   /** 检查 git 更新 (非阻塞, 仅日志提示) */

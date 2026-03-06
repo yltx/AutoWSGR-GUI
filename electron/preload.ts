@@ -44,7 +44,15 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('start-backend');
   },
 
+  runSetup: () => {
+    return ipcRenderer.invoke('run-setup');
+  },
+
   onBackendLog: (callback: (line: string) => void) => {
     ipcRenderer.on('backend-log', (_event, line: string) => callback(line));
+  },
+
+  onSetupLog: (callback: (text: string) => void) => {
+    ipcRenderer.on('setup-log', (_event, text: string) => callback(text));
   },
 });

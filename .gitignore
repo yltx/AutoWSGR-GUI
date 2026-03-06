@@ -25,3 +25,10 @@ usersettings.yaml
 
 # 测试包
 test_pkg/
+
+# 打包输出
+release/
+
+# 安装临时文件
+_setup_tmp/
+node/

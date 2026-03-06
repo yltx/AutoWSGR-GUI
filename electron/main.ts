@@ -9,14 +9,38 @@ import { execSync, spawn, ChildProcess } from 'child_process';
 
 let mainWindow: BrowserWindow | null = null;
 
-/** 项目根目录 (__dirname = dist/electron/) → 向上两级 */
+/** 是否处于打包后的生产模式 */
+function isPackaged(): boolean {
+  return app.isPackaged;
+}
+
+/**
+ * 项目根目录：
+ * - 开发模式: __dirname = dist/electron/ → 向上两级
+ * - 打包模式: process.resourcesPath (Electron resources 目录)
+ */
 function appRoot(): string {
+  if (isPackaged()) {
+    return path.dirname(app.getPath('exe'));
+  }
+  return path.join(__dirname, '..', '..');
+}
+
+/** 获取 extraResources 打包的资源目录 */
+function resourceRoot(): string {
+  if (isPackaged()) {
+    return process.resourcesPath;
+  }
   return path.join(__dirname, '..', '..');
 }
 
 /** 将相对路径解析为相对于项目根目录的绝对路径 */
 function resolveAppPath(filePath: string): string {
   if (path.isAbsolute(filePath)) return filePath;
+  // resource/ 和 plans/ 在打包后位于 resourcesPath 下
+  if (filePath.startsWith('resource') || filePath.startsWith('plans')) {
+    return path.join(resourceRoot(), filePath);
+  }
   return path.join(appRoot(), filePath);
 }
 
@@ -35,8 +59,9 @@ function createWindow(): BrowserWindow {
     backgroundColor: '#1a1a2e',
   });
 
-  // __dirname = dist/electron/, HTML原文件在项目根目录 src/view/
-  win.loadFile(path.join(appRoot(), 'src', 'view', 'index.html'));
+  // 开发模式: 源文件在项目根目录 src/view/
+  // 打包模式: 文件在 app.asar 内的 src/view/
+  win.loadFile(path.join(isPackaged() ? __dirname : appRoot(), isPackaged() ? '../src/view/index.html' : 'src/view/index.html'));
   mainWindow = win;
   win.on('closed', () => { mainWindow = null; });
   return win;
@@ -207,6 +232,10 @@ ipcMain.handle('install-deps', async () => {
   return installDependencies(pythonCmd);
 });
 
+ipcMain.handle('run-setup', async () => {
+  return runSetupScript();
+});
+
 ipcMain.handle('pull-updates', async () => {
   return pullUpdates();
 });
@@ -223,23 +252,48 @@ ipcMain.handle('start-backend', async () => {
 
 let backendProcess: ChildProcess | null = null;
 
-/** 确保后端子模块已初始化 */
+/** 确保后端代码已就绪 (git submodule 或 curl 下载) */
 function ensureSubmodule(): void {
   const submodDir = path.join(appRoot(), 'autowsgr');
   const marker = path.join(submodDir, 'pyproject.toml');
-  if (fs.existsSync(marker)) return; // 子模块已就绪
+  if (fs.existsSync(marker)) return;
 
+  // 先尝试 git submodule
   try {
-    execSync('git submodule update --init', {
-      cwd: appRoot(),
-      encoding: 'utf-8',
-      windowsHide: true,
-      timeout: 60000,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    });
-  } catch {
-    // 无 git 或网络问题，后续 checkEnvironment 会报缺少 autowsgr
-  }
+    execSync('git --version', { encoding: 'utf-8', windowsHide: true });
+    const gitDir = path.join(appRoot(), '.git');
+    if (fs.existsSync(gitDir)) {
+      execSync('git submodule update --init', {
+        cwd: appRoot(),
+        encoding: 'utf-8',
+        windowsHide: true,
+        timeout: 60000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      if (fs.existsSync(marker)) return;
+    }
+  } catch { /* git 不可用, 使用 curl 下载 */ }
+
+  // 降级: 用 curl 下载 zip
+  try {
+    const zipPath = path.join(app.getPath('temp'), 'autowsgr.zip');
+    const extractDir = path.join(app.getPath('temp'), 'autowsgr_extract');
+    execSync(
+      `curl -L -o "${zipPath}" "https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip"`,
+      { encoding: 'utf-8', windowsHide: true, timeout: 120000 },
+    );
+    execSync(
+      `powershell -NoProfile -Command "Expand-Archive -Path '${zipPath}' -DestinationPath '${extractDir}' -Force"`,
+      { encoding: 'utf-8', windowsHide: true, timeout: 30000 },
+    );
+    const entries = fs.readdirSync(extractDir);
+    const autoDir = entries.find(e => e.startsWith('AutoWSGR-'));
+    if (autoDir) {
+      fs.renameSync(path.join(extractDir, autoDir), submodDir);
+    }
+    try { fs.unlinkSync(zipPath); } catch { /* ignore */ }
+    try { fs.rmSync(extractDir, { recursive: true }); } catch { /* ignore */ }
+  } catch { /* 下载失败, checkEnvironment 会报缺少 */ }
 }
 
 /** 查找可用的 Python 可执行文件 */
@@ -374,6 +428,45 @@ function pullUpdates(): Promise<{ success: boolean; output: string }> {
     } catch (e) {
       resolve({ success: false, output: e instanceof Error ? e.message : String(e) });
     }
+  });
+}
+
+/** 运行 setup.bat 安装环境 */
+function runSetupScript(): Promise<{ success: boolean; output: string }> {
+  return new Promise((resolve) => {
+    // 打包模式下 setup.bat 在 extraResources 里
+    let setupPath = path.join(resourceRoot(), 'setup.bat');
+    if (!fs.existsSync(setupPath)) {
+      setupPath = path.join(appRoot(), 'setup.bat');
+    }
+    if (!fs.existsSync(setupPath)) {
+      resolve({ success: false, output: '找不到 setup.bat' });
+      return;
+    }
+
+    const proc = spawn('cmd.exe', ['/c', setupPath], {
+      cwd: appRoot(),
+      windowsHide: false,
+      stdio: 'pipe',
+    });
+
+    let output = '';
+    proc.stdout?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      output += text;
+      mainWindow?.webContents.send('setup-log', text);
+    });
+    proc.stderr?.on('data', (data: Buffer) => {
+      const text = data.toString();
+      output += text;
+      mainWindow?.webContents.send('setup-log', text);
+    });
+    proc.on('close', (code) => {
+      resolve({ success: code === 0, output: output.slice(-1000) });
+    });
+    proc.on('error', (err) => {
+      resolve({ success: false, output: err.message });
+    });
   });
 }
 

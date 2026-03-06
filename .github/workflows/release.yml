@@ -1,0 +1,94 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如 0.1.0)'
+        required: true
+        default: '0.1.0'
+      prerelease:
+        description: '标记为预发布'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+
+      - name: Download backend source
+        shell: pwsh
+        run: |
+          $zipUrl = "https://github.com/OpenWSGR/AutoWSGR/archive/refs/heads/main.zip"
+          $zipFile = "$env:TEMP\autowsgr.zip"
+          $extractDir = "$env:TEMP\autowsgr_extract"
+          Invoke-WebRequest -Uri $zipUrl -OutFile $zipFile
+          Expand-Archive -Path $zipFile -DestinationPath $extractDir -Force
+          $srcDir = Get-ChildItem -Path $extractDir -Directory | Where-Object { $_.Name -like "AutoWSGR-*" } | Select-Object -First 1
+          if ($srcDir) {
+            Move-Item -Path $srcDir.FullName -Destination "autowsgr" -Force
+          }
+          Remove-Item $zipFile -ErrorAction SilentlyContinue
+          Remove-Item $extractDir -Recurse -ErrorAction SilentlyContinue
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Update version
+        shell: pwsh
+        run: |
+          $pkg = Get-Content package.json | ConvertFrom-Json
+          $pkg.version = "${{ github.event.inputs.version }}"
+          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json -Encoding UTF8
+
+      - name: Build & Package
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: List release artifacts
+        shell: pwsh
+        run: Get-ChildItem -Path release -Recurse -File | Select-Object FullName, Length
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          name: AutoWSGR-GUI v${{ github.event.inputs.version }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            release/*.exe
+            release/*.zip
+          body: |
+            ## AutoWSGR-GUI v${{ github.event.inputs.version }}
+
+            ### 使用方法
+            1. 下载 `AutoWSGR-GUI-*-portable.exe`（免安装版）或 `AutoWSGR-GUI-*-Setup.exe`（安装版）
+            2. 首次运行时，若未安装 Python 3.12+，程序会自动下载安装
+            3. 程序会自动下载后端代码并安装 Python 依赖
+
+            ### 手动安装环境（可选）
+            如果自动安装失败，可单独下载 `setup.bat` 运行：
+            ```
+            setup.bat
+            ```
+
+            ### 系统要求
+            - Windows 10/11 x64
+            - 网络连接（首次运行需下载 Python 和依赖）
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
