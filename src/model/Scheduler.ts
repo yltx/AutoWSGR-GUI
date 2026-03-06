@@ -137,6 +137,16 @@ export class Scheduler {
     if (!resp.success) return false;
 
     this.api.connectWebSockets();
+
+    // 系统启动后立即检查远征，确保远征页面不会阻碍后续任务
+    this.emitLog('info', '正在检查远征...');
+    try {
+      await this.api.expeditionCheck();
+      this.emitLog('info', '远征检查完成');
+    } catch {
+      this.emitLog('debug', '远征检查跳过');
+    }
+
     this.setStatus('idle');
     this.startExpeditionTimer();
     return true;
@@ -319,13 +329,12 @@ export class Scheduler {
     }
   }
 
-  /** 触发一次远征检查 — 目前后端 TaskScheduler 内部自带远征插入，
-   *  所以前端只需重置倒计时计数器。
-   *  未来若后端暴露独立远征 API，这里可以插入高优先级任务。 */
+  /** 触发一次远征检查 — 调用后端 API 收取已完成的远征。 */
   private triggerExpeditionCheck(): void {
     this.lastExpeditionCheck = Date.now();
-    // 后端 TaskScheduler 会在战斗间歇自动检查远征，
-    // 前端定时器仅作为 UI 倒计时展示用途。
+    this.api.expeditionCheck().catch(() => {
+      // 定时远征检查失败不影响调度器运行
+    });
   }
 
   // ── 内部: WebSocket 回调绑定 ──
@@ -364,6 +373,17 @@ export class Scheduler {
     if (this._status === s) return;
     this._status = s;
     this.callbacks.onStatusChange?.(s);
+  }
+
+  /** 通过回调发送前端侧日志 */
+  private emitLog(level: string, message: string): void {
+    this.callbacks.onLog?.({
+      type: 'log',
+      timestamp: new Date().toISOString(),
+      level,
+      channel: 'scheduler',
+      message,
+    });
   }
 
   private notifyQueueChange(): void {

@@ -238,8 +238,10 @@ export class ApiClient {
   }
 
   // ── 远征收取 ──
-  // 后端目前没有单独的远征 API endpoint，由调度器内部穿插。
-  // 前端远征按钮预留，调度器通过 taskStart 配合后端的 expedition_interval 实现。
+
+  async expeditionCheck(): Promise<ApiResponse> {
+    return this.request('POST', '/api/expedition/check');
+  }
 
   // ── WebSocket ──
 

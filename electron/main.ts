@@ -396,7 +396,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
       sendProgress(`  ${pkg} \u2717`);
     }
   }
-  // autowsgr 需要检查版本 >= 2.0.3
+  // autowsgr 需要检查版本 >= 2.0.4
   let autowsgrOk = false;
   try {
     const { stdout } = await execAsync(
@@ -406,7 +406,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
     const ver = stdout.trim();
     // 简单版本比较: 拆分数字比较
     const parts = ver.replace(/[^0-9.]/g, '.').split('.').map(Number);
-    const minParts = [2, 0, 3];
+    const minParts = [2, 0, 4];
     let ok = false;
     for (let i = 0; i < 3; i++) {
       if ((parts[i] || 0) > (minParts[i] || 0)) { ok = true; break; }
@@ -417,7 +417,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
     if (ok) {
       sendProgress(`  autowsgr ${ver} \u2713`);
     } else {
-      sendProgress(`  autowsgr ${ver} < 2.0.3 \u2717`);
+      sendProgress(`  autowsgr ${ver} < 2.0.4 \u2717`);
       missingPackages.push('autowsgr');
     }
   } catch {
