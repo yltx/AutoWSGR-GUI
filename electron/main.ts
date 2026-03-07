@@ -427,7 +427,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
 
   sendProgress('正在检查依赖包…');
   const prefix = sysPathInsert();
-  const simplePackages = ['uvicorn', 'fastapi'];
+  const simplePackages = ['uvicorn', 'fastapi', 'setuptools'];
   const missingPackages: string[] = [];
   for (const pkg of simplePackages) {
     try {
