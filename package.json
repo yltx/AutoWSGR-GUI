@@ -47,6 +47,10 @@
       {
         "from": "setup.bat",
         "to": "setup.bat"
+      },
+      {
+        "from": "debug_deps.bat",
+        "to": "debug_deps.bat"
       }
     ],
     "win": {

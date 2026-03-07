@@ -33,6 +33,19 @@ import {
   type EnemyRule,
 } from '../model/types';
 import { loadMapData, getNodeType, isDetourNode } from '../model/MapDataLoader';
+
+/** 将 repair_mode（数字或数组）转换为显示文本 */
+function resolveRepairModeLabel(mode: number | number[]): string {
+  if (Array.isArray(mode)) {
+    const unique = [...new Set(mode)];
+    if (unique.length === 1) return REPAIR_MODE_NAMES[unique[0]] ?? '中破就修';
+    // 混合策略：按舰位显示，如 "①大破 ②大破 ③大破 ④中破 ⑤大破 ⑥大破"
+    const circled = ['①','②','③','④','⑤','⑥'];
+    const short: Record<number, string> = { 1: '中破', 2: '大破' };
+    return mode.map((v, i) => `${circled[i] ?? (i+1)}${short[v] ?? v}`).join(' ');
+  }
+  return REPAIR_MODE_NAMES[mode] ?? '中破就修';
+}
 import type { MapData } from '../model/MapDataLoader';
 
 /** 通过 preload 注入的 IPC 桥 */
@@ -541,19 +554,24 @@ export class AppController {
     if (!result) return;
 
     try {
-      // 检测是否为任务预设 YAML (含 task_type 字段)
       const parsed = (await import('js-yaml')).load(result.content) as Record<string, unknown>;
+
+      // 含 chapter + map 的文件视为战斗方案 (可能同时含 times/stop_condition 等任务字段)
+      if (parsed && typeof parsed === 'object' && 'chapter' in parsed && 'map' in parsed) {
+        this.currentPlan = PlanModel.fromYaml(result.content, result.path);
+        this.currentMapData = await loadMapData(this.currentPlan.data.chapter, this.currentPlan.data.map);
+        this.renderPlanPreview();
+        this.switchPage('plan');
+        return;
+      }
+
+      // 仅含 task_type 的文件视为纯任务预设 (引用外部 plan)
       if (parsed && typeof parsed === 'object' && 'task_type' in parsed) {
         this.importTaskPreset(parsed as unknown as TaskPreset, result.path);
         return;
       }
 
-      // 否则当作战斗方案
-      this.currentPlan = PlanModel.fromYaml(result.content, result.path);
-      // 加载对应的地图数据
-      this.currentMapData = await loadMapData(this.currentPlan.data.chapter, this.currentPlan.data.map);
-      this.renderPlanPreview();
-      this.switchPage('plan');
+      throw new Error('文件缺少 chapter/map 或 task_type 字段');
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       console.error('YAML 解析失败:', msg);
@@ -640,14 +658,17 @@ export class AppController {
     if (!this.currentPlan) return;
 
     const timesInput = document.getElementById('plan-times') as HTMLInputElement;
-    const times = Math.max(1, parseInt(timesInput.value, 10) || 1);
-
     const plan = this.currentPlan;
+
+    // 优先使用 plan 内嵌的 times，否则使用 UI 输入
+    const times = plan.data.times ?? Math.max(1, parseInt(timesInput.value, 10) || 1);
+    const stopCondition = plan.data.stop_condition;
+
     const req: NormalFightReq = {
       type: 'normal_fight',
       plan_id: plan.fileName,
       times: 1, // 调度器 remainingTimes 控制重复
-      gap: 0,
+      gap: plan.data.gap ?? 0,
     };
 
     this.scheduler.addTask(
@@ -656,10 +677,19 @@ export class AppController {
       req,
       TaskPriority.USER_TASK,
       times,
+      stopCondition,
     );
 
     this.switchPage('main');
     this.renderMain();
+
+    // 日志提示
+    if (stopCondition) {
+      const parts: string[] = [`×${times}`];
+      if (stopCondition.loot_count_ge) parts.push(`战利品≥${stopCondition.loot_count_ge}时停止`);
+      if (stopCondition.ship_count_ge) parts.push(`舰船≥${stopCondition.ship_count_ge}时停止`);
+      this.appendLocalLog('info', `任务「${plan.mapName}」已加入队列 (${parts.join(', ')})`);
+    }
   }
 
   /** 将节点编辑面板的值保存回 PlanModel */
@@ -768,13 +798,19 @@ export class AppController {
       chapter: plan.data.chapter,
       map: plan.data.map,
       mapName: plan.mapName,
-      repairMode: REPAIR_MODE_NAMES[plan.repairMode] ?? '中破就修',
+      repairMode: resolveRepairModeLabel(plan.repairMode),
       fightCondition: FIGHT_CONDITION_NAMES[plan.fightCondition] ?? '稳步前进',
       selectedNodes: nodes,
       comment: plan.comment,
     };
 
     this.planView.render(vo);
+
+    // 内嵌了 times 的方案：预填次数输入框
+    if (plan.data.times != null) {
+      const timesInput = document.getElementById('plan-times') as HTMLInputElement;
+      if (timesInput) timesInput.value = String(plan.data.times);
+    }
   }
 
   private renderConfig(): void {

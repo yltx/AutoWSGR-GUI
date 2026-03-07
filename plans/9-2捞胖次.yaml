@@ -1,10 +1,51 @@
-# 任务预设: 9-2 捞胖次 (自动循环直到战利品 50/50)
-# 导入此文件后将自动开始循环，直到战利品达到 50 个
+# 作战计划: 9-2 捞胖次
+# 编队 1, 梯形阵
+# 迂回点 (A D G H M): 有活动补给舰(AP)梯形阵战斗, 无则迂回
+# E K O: 无活动补给舰撤退, 有则梯形阵战斗
 
-task_type: normal_fight
-plan_id: 9-2捞胖次.plan.yaml
+chapter: 9
+map: 2
+selected_nodes: [A, D, G, H, M, O, E, K]
+fight_condition: 1
+repair_mode: 2
+fleet_id: 1
 times: 9999
 gap: 0
-
 stop_condition:
   loot_count_ge: 50
+
+node_defaults:
+  formation: 4
+  night: false
+  proceed: true
+
+node_args:
+  A:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  D:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  G:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  H:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  M:
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  E:
+    enemy_rules:
+      - [AP < 1, retreat]
+  K:
+    enemy_rules:
+      - [AP < 1, retreat]
+  O:
+    enemy_rules:
+      - [AP < 1, retreat]

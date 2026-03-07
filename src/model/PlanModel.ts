@@ -31,9 +31,18 @@ export class PlanModel {
         ? parsed.selected_nodes.map(String)
         : [],
       fight_condition: parsed.fight_condition != null ? Number(parsed.fight_condition) : undefined,
-      repair_mode: parsed.repair_mode != null ? Number(parsed.repair_mode) : undefined,
+      repair_mode: parsed.repair_mode != null
+        ? (Array.isArray(parsed.repair_mode)
+          ? (parsed.repair_mode as number[]).map(Number)
+          : Number(parsed.repair_mode))
+        : undefined,
+      fleet_id: parsed.fleet_id != null ? Number(parsed.fleet_id) : undefined,
       node_defaults: parsed.node_defaults as NodeArgs | undefined,
       node_args: parsed.node_args as Record<string, NodeArgs> | undefined,
+      // 任务级字段
+      times: parsed.times != null ? Number(parsed.times) : undefined,
+      gap: parsed.gap != null ? Number(parsed.gap) : undefined,
+      stop_condition: parsed.stop_condition as PlanData['stop_condition'],
     };
 
     return new PlanModel(data, path, comment);
@@ -44,8 +53,8 @@ export class PlanModel {
     return `${this.data.chapter}-${this.data.map}`;
   }
 
-  /** 修理模式，默认 1 */
-  get repairMode(): number {
+  /** 修理模式，默认 1。若为数组则返回原始数组 */
+  get repairMode(): number | number[] {
     return this.data.repair_mode ?? 1;
   }
 

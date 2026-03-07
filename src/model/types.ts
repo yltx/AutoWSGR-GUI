@@ -26,9 +26,14 @@ export interface PlanData {
   map: number;
   selected_nodes: string[];
   fight_condition?: number;        // 1-5, 默认 1
-  repair_mode?: number;            // 1 或 2, 默认 1
+  repair_mode?: number | number[];  // 1 或 2（或每舰位数组）, 默认 1
+  fleet_id?: number;               // 编队号
   node_defaults?: NodeArgs;
   node_args?: Record<string, NodeArgs>;
+  // 任务级字段（可内联在 plan 中，无需单独的 preset 文件）
+  times?: number;
+  gap?: number;
+  stop_condition?: StopCondition;
 }
 
 // ════════════════════════════════════════
@@ -83,7 +88,7 @@ export const FIGHT_CONDITION_NAMES: Record<number, string> = {
 
 export const REPAIR_MODE_NAMES: Record<number, string> = {
   1: '中破就修',
-  2: '大破就修',
+  2: '大破才修',
 };
 
 // ════════════════════════════════════════

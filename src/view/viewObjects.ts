@@ -69,7 +69,7 @@ export interface PlanPreviewViewObject {
   chapter: number;
   map: number;
   mapName: string;                // "7-4" 格式
-  repairMode: string;             // "中破就修" / "大破就修"
+  repairMode: string;             // "中破就修" / "大破才修"
   fightCondition: string;         // 战况中文名
   selectedNodes: NodeViewObject[];
   comment: string;                // yaml 文件顶部注释

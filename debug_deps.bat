@@ -1,110 +1,154 @@
 @echo off
+setlocal enabledelayedexpansion
 chcp 65001 >nul
-echo ============================================
-echo   AutoWSGR-GUI 依赖诊断脚本
-echo ============================================
-echo.
 
 set "APP_DIR=%~dp0"
 set "SITE_PKG=%APP_DIR%python\site-packages"
 set "LOCAL_PY=%APP_DIR%python\python.exe"
 set "PTH_FILE=%APP_DIR%python\python312._pth"
+set "LOG=%APP_DIR%debug_report.txt"
 
-echo [1] 应用目录: %APP_DIR%
-echo [2] site-packages: %SITE_PKG%
-echo.
+:: 清空旧日志
+> "%LOG%" echo ============================================
+>> "%LOG%" echo   AutoWSGR-GUI 诊断报告
+>> "%LOG%" echo   生成时间: %DATE% %TIME%
+>> "%LOG%" echo ============================================
+>> "%LOG%" echo.
+
+>> "%LOG%" echo [基础信息]
+>> "%LOG%" echo   应用目录: %APP_DIR%
+>> "%LOG%" echo   site-packages: %SITE_PKG%
+>> "%LOG%" echo.
 
 :: --- 检查本地 Python ---
-echo === Python 检测 ===
+>> "%LOG%" echo === Python 检测 ===
 if exist "%LOCAL_PY%" (
-    echo [OK] 本地便携版 Python 存在: %LOCAL_PY%
+    >> "%LOG%" echo [OK] 本地便携版 Python 存在: %LOCAL_PY%
     set "PY=%LOCAL_PY%"
+    for /f "delims=" %%v in ('"%LOCAL_PY%" -c "import sys; print(sys.version)"  2^>nul') do (
+        >> "%LOG%" echo   版本: %%v
+    )
 ) else (
-    echo [--] 无本地便携版 Python
+    >> "%LOG%" echo [--] 无本地便携版 Python
     where python >nul 2>nul
     if !errorlevel! equ 0 (
         for /f "delims=" %%i in ('python -c "import sys; print(sys.executable)"') do set "PY=%%i"
-        echo [OK] 系统 Python: !PY!
+        >> "%LOG%" echo [OK] 系统 Python: !PY!
+        for /f "delims=" %%v in ('python -c "import sys; print(sys.version)" 2^>nul') do (
+            >> "%LOG%" echo   版本: %%v
+        )
     ) else (
-        echo [FAIL] 未找到任何 Python
-        goto :end
+        >> "%LOG%" echo [FAIL] 未找到任何 Python
+        >> "%LOG%" echo.
+        goto :done
     )
 )
-echo.
+>> "%LOG%" echo.
 
 :: --- 检查 ._pth 文件 ---
-echo === ._pth 文件检查 (仅便携版) ===
+>> "%LOG%" echo === ._pth 文件检查 (仅便携版) ===
 if exist "%PTH_FILE%" (
-    echo [INFO] ._pth 文件存在: %PTH_FILE%
-    echo --- 内容 ---
-    type "%PTH_FILE%"
-    echo.
-    echo --- 分析 ---
+    >> "%LOG%" echo [INFO] ._pth 文件内容:
+    >> "%LOG%" type "%PTH_FILE%"
+    >> "%LOG%" echo.
     findstr /c:"import site" "%PTH_FILE%" >nul 2>nul
     if !errorlevel! equ 0 (
-        echo [OK] import site 已启用
+        >> "%LOG%" echo [OK] import site 已启用
     ) else (
-        echo [FAIL] import site 未启用! PYTHONPATH 将被忽略!
+        >> "%LOG%" echo [FAIL] import site 未启用! .pth 文件不会被处理!
     )
     findstr /c:"site-packages" "%PTH_FILE%" >nul 2>nul
     if !errorlevel! equ 0 (
-        echo [OK] site-packages 已在 ._pth 中
+        >> "%LOG%" echo [OK] site-packages 已在路径中
     ) else (
-        echo [FAIL] site-packages 未在 ._pth 中! 本地包将无法被找到!
+        >> "%LOG%" echo [FAIL] site-packages 未在路径中!
     )
 ) else (
-    echo [--] 无 ._pth 文件 (非嵌入式 Python 或文件不存在)
+    >> "%LOG%" echo [--] 无 ._pth 文件 (非嵌入式 Python 或文件不存在)
 )
-echo.
+>> "%LOG%" echo.
 
-:: --- 检查 site-packages 目录 ---
-echo === site-packages 目录检查 ===
-if exist "%SITE_PKG%" (
-    echo [OK] 目录存在
-    echo --- 关键包 ---
-    if exist "%SITE_PKG%\uvicorn" (echo   uvicorn: OK) else (echo   uvicorn: MISSING)
-    if exist "%SITE_PKG%\fastapi" (echo   fastapi: OK) else (echo   fastapi: MISSING)
-    if exist "%SITE_PKG%\autowsgr" (echo   autowsgr: OK) else (echo   autowsgr: MISSING)
-    echo --- 目录内容 (前20项) ---
-    dir /b "%SITE_PKG%" 2>nul | findstr /n "^" | findstr /b "[1-9]: [12][0-9]:"
-    for /f %%a in ('dir /b "%SITE_PKG%" 2^>nul ^| find /c /v ""') do echo   共 %%a 项
+:: --- 检查 distutils shim ---
+>> "%LOG%" echo === distutils 可用性检查 ===
+"%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import site; site.addsitedir(r'%SITE_PKG%'); import distutils; print('OK')" >nul 2>nul
+if !errorlevel! equ 0 (
+    >> "%LOG%" echo [OK] distutils 可用 (setuptools shim 正常)
 ) else (
-    echo [FAIL] 目录不存在!
+    >> "%LOG%" echo [FAIL] distutils 不可用! 请确认 setuptools 已安装
 )
-echo.
+>> "%LOG%" echo.
+
+:: --- 检查 site-packages 关键包 ---
+>> "%LOG%" echo === 关键包检查 ===
+if exist "%SITE_PKG%" (
+    >> "%LOG%" echo [OK] site-packages 目录存在
+    if exist "%SITE_PKG%\uvicorn" (>> "%LOG%" echo   uvicorn: OK) else (>> "%LOG%" echo   uvicorn: MISSING)
+    if exist "%SITE_PKG%\fastapi" (>> "%LOG%" echo   fastapi: OK) else (>> "%LOG%" echo   fastapi: MISSING)
+    if exist "%SITE_PKG%\autowsgr" (>> "%LOG%" echo   autowsgr: OK) else (>> "%LOG%" echo   autowsgr: MISSING)
+    if exist "%SITE_PKG%\setuptools" (>> "%LOG%" echo   setuptools: OK) else (>> "%LOG%" echo   setuptools: MISSING)
+    for /f %%a in ('dir /b "%SITE_PKG%" 2^>nul ^| find /c /v ""') do >> "%LOG%" echo   总计 %%a 项
+) else (
+    >> "%LOG%" echo [FAIL] site-packages 目录不存在!
+)
+>> "%LOG%" echo.
 
 :: --- Python import 测试 ---
-echo === Python import 测试 ===
-setlocal enabledelayedexpansion
+>> "%LOG%" echo === Python import 测试 ===
 
-echo [测试1] 直接 import (不设 PYTHONPATH, 不设 sys.path):
-"%PY%" -c "import uvicorn; print('  uvicorn OK')" 2>nul || echo   uvicorn FAIL
-"%PY%" -c "import fastapi; print('  fastapi OK')" 2>nul || echo   fastapi FAIL
-"%PY%" -c "import autowsgr; print('  autowsgr', autowsgr.__version__, 'OK')" 2>nul || echo   autowsgr FAIL
+>> "%LOG%" echo [测试1] 直接 import (无 sys.path 修改):
+for %%m in (uvicorn fastapi autowsgr) do (
+    "%PY%" -c "import %%m; print('OK')" >nul 2>nul
+    if !errorlevel! equ 0 (>> "%LOG%" echo   %%m: OK) else (>> "%LOG%" echo   %%m: FAIL)
+)
+>> "%LOG%" echo.
 
-echo.
-echo [测试2] 设置 PYTHONPATH=%SITE_PKG%:
-set "PYTHONPATH=%SITE_PKG%"
-"%PY%" -c "import uvicorn; print('  uvicorn OK')" 2>nul || echo   uvicorn FAIL
-"%PY%" -c "import fastapi; print('  fastapi OK')" 2>nul || echo   fastapi FAIL
-"%PY%" -c "import autowsgr; print('  autowsgr', autowsgr.__version__, 'OK')" 2>nul || echo   autowsgr FAIL
-set "PYTHONPATH="
+>> "%LOG%" echo [测试2] sys.path.insert 后 import:
+for %%m in (uvicorn fastapi autowsgr) do (
+    "%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import %%m; print('OK')" >nul 2>nul
+    if !errorlevel! equ 0 (>> "%LOG%" echo   %%m: OK) else (>> "%LOG%" echo   %%m: FAIL)
+)
+>> "%LOG%" echo.
 
-echo.
-echo [测试3] 使用 sys.path.insert (GUI 新检测方式):
-"%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import uvicorn; print('  uvicorn OK')" 2>nul || echo   uvicorn FAIL
-"%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import fastapi; print('  fastapi OK')" 2>nul || echo   fastapi FAIL
-"%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import autowsgr; print('  autowsgr', autowsgr.__version__, 'OK')" 2>nul || echo   autowsgr FAIL
+>> "%LOG%" echo [测试3] site.addsitedir 后 import (GUI 实际启动方式):
+for %%m in (uvicorn fastapi autowsgr) do (
+    "%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import site; site.addsitedir(r'%SITE_PKG%'); import %%m; print('OK')" >nul 2>nul
+    if !errorlevel! equ 0 (>> "%LOG%" echo   %%m: OK) else (>> "%LOG%" echo   %%m: FAIL)
+)
+>> "%LOG%" echo.
 
-echo.
-echo [测试4] Python sys.path 内容:
-"%PY%" -c "import sys; [print('  ', p) for p in sys.path]"
+:: --- autowsgr 版本 ---
+>> "%LOG%" echo === autowsgr 版本 ===
+for /f "delims=" %%v in ('"%PY%" -c "import sys; sys.path.insert(0, r'%SITE_PKG%'); import autowsgr; print(autowsgr.__version__)" 2^>nul') do (
+    >> "%LOG%" echo   版本: %%v
+)
+>> "%LOG%" echo.
 
+:: --- sys.path 内容 ---
+>> "%LOG%" echo === sys.path 内容 ===
+"%PY%" -c "import sys; [print(' ', p) for p in sys.path]" >> "%LOG%" 2>nul
+>> "%LOG%" echo.
+
+:: --- 模拟器连接检查 ---
+>> "%LOG%" echo === 模拟器 adb 检查 ===
+where adb >nul 2>nul
+if !errorlevel! equ 0 (
+    >> "%LOG%" echo [OK] adb 在 PATH 中
+    for /f "delims=" %%d in ('adb devices 2^>nul') do >> "%LOG%" echo   %%d
+) else (
+    >> "%LOG%" echo [--] adb 不在 PATH 中 (可能由程序内部提供)
+)
+>> "%LOG%" echo.
+
+>> "%LOG%" echo ============================================
+>> "%LOG%" echo 诊断完毕。请将此文件发送给开发者。
+>> "%LOG%" echo ============================================
+
+:done
 endlocal
-echo.
-echo ============================================
-echo 诊断完毕。请将以上输出截图发送给开发者。
-echo ============================================
 
-:end
-pause
+echo 诊断完成！报告已保存到:
+echo   %LOG%
+echo.
+echo 按任意键打开报告文件...
+pause >nul
+start "" "%LOG%"

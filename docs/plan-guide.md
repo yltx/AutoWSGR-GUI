@@ -8,9 +8,11 @@
 
 每个 YAML 文件对应一种任务类型。通过 `task_type` 字段（或直接使用 `chapter` + `map` 隐含常规战斗）来区分。
 
+常规战斗方案可以直接内嵌任务控制字段（`times`、`stop_condition` 等），无需拆分为两个文件。
+
 ### 1. 常规战斗 (normal_fight)
 
-最常用的方案类型，用于地图出击。
+最常用的方案类型，用于地图出击。任务控制字段（`times`、`stop_condition` 等）可直接写在方案中。
 
 ```yaml
 chapter: 9
@@ -19,6 +21,9 @@ selected_nodes: [A, D, G, H, M, O, E, K]
 fight_condition: 1
 repair_mode: 1
 fleet_id: 1
+times: 9999
+stop_condition:
+  loot_count_ge: 50
 
 node_defaults:
   formation: 4
@@ -31,7 +36,7 @@ node_args:
       - [NAP < 1, retreat]
 ```
 
-也可以引用内置方案：
+也可以引用内置方案（纯任务预设，不包含地图数据）：
 
 ```yaml
 task_type: normal_fight
@@ -90,9 +95,12 @@ flagship_priority:
 | `selected_nodes` | 字符串列表 | 是 | 途经的节点列表，如 `[A, D, G, H, M, O]` |
 | `fleet_id` | 数字 | 否 | 使用的舰队编号 (1-4)，默认 `1` |
 | `fight_condition` | 数字 | 否 | 战况条件，见下表 |
-| `repair_mode` | 数字 | 否 | 修理策略，见下表 |
+| `repair_mode` | 数字或数组 | 否 | 修理策略，见下表 |
 | `node_defaults` | 对象 | 否 | 所有节点的默认配置 |
 | `node_args` | 对象 | 否 | 按节点名覆盖的个性化配置 |
+| `times` | 数字 | 否 | 循环执行次数，默认 `1` |
+| `gap` | 数字 | 否 | 每次执行间隔（秒），默认 `0` |
+| `stop_condition` | 对象 | 否 | 停止条件，满足时自动停止循环 |
 
 ### fight_condition 战况条件
 
@@ -110,6 +118,27 @@ flagship_priority:
 |----|------|
 | `1` | 中破就修 |
 | `2` | 大破才修 |
+
+可以设为单个数字（所有舰位统一），也可以设为 6 个数字的列表（每个舰位独立设置）：
+
+```yaml
+repair_mode: 2              # 所有位置大破才修
+repair_mode: [2, 2, 2, 1, 2, 2]  # 4号位中破就修，其余大破才修
+```
+
+### stop_condition 停止条件
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `loot_count_ge` | 数字 | 战利品数量 ≥ 该值时停止 |
+| `ship_count_ge` | 数字 | 获取舰船数量 ≥ 该值时停止 |
+
+示例：
+
+```yaml
+stop_condition:
+  loot_count_ge: 50
+```
 
 ---
 
@@ -221,7 +250,7 @@ enemy_rules:
 
 ### 示例 1：9-2 捞胖次
 
-迂回节点有补给舰时战斗，否则迂回；E/K 点无补给舰则撤退。
+迂回节点有补给舰时战斗，否则迂回；E/K 点无补给舰则撤退。内嵌循环 9999 次、战利品 ≥ 50 自动停止。
 
 ```yaml
 # 9-2 捞胖次
@@ -229,8 +258,12 @@ chapter: 9
 map: 2
 selected_nodes: [A, D, G, H, M, O, E, K]
 fight_condition: 1
-repair_mode: 1
+repair_mode: 2
 fleet_id: 1
+times: 9999
+gap: 0
+stop_condition:
+  loot_count_ge: 50
 
 node_defaults:
   formation: 4
@@ -240,25 +273,33 @@ node_defaults:
 node_args:
   A:
     enemy_rules:
-      - [NAP >= 1, 4]
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
   D:
     enemy_rules:
-      - [NAP >= 1, 4]
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
   G:
     enemy_rules:
-      - [NAP >= 1, 4]
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
   H:
     enemy_rules:
-      - [NAP >= 1, 4]
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
   M:
     enemy_rules:
-      - [NAP >= 1, 4]
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
   E:
     enemy_rules:
-      - [NAP < 1, retreat]
+      - [AP < 1, retreat]
   K:
     enemy_rules:
-      - [NAP < 1, retreat]
+      - [AP < 1, retreat]
+  O:
+    enemy_rules:
+      - [AP < 1, retreat]
 ```
 
 ### 示例 2：7-4 漂流捞胖次
