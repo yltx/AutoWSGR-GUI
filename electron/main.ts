@@ -381,9 +381,37 @@ interface EnvCheckResult {
   allReady: boolean;
 }
 
+/** 生成在 Python 命令前插入 site-packages 路径的前缀代码 */
+function sysPathInsert(): string {
+  // 使用 sys.path.insert 而非 PYTHONPATH 环境变量，因为：
+  // 1. 嵌入式 Python 的 ._pth 会完全忽略 PYTHONPATH
+  // 2. 避免 Windows 环境变量传递的各种边界问题
+  const sp = localSitePackages().replace(/\\/g, '\\\\');
+  return `import sys; sys.path.insert(0, r'${sp}'); `;
+}
+
+/** 确保嵌入式 Python 的 ._pth 包含 site-packages（每次检查前都执行） */
+function ensurePthFile(): void {
+  const pythonDir = path.join(appRoot(), 'python');
+  const pthFile = path.join(pythonDir, 'python312._pth');
+  if (!fs.existsSync(pthFile)) return;
+  let content = fs.readFileSync(pthFile, 'utf-8');
+  let changed = false;
+  if (/^#\s*import site/m.test(content)) {
+    content = content.replace(/^#\s*import site/m, 'import site');
+    changed = true;
+  }
+  if (!content.includes('site-packages')) {
+    content = content.trimEnd() + '\nsite-packages\n';
+    changed = true;
+  }
+  if (changed) fs.writeFileSync(pthFile, content, 'utf-8');
+}
+
 /** 检查 Python 环境和所需包 */
 async function checkEnvironment(): Promise<EnvCheckResult> {
   sendProgress('正在检查 Python 环境…');
+  ensurePthFile();
   const pythonCmd = await findPython();
   if (!pythonCmd) {
     sendProgress('WARNING 未找到 Python');
@@ -398,15 +426,13 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   } catch { /* ignore */ }
 
   sendProgress('正在检查依赖包…');
-  // 用 import 检测存在性 (pip show / importlib.metadata 无法识别 --target 安装的包，
-  // 但 PYTHONPATH 对 import 有效)
+  const prefix = sysPathInsert();
   const simplePackages = ['uvicorn', 'fastapi'];
   const missingPackages: string[] = [];
   for (const pkg of simplePackages) {
     try {
-      await execAsync(`"${pythonCmd}" -c "import ${pkg}"`, {
+      await execAsync(`"${pythonCmd}" -c "${prefix}import ${pkg}"`, {
         windowsHide: true,
-        env: pipEnv(),
       });
       sendProgress(`  ${pkg} \u2713`);
     } catch {
@@ -418,8 +444,8 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   let autowsgrOk = false;
   try {
     const { stdout } = await execAsync(
-      `"${pythonCmd}" -c "import autowsgr; print(autowsgr.__version__)"`,
-      { windowsHide: true, env: pipEnv() },
+      `"${pythonCmd}" -c "${prefix}import autowsgr; print(autowsgr.__version__)"`,
+      { windowsHide: true },
     );
     const ver = stdout.trim();
     // 简单版本比较: 拆分数字比较
@@ -651,6 +677,7 @@ function runSetupScript(): Promise<{ success: boolean; output: string }> {
 }
 
 async function startBackend(): Promise<void> {
+  ensurePthFile();
   const pythonCmd = await findPython();
   if (!pythonCmd) {
     console.error('[Backend] 找不到 Python');
