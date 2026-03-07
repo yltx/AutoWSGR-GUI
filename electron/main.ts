@@ -582,6 +582,7 @@ function installDependencies(pythonCmd: string): Promise<{ success: boolean; out
       '-m', 'pip', 'install',
       '--target', targetDir,
       '--upgrade',
+      'setuptools',  // provides distutils (removed in Python 3.12)
       'autowsgr',
     ], {
       cwd,
@@ -618,6 +619,7 @@ function pullUpdates(): Promise<{ success: boolean; output: string }> {
       '-m', 'pip', 'install',
       '--target', targetDir,
       '--upgrade',
+      'setuptools',
       'autowsgr',
     ], {
       cwd: appRoot(),

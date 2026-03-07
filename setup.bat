@@ -92,7 +92,7 @@ set "TARGET_DIR=%APP_DIR%\python\site-packages"
 if not exist "%TARGET_DIR%" mkdir "%TARGET_DIR%"
 
 "!PYTHON_EXE!" -m pip install --upgrade pip 2>nul
-"!PYTHON_EXE!" -m pip install --target "%TARGET_DIR%" --upgrade autowsgr
+"!PYTHON_EXE!" -m pip install --target "%TARGET_DIR%" --upgrade setuptools autowsgr
 if !errorlevel! neq 0 (
     echo       FAILED: pip install autowsgr failed
     goto :error
