@@ -76,11 +76,51 @@
     <section id="page-plan" class="page">
       <div id="plan-empty" class="empty-state">
         <p>尚未导入方案</p>
-        <button class="btn btn-primary" id="btn-import-plan-2">选择 yaml 文件</button>
+        <div class="empty-state-actions">
+          <button class="btn btn-primary" id="btn-import-plan-2">选择 yaml 文件</button>
+          <button class="btn" id="btn-new-plan">新建方案</button>
+        </div>
+      </div>
+
+      <!-- 新建方案：选择地图对话框 -->
+      <div id="new-plan-dialog" class="modal-overlay" style="display:none">
+        <div class="modal card">
+          <h3>新建方案 — 选择地图</h3>
+          <div class="form-group">
+            <label>海域</label>
+            <select id="new-plan-chapter" class="input">
+              <option value="1">第 1 章</option>
+              <option value="2">第 2 章</option>
+              <option value="3">第 3 章</option>
+              <option value="4">第 4 章</option>
+              <option value="5">第 5 章</option>
+              <option value="6">第 6 章</option>
+              <option value="7">第 7 章</option>
+              <option value="8">第 8 章</option>
+              <option value="9">第 9 章</option>
+              <option value="Ex">Ex 系列</option>
+            </select>
+          </div>
+          <div class="form-group" id="new-plan-map-group">
+            <label>地图</label>
+            <select id="new-plan-map" class="input">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary" id="btn-new-plan-confirm">确定</button>
+            <button class="btn" id="btn-new-plan-cancel">取消</button>
+          </div>
+        </div>
       </div>
 
       <div id="plan-detail" class="plan-layout" style="display:none">
-        <!-- 左列：方案信息 + 节点路线 + 操作 -->
+        <!-- 左列：方案信息 + 节点编辑 + 操作 -->
         <div class="plan-left">
           <div class="card plan-header">
             <div class="plan-header-top">
@@ -89,61 +129,82 @@
             </div>
             <span class="badge" id="plan-file-name"></span>
             <div class="plan-meta">
-              <span>修理策略：<strong id="plan-repair"></strong></span>
-              <span>战况：<strong id="plan-fight-cond"></strong></span>
+              <label class="plan-meta-item">修理策略：
+                <select id="plan-edit-repair" class="input input-inline">
+                  <option value="1">中破就修</option>
+                  <option value="2">大破才修</option>
+                </select>
+              </label>
+              <label class="plan-meta-item">战况：
+                <select id="plan-edit-fight-cond" class="input input-inline">
+                  <option value="1">稳步前进</option>
+                  <option value="2">火力万岁</option>
+                  <option value="3">全力以赴</option>
+                  <option value="4">深入敌阵</option>
+                  <option value="5">以退为进</option>
+                </select>
+              </label>
+              <label class="plan-meta-item">编队：
+                <select id="plan-edit-fleet" class="input input-inline">
+                  <option value="1">第 1 舰队</option>
+                  <option value="2">第 2 舰队</option>
+                  <option value="3">第 3 舰队</option>
+                  <option value="4">第 4 舰队</option>
+                </select>
+              </label>
             </div>
             <p class="plan-comment" id="plan-comment"></p>
           </div>
 
-          <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
-          <div class="node-list" id="node-list">
-            <!-- 由 View 动态渲染 -->
+          <!-- 节点详细设置（可滚动区域） -->
+          <div class="plan-editor-area">
+            <div id="node-editor-placeholder" class="card node-editor-placeholder">
+              <p>点击右侧地图节点查看/编辑设置</p>
+            </div>
+            <div id="node-info" class="card node-info" style="display:none"></div>
+            <div id="node-editor" class="card node-editor" style="display:none">
+              <div class="node-editor-header">
+                <h3>节点 <span id="node-editor-id"></span></h3>
+                <button class="btn btn-small" id="btn-node-editor-close">✕</button>
+              </div>
+              <div class="form-group">
+                <label>阵型</label>
+                <select id="node-edit-formation" class="input">
+                  <option value="1">单纵阵</option>
+                  <option value="2">复纵阵</option>
+                  <option value="3">轮型阵</option>
+                  <option value="4">梯形阵</option>
+                  <option value="5">单横阵</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label><input type="checkbox" id="node-edit-night"> 夜战</label>
+              </div>
+              <div class="form-group">
+                <label><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
+              </div>
+              <div class="form-group">
+                <label>索敌规则</label>
+                <textarea id="node-edit-rules" class="input node-rules-textarea" rows="2"
+                  placeholder="每行一条，如: DD + CL <= 1, 4"></textarea>
+              </div>
+              <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
+            </div>
           </div>
 
           <div class="plan-actions">
-            <button class="btn btn-primary" id="btn-execute-plan">加入队列</button>
+            <button class="btn btn-primary btn-small" id="btn-execute-plan">加入队列</button>
+            <button class="btn btn-small" id="btn-export-plan">导出 YAML</button>
             <label>
               次数：<input type="number" id="plan-times" value="1" min="1" max="99" class="input-small">
             </label>
           </div>
         </div>
 
-        <!-- 右列：节点编辑面板 -->
+        <!-- 右列：节点路线地图 -->
         <div class="plan-right">
-          <div id="node-editor-placeholder" class="card node-editor-placeholder">
-            <p>← 点击左侧节点查看/编辑设置</p>
-          </div>
-          <div id="node-info" class="card node-info" style="display:none">
-            <!-- 由 PlanPreviewView.showNodeInfo() 动态填充 -->
-          </div>
-          <div id="node-editor" class="card node-editor" style="display:none">
-            <div class="node-editor-header">
-              <h3>节点 <span id="node-editor-id"></span></h3>
-              <button class="btn btn-small" id="btn-node-editor-close">✕</button>
-            </div>
-            <div class="form-group">
-              <label>阵型</label>
-              <select id="node-edit-formation" class="input">
-                <option value="1">单纵阵</option>
-                <option value="2">复纵阵</option>
-                <option value="3">轮型阵</option>
-                <option value="4">梯形阵</option>
-                <option value="5">单横阵</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" id="node-edit-night"> 夜战</label>
-            </div>
-            <div class="form-group">
-              <label><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
-            </div>
-            <div class="form-group">
-              <label>索敌规则</label>
-              <textarea id="node-edit-rules" class="input node-rules-textarea" rows="3"
-                placeholder="每行一条，如: DD + CL <= 1, 4"></textarea>
-            </div>
-            <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
-          </div>
+          <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
+          <div class="node-list" id="node-list"></div>
         </div>
       </div>
     </section>
@@ -195,6 +256,9 @@
         <div class="form-group">
           <label><input type="checkbox" id="cfg-auto-expedition" checked> 自动远征</label>
         </div>
+
+        <hr class="card-divider">
+
         <div class="form-group">
           <label><input type="checkbox" id="cfg-auto-battle"> 自动战役</label>
         </div>
@@ -214,7 +278,23 @@
           </select>
         </div>
         <div class="form-group">
+          <label>战役次数</label>
+          <input type="number" id="cfg-battle-times" class="input" min="1" max="10" value="3">
+        </div>
+
+        <hr class="card-divider">
+
+        <div class="form-group">
           <label><input type="checkbox" id="cfg-auto-exercise"> 自动演习</label>
+        </div>
+        <div class="form-group">
+          <label>演习舰队</label>
+          <select id="cfg-exercise-fleet" class="input">
+            <option value="1">第 1 舰队</option>
+            <option value="2">第 2 舰队</option>
+            <option value="3">第 3 舰队</option>
+            <option value="4">第 4 舰队</option>
+          </select>
         </div>
       </div>
 

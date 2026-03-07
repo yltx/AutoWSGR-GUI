@@ -34,6 +34,8 @@ export interface PlanData {
   times?: number;
   gap?: number;
   stop_condition?: StopCondition;
+  /** 定时触发时间 "HH:MM" 格式，到时自动加入队列 */
+  scheduled_time?: string;
 }
 
 // ════════════════════════════════════════
@@ -56,8 +58,9 @@ export interface DailyAutomation {
   auto_expedition: boolean;
   auto_battle: boolean;
   battle_type: string;
+  battle_times: number;
   auto_exercise: boolean;
-  exercise_fleet_id?: number;
+  exercise_fleet_id: number;
 }
 
 export interface UserSettings {
@@ -124,4 +127,6 @@ export interface TaskPreset {
   flagship_priority?: string[];
   // 停止条件
   stop_condition?: StopCondition;
+  /** 定时触发时间 "HH:MM" 格式 */
+  scheduled_time?: string;
 }

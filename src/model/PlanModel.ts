@@ -6,8 +6,8 @@ import * as yaml from 'js-yaml';
 import type { PlanData, NodeArgs } from './types';
 
 export class PlanModel {
-  readonly data: PlanData;
-  readonly fileName: string;
+  data: PlanData;
+  fileName: string;
   readonly comment: string;
 
   private constructor(data: PlanData, fileName: string, comment: string) {
@@ -43,13 +43,15 @@ export class PlanModel {
       times: parsed.times != null ? Number(parsed.times) : undefined,
       gap: parsed.gap != null ? Number(parsed.gap) : undefined,
       stop_condition: parsed.stop_condition as PlanData['stop_condition'],
+      scheduled_time: typeof parsed.scheduled_time === 'string' ? parsed.scheduled_time : undefined,
     };
 
     return new PlanModel(data, path, comment);
   }
 
-  /** 地图名，如 "7-4" */
+  /** 地图名，如 "7-4" 或 "Ex-3" */
   get mapName(): string {
+    if (this.data.chapter === 99) return `Ex-${this.data.map}`;
     return `${this.data.chapter}-${this.data.map}`;
   }
 
@@ -89,5 +91,71 @@ export class PlanModel {
       }
     }
     return lines.join('\n');
+  }
+
+  /** 创建空方案 (新建方案用) */
+  static create(chapter: number, map: number, selectedNodes: string[]): PlanModel {
+    const data: PlanData = {
+      chapter,
+      map,
+      selected_nodes: selectedNodes,
+      fight_condition: 1,
+      repair_mode: 1,
+      fleet_id: 1,
+      node_defaults: { formation: 2, night: false, proceed: true },
+      node_args: {},
+    };
+    return new PlanModel(data, '', '');
+  }
+
+  /** 序列化为 YAML 字符串 */
+  toYaml(): string {
+    const obj: Record<string, unknown> = {
+      chapter: this.data.chapter,
+      map: this.data.map,
+      selected_nodes: this.data.selected_nodes,
+    };
+
+    if (this.data.fleet_id != null) obj.fleet_id = this.data.fleet_id;
+    if (this.data.fight_condition != null) obj.fight_condition = this.data.fight_condition;
+    if (this.data.repair_mode != null) obj.repair_mode = this.data.repair_mode;
+
+    if (this.data.node_defaults && Object.keys(this.data.node_defaults).length > 0) {
+      obj.node_defaults = this.cleanNodeArgs(this.data.node_defaults);
+    }
+
+    if (this.data.node_args) {
+      const cleaned: Record<string, unknown> = {};
+      for (const [nodeId, args] of Object.entries(this.data.node_args)) {
+        const c = this.cleanNodeArgs(args);
+        if (Object.keys(c).length > 0) cleaned[nodeId] = c;
+      }
+      if (Object.keys(cleaned).length > 0) obj.node_args = cleaned;
+    }
+
+    // 任务级字段 (仅导出已设置的)
+    if (this.data.times != null) obj.times = this.data.times;
+    if (this.data.gap != null) obj.gap = this.data.gap;
+    if (this.data.stop_condition != null) obj.stop_condition = this.data.stop_condition;
+    if (this.data.scheduled_time) obj.scheduled_time = this.data.scheduled_time;
+
+    let result = '';
+    if (this.comment) {
+      result = this.comment.split('\n').map(l => `# ${l}`).join('\n') + '\n';
+    }
+    result += yaml.dump(obj, { lineWidth: -1, noRefs: true, sortKeys: false });
+    return result;
+  }
+
+  /** 清理节点参数：移除 undefined 值 */
+  private cleanNodeArgs(args: NodeArgs): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    if (args.formation != null) out.formation = args.formation;
+    if (args.night != null) out.night = args.night;
+    if (args.proceed != null) out.proceed = args.proceed;
+    if (args.SL_when_detour_fails != null) out.SL_when_detour_fails = args.SL_when_detour_fails;
+    if (args.enemy_rules && args.enemy_rules.length > 0) out.enemy_rules = args.enemy_rules;
+    if (args.proceed_stop) out.proceed_stop = args.proceed_stop;
+    return out;
   }
 }

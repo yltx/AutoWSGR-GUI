@@ -2,7 +2,7 @@
  * PlanPreviewView —— 方案预览纯渲染组件。
  * 只接收 PlanPreviewViewObject 并将其渲染到 DOM，不做任何业务判断。
  */
-import type { PlanPreviewViewObject, NodeViewObject, MapNodeType } from './viewObjects';
+import type { PlanPreviewViewObject, NodeViewObject, MapNodeType, MapEdgeVO } from './viewObjects';
 
 const FORMATION_SHORT: Record<string, string> = {
   '单纵阵': '单纵',
@@ -26,7 +26,7 @@ const NODE_TYPE_ICON: Record<MapNodeType, string> = {
 
 /** 节点类型 → 中文名称 */
 const NODE_TYPE_NAME: Record<MapNodeType, string> = {
-  Start: '起始点',
+  Start: '出击点',
   Normal: '普通战斗',
   Boss: 'Boss 点',
   Resource: '资源点',
@@ -44,8 +44,9 @@ export class PlanPreviewView {
   private detailEl: HTMLElement;
   private mapNameEl: HTMLElement;
   private fileNameEl: HTMLElement;
-  private repairEl: HTMLElement;
-  private fightCondEl: HTMLElement;
+  private repairSelect: HTMLSelectElement;
+  private fightCondSelect: HTMLSelectElement;
+  private fleetSelect: HTMLSelectElement;
   private commentEl: HTMLElement;
   private nodeListEl: HTMLElement;
   private nodeEditorEl: HTMLElement;
@@ -55,20 +56,34 @@ export class PlanPreviewView {
 
   /** 外部回调：用户点击某个节点 chip 时触发 */
   onNodeClick?: (nodeId: string) => void;
+  /** 外部回调：方案级别字段修改 */
+  onPlanFieldChange?: (field: 'repair_mode' | 'fight_condition' | 'fleet_id', value: number) => void;
 
   constructor() {
     this.emptyEl = document.getElementById('plan-empty')!;
     this.detailEl = document.getElementById('plan-detail')!;
     this.mapNameEl = document.getElementById('plan-map-name')!;
     this.fileNameEl = document.getElementById('plan-file-name')!;
-    this.repairEl = document.getElementById('plan-repair')!;
-    this.fightCondEl = document.getElementById('plan-fight-cond')!;
+    this.repairSelect = document.getElementById('plan-edit-repair') as HTMLSelectElement;
+    this.fightCondSelect = document.getElementById('plan-edit-fight-cond') as HTMLSelectElement;
+    this.fleetSelect = document.getElementById('plan-edit-fleet') as HTMLSelectElement;
     this.commentEl = document.getElementById('plan-comment')!;
     this.nodeListEl = document.getElementById('node-list')!;
     this.nodeEditorEl = document.getElementById('node-editor')!;
     this.nodeEditorIdEl = document.getElementById('node-editor-id')!;
     this.nodeEditorPlaceholderEl = document.getElementById('node-editor-placeholder')!;
     this.nodeInfoEl = document.getElementById('node-info')!;
+
+    // 方案级别字段变更事件
+    this.repairSelect.addEventListener('change', () => {
+      this.onPlanFieldChange?.('repair_mode', Number(this.repairSelect.value));
+    });
+    this.fightCondSelect.addEventListener('change', () => {
+      this.onPlanFieldChange?.('fight_condition', Number(this.fightCondSelect.value));
+    });
+    this.fleetSelect.addEventListener('change', () => {
+      this.onPlanFieldChange?.('fleet_id', Number(this.fleetSelect.value));
+    });
   }
 
   /** 渲染 Plan 预览 */
@@ -84,15 +99,107 @@ export class PlanPreviewView {
 
     this.mapNameEl.textContent = vo.mapName;
     this.fileNameEl.textContent = vo.fileName;
-    this.repairEl.textContent = vo.repairMode;
-    this.fightCondEl.textContent = vo.fightCondition;
+    this.repairSelect.value = String(vo.repairModeValue);
+    this.fightCondSelect.value = String(vo.fightConditionValue);
+    this.fleetSelect.value = String(vo.fleetId);
     this.commentEl.textContent = vo.comment || '';
 
     // 渲染节点列表
     this.nodeListEl.innerHTML = '';
-    for (const node of vo.selectedNodes) {
-      this.nodeListEl.appendChild(this.createNodeChip(node));
+
+    if (vo.allNodes && vo.edges) {
+      // ── 地图可视化模式 ──
+      this.nodeListEl.classList.add('map-canvas');
+
+      // SVG 连线层 (viewBox 0-100 匹配百分比坐标)
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      svg.classList.add('map-edges');
+      svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('preserveAspectRatio', 'none');
+      this.renderEdges(svg, vo.edges);
+      this.nodeListEl.appendChild(svg);
+
+      // 节点层
+      const selectedSet = new Set(vo.selectedNodes.map(n => n.id));
+      for (const node of vo.allNodes) {
+        const chip = this.createMapNode(node, selectedSet.has(node.id));
+        this.nodeListEl.appendChild(chip);
+      }
+    } else {
+      // ── 传统列表模式 ──
+      this.nodeListEl.classList.remove('map-canvas');
+      for (const node of vo.selectedNodes) {
+        this.nodeListEl.appendChild(this.createNodeChip(node));
+      }
     }
+  }
+
+  /** 渲染 SVG 曲线连线 */
+  private renderEdges(svg: SVGSVGElement, edges: MapEdgeVO[]): void {
+    // 箭头 marker
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    const marker = document.createElementNS('http://www.w3.org/2000/svg', 'marker');
+    marker.setAttribute('id', 'arrowhead');
+    marker.setAttribute('markerWidth', '4');
+    marker.setAttribute('markerHeight', '3');
+    marker.setAttribute('refX', '4');
+    marker.setAttribute('refY', '1.5');
+    marker.setAttribute('orient', 'auto');
+    marker.setAttribute('markerUnits', 'strokeWidth');
+    const arrowPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    arrowPath.setAttribute('d', 'M0,0 L4,1.5 L0,3 Z');
+    arrowPath.setAttribute('fill', 'var(--text-muted)');
+    marker.appendChild(arrowPath);
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+
+    for (const edge of edges) {
+      const [x1, y1] = edge.from;
+      const [x2, y2] = edge.to;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 0.1) continue;
+
+      // 用节点 ID 排序决定曲线弯曲方向，确保双向边弧线对称
+      const sign = edge.fromId < edge.toId ? 1 : -1;
+      const nx = (-dy / dist) * sign;
+      const ny = (dx / dist) * sign;
+      const bulge = dist * 0.10;
+      const cx = (x1 + x2) / 2 + nx * bulge;
+      const cy = (y1 + y2) / 2 + ny * bulge;
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`);
+      path.setAttribute('marker-end', 'url(#arrowhead)');
+      path.classList.add('map-edge-line');
+      svg.appendChild(path);
+    }
+  }
+
+  /** 创建地图定位节点 */
+  private createMapNode(node: NodeViewObject, isSelected: boolean): HTMLElement {
+    const chip = document.createElement('div');
+    const typeCls = `node-type-${node.nodeType.toLowerCase()}`;
+    chip.className = `map-node ${typeCls}${isSelected ? ' map-node-selected' : ''}${node.detour ? ' is-detour' : ''}`;
+    if (node.position) {
+      chip.style.left = node.position[0] + '%';
+      chip.style.top = node.position[1] + '%';
+    }
+    chip.dataset['nodeId'] = node.id;
+
+    // 只显示节点 ID，类型用边框/背景色区分
+    chip.innerHTML = `<span class="map-node-id">${this.escapeHtml(node.id)}</span>`;
+
+    if (isSelected) {
+      chip.addEventListener('click', () => {
+        this.nodeListEl.querySelectorAll('.map-node,.node-chip').forEach(c => c.classList.remove('selected'));
+        chip.classList.add('selected');
+        this.onNodeClick?.(node.id);
+      });
+    }
+
+    return chip;
   }
 
   private createNodeChip(node: NodeViewObject): HTMLElement {
@@ -115,7 +222,7 @@ export class PlanPreviewView {
 
     chip.addEventListener('click', () => {
       // 清除其他 chip 的选中状态
-      this.nodeListEl.querySelectorAll('.node-chip').forEach(c => c.classList.remove('selected'));
+      this.nodeListEl.querySelectorAll('.node-chip,.map-node').forEach(c => c.classList.remove('selected'));
       chip.classList.add('selected');
       this.onNodeClick?.(node.id);
     });
@@ -147,7 +254,7 @@ export class PlanPreviewView {
 
     let desc = '';
     switch (nodeType) {
-      case 'Start': desc = '舰队从此处出发，无战斗或设置。'; break;
+      case 'Start': desc = '舰队从此处出击，无战斗或设置。'; break;
       case 'Resource': desc = '经过此点可获取资源，无需战斗。'; break;
       case 'Penalty': desc = '经过此点会扣除资源，无需战斗。'; break;
     }
@@ -171,7 +278,7 @@ export class PlanPreviewView {
     this.nodeEditorEl.style.display = 'none';
     this.nodeInfoEl.style.display = 'none';
     this.nodeEditorPlaceholderEl.style.display = '';
-    this.nodeListEl.querySelectorAll('.node-chip').forEach(c => c.classList.remove('selected'));
+    this.nodeListEl.querySelectorAll('.node-chip,.map-node').forEach(c => c.classList.remove('selected'));
   }
 
   /** 收集节点编辑面板的当前值 */

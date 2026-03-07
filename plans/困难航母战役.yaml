@@ -1,6 +1,6 @@
-# 困难航母战役 — 刷 3 次困难航母
+# 困难航母战役 — 刷 8 次困难航母
 # 对应后端 API: POST /api/task/start { type: "campaign" }
 
 task_type: campaign
 campaign_name: 困难航母
-times: 3
+times: 8

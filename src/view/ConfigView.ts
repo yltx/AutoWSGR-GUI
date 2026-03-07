@@ -13,6 +13,8 @@ export class ConfigView {
   private autoBattle: HTMLInputElement;
   private battleType: HTMLSelectElement;
   private autoExercise: HTMLInputElement;
+  private exerciseFleetId: HTMLSelectElement;
+  private battleTimes: HTMLInputElement;
   private themeMode: HTMLSelectElement;
   private accentColor: HTMLInputElement;
   private accentLabel: HTMLElement;
@@ -26,6 +28,8 @@ export class ConfigView {
     this.autoBattle = document.getElementById('cfg-auto-battle') as HTMLInputElement;
     this.battleType = document.getElementById('cfg-battle-type') as HTMLSelectElement;
     this.autoExercise = document.getElementById('cfg-auto-exercise') as HTMLInputElement;
+    this.exerciseFleetId = document.getElementById('cfg-exercise-fleet') as HTMLSelectElement;
+    this.battleTimes = document.getElementById('cfg-battle-times') as HTMLInputElement;
     this.themeMode = document.getElementById('cfg-theme-mode') as HTMLSelectElement;
     this.accentColor = document.getElementById('cfg-accent-color') as HTMLInputElement;
     this.accentLabel = document.getElementById('cfg-accent-label')!;
@@ -46,6 +50,8 @@ export class ConfigView {
     this.autoBattle.checked = vo.autoBattle;
     this.battleType.value = vo.battleType;
     this.autoExercise.checked = vo.autoExercise;
+    this.exerciseFleetId.value = String(vo.exerciseFleetId);
+    this.battleTimes.value = String(vo.battleTimes);
     this.themeMode.value = vo.themeMode;
     this.accentColor.value = vo.accentColor;
     this.accentLabel.textContent = vo.accentColor;
@@ -62,6 +68,8 @@ export class ConfigView {
       autoBattle: this.autoBattle.checked,
       battleType: this.battleType.value,
       autoExercise: this.autoExercise.checked,
+      exerciseFleetId: Number(this.exerciseFleetId.value) || 1,
+      battleTimes: Number(this.battleTimes.value) || 3,
       themeMode: this.themeMode.value as 'dark' | 'light' | 'system',
       accentColor: this.accentColor.value,
     };

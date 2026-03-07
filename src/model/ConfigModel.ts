@@ -16,7 +16,9 @@ const DEFAULT_SETTINGS: UserSettings = {
     auto_expedition: true,
     auto_battle: false,
     battle_type: '困难潜艇',
+    battle_times: 3,
     auto_exercise: false,
+    exercise_fleet_id: 1,
   },
 };
 

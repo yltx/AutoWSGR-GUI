@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('save-file', filePath, content);
   },
 
+  saveFileDialog: (defaultName: string, content: string, filters: { name: string; extensions: string[] }[]) => {
+    return ipcRenderer.invoke('save-file-dialog', defaultName, content, filters);
+  },
+
   readFile: (filePath: string) => {
     return ipcRenderer.invoke('read-file', filePath);
   },

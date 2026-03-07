@@ -11,6 +11,7 @@ import type {
   MainViewObject,
   PlanPreviewViewObject,
   NodeViewObject,
+  MapEdgeVO,
   ConfigViewObject,
   TaskQueueItemVO,
   LogEntryVO,
@@ -24,6 +25,7 @@ import {
   type SchedulerTask,
   type SchedulerStatus,
 } from '../model/Scheduler';
+import { CronScheduler } from '../model/CronScheduler';
 import type { NormalFightReq, TaskRequest } from '../model/ApiClient';
 import {
   FORMATION_NAMES,
@@ -32,7 +34,7 @@ import {
   type TaskPreset,
   type EnemyRule,
 } from '../model/types';
-import { loadMapData, getNodeType, isDetourNode } from '../model/MapDataLoader';
+import { loadMapData, loadExMapData, getNodeType, isDetourNode } from '../model/MapDataLoader';
 
 /** 将 repair_mode（数字或数组）转换为显示文本 */
 function resolveRepairModeLabel(mode: number | number[]): string {
@@ -52,6 +54,7 @@ import type { MapData } from '../model/MapDataLoader';
 interface ElectronBridge {
   openFileDialog: (filters: { name: string; extensions: string[] }[]) => Promise<{ path: string; content: string } | null>;
   saveFile: (path: string, content: string) => Promise<void>;
+  saveFileDialog: (defaultName: string, content: string, filters: { name: string; extensions: string[] }[]) => Promise<string | null>;
   readFile: (path: string) => Promise<string>;
   detectEmulator: () => Promise<{ type: string; path: string; serial: string; adbPath: string } | null>;
   getAppRoot: () => Promise<string>;
@@ -110,6 +113,7 @@ export class AppController {
   // ── 调度相关 ──
   private api: ApiClient;
   private scheduler: Scheduler;
+  private cronScheduler: CronScheduler;
   private wsConnected = false;
   private expeditionTimerText = '--:--';
   private currentProgress = '';
@@ -124,6 +128,15 @@ export class AppController {
 
     this.api = new ApiClient();
     this.scheduler = new Scheduler(this.api);
+
+    const cfg = this.configModel.current.daily_automation;
+    this.cronScheduler = new CronScheduler({
+      autoExercise: cfg.auto_exercise,
+      exerciseFleetId: cfg.exercise_fleet_id,
+      autoBattle: cfg.auto_battle,
+      battleType: cfg.battle_type,
+      battleTimes: cfg.battle_times,
+    });
   }
 
   /** 初始化：绑定事件、渲染初始状态、自动连接后端 */
@@ -132,12 +145,18 @@ export class AppController {
     this.bindNavigation();
     this.bindActions();
     this.bindSchedulerCallbacks();
+    this.bindCronCallbacks();
     this.renderMain();
     this.planView.render(null);
 
     // 监听系统主题变化
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       if (this.getThemeMode() === 'system') this.applyTheme();
+    });
+
+    // 窗口关闭时保存定时调度器状态 (用于下次启动时检测错过的刷新)
+    window.addEventListener('beforeunload', () => {
+      this.cronScheduler.saveState();
     });
 
     // 加载配置 → 自动检测模拟器 → 渲染 → 连接
@@ -306,6 +325,8 @@ export class AppController {
     this.scheduler.start(configPath).then((ok) => {
       if (ok) {
         this.appendLocalLog('info', '系统启动成功 ✓');
+        this.cronScheduler.start();
+        this.appendLocalLog('info', '定时调度器已启动');
       } else {
         this.appendLocalLog('error', '系统启动失败 (模拟器连接/游戏启动异常)');
       }
@@ -485,6 +506,31 @@ export class AppController {
       localStorage.setItem('accentColor', color);
       this.applyTheme();
     });
+
+    // 方案：导出 YAML
+    document.getElementById('btn-export-plan')?.addEventListener('click', () => this.exportPlan());
+
+    // 方案：新建
+    document.getElementById('btn-new-plan')?.addEventListener('click', () => this.showNewPlanDialog());
+    document.getElementById('btn-new-plan-confirm')?.addEventListener('click', () => this.confirmNewPlan());
+    document.getElementById('btn-new-plan-cancel')?.addEventListener('click', () => this.hideNewPlanDialog());
+
+    // 新建方案：切换海域时更新地图下拉选项（Ex 系列 1-12，普通章节 1-6）
+    document.getElementById('new-plan-chapter')?.addEventListener('change', (e) => {
+      const val = (e.target as HTMLSelectElement).value;
+      const mapSelect = document.getElementById('new-plan-map') as HTMLSelectElement;
+      const count = val === 'Ex' ? 12 : 6;
+      mapSelect.innerHTML = Array.from({length: count}, (_, i) =>
+        `<option value="${i + 1}">${i + 1}</option>`).join('');
+    });
+
+    // 方案：plan-level 字段修改回调
+    this.planView.onPlanFieldChange = (field, value) => {
+      if (!this.currentPlan) return;
+      if (field === 'repair_mode') this.currentPlan.data.repair_mode = value;
+      else if (field === 'fight_condition') this.currentPlan.data.fight_condition = value;
+      else if (field === 'fleet_id') this.currentPlan.data.fleet_id = value;
+    };
   }
 
   // ════════════════════════════════════════
@@ -537,6 +583,44 @@ export class AppController {
     });
   }
 
+  /** 绑定定时调度器回调 */
+  private bindCronCallbacks(): void {
+    this.cronScheduler.setCallbacks({
+      onExerciseDue: (fleetId) => {
+        this.scheduler.addTask(
+          '自动演习',
+          'exercise',
+          { type: 'exercise', fleet_id: fleetId },
+          TaskPriority.DAILY,
+          1,
+        );
+        this.appendLocalLog('info', `自动演习已加入队列 (舰队 ${fleetId})`);
+        this.scheduler.startConsuming();
+      },
+
+      onCampaignDue: (campaignName, times) => {
+        this.scheduler.addTask(
+          `自动战役·${campaignName}`,
+          'campaign',
+          { type: 'campaign', campaign_name: campaignName, times },
+          TaskPriority.DAILY,
+          times,
+        );
+        this.appendLocalLog('info', `自动战役已加入队列 (${campaignName} ×${times})`);
+        this.scheduler.startConsuming();
+      },
+
+      onScheduledTaskDue: (taskKey) => {
+        this.appendLocalLog('info', `定时任务「${taskKey}」已触发`);
+        // scheduled tasks are handled via plan re-import (future extension)
+      },
+
+      onLog: (level, message) => {
+        this.appendLocalLog(level, message);
+      },
+    });
+  }
+
   // ════════════════════════════════════════
   // 核心流程：导入 Plan
   // ════════════════════════════════════════
@@ -559,7 +643,10 @@ export class AppController {
       // 含 chapter + map 的文件视为战斗方案 (可能同时含 times/stop_condition 等任务字段)
       if (parsed && typeof parsed === 'object' && 'chapter' in parsed && 'map' in parsed) {
         this.currentPlan = PlanModel.fromYaml(result.content, result.path);
-        this.currentMapData = await loadMapData(this.currentPlan.data.chapter, this.currentPlan.data.map);
+        const { chapter, map } = this.currentPlan.data;
+        this.currentMapData = chapter === 99
+          ? await loadExMapData(map)
+          : await loadMapData(chapter, map);
         this.renderPlanPreview();
         this.switchPage('plan');
         return;
@@ -771,6 +858,77 @@ export class AppController {
     this.planView.hideNodeEditor();
   }
 
+  /** 导出当前方案为 YAML 文件 */
+  private async exportPlan(): Promise<void> {
+    if (!this.currentPlan) return;
+    const bridge = window.electronBridge;
+    if (!bridge) return;
+
+    const yamlStr = this.currentPlan.toYaml();
+    const defaultName = this.currentPlan.fileName
+      ? this.currentPlan.fileName.split(/[\\/]/).pop() || `${this.currentPlan.mapName}.yaml`
+      : `${this.currentPlan.mapName}.yaml`;
+
+    const saved = await bridge.saveFileDialog(defaultName, yamlStr, [
+      { name: 'YAML 方案', extensions: ['yaml', 'yml'] },
+    ]);
+    if (saved) {
+      this.currentPlan.fileName = saved;
+      this.appendLocalLog('info', `方案已导出: ${saved}`);
+      this.renderPlanPreview();
+    }
+  }
+
+  /** 显示新建方案对话框 */
+  private showNewPlanDialog(): void {
+    document.getElementById('new-plan-dialog')!.style.display = '';
+  }
+
+  /** 隐藏新建方案对话框 */
+  private hideNewPlanDialog(): void {
+    document.getElementById('new-plan-dialog')!.style.display = 'none';
+  }
+
+  /** 确认新建方案 */
+  private async confirmNewPlan(): Promise<void> {
+    const chapterVal = (document.getElementById('new-plan-chapter') as HTMLSelectElement).value;
+    this.hideNewPlanDialog();
+
+    try {
+      let mapData: MapData | null;
+      let chapter: number;
+      let map: number;
+      let mapLabel: string;
+
+      map = parseInt((document.getElementById('new-plan-map') as HTMLSelectElement).value, 10);
+
+      if (chapterVal === 'Ex') {
+        mapData = await loadExMapData(map);
+        chapter = 99;
+        mapLabel = `Ex-${map}`;
+      } else {
+        chapter = parseInt(chapterVal, 10);
+        mapData = await loadMapData(chapter, map);
+        mapLabel = `${chapter}-${map}`;
+      }
+
+      if (!mapData) {
+        this.appendLocalLog('error', `地图 ${mapLabel} 数据不存在`);
+        return;
+      }
+
+      const allNodes = Object.keys(mapData).sort();
+      this.currentPlan = PlanModel.create(chapter, map, allNodes);
+      this.currentMapData = mapData;
+      this.renderPlanPreview();
+      this.switchPage('plan');
+      this.appendLocalLog('info', `已新建方案 ${mapLabel}，共 ${allNodes.length} 个节点`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.appendLocalLog('error', `新建方案失败: ${msg}`);
+    }
+  }
+
   private renderPlanPreview(): void {
     if (!this.currentPlan) {
       this.planView.render(null);
@@ -779,6 +937,9 @@ export class AppController {
 
     const plan = this.currentPlan;
     const mapData = this.currentMapData;
+    const selectedSet = new Set(plan.data.selected_nodes);
+
+    // 已选节点 VO
     const nodes: NodeViewObject[] = plan.data.selected_nodes.map((nodeId) => {
       const args = plan.getNodeArgs(nodeId);
       return {
@@ -793,15 +954,83 @@ export class AppController {
       };
     });
 
+    // 构建地图可视化数据
+    let allNodes: NodeViewObject[] | undefined;
+    let edges: MapEdgeVO[] | undefined;
+    if (mapData) {
+      // 收集所有位置坐标以计算边界
+      const positions = new Map<string, [number, number]>();
+      for (const [id, pt] of Object.entries(mapData)) {
+        if (pt.position) positions.set(id, pt.position);
+      }
+
+      if (positions.size > 0) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const [x, y] of positions.values()) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        }
+
+        // 归一化到 0-100 百分比坐标，保持比例
+        const rangeX = maxX - minX || 1;
+        const rangeY = maxY - minY || 1;
+        const PAD = 6;
+        const innerW = 100 - PAD * 2;
+        const innerH = 100 - PAD * 2;
+        const scale = Math.min(innerW / rangeX, innerH / rangeY);
+        const offsetX = PAD + (innerW - rangeX * scale) / 2;
+        const offsetY = PAD + (innerH - rangeY * scale) / 2;
+
+        const scaledPos = new Map<string, [number, number]>();
+        for (const [id, [x, y]] of positions) {
+          scaledPos.set(id, [(x - minX) * scale + offsetX, (y - minY) * scale + offsetY]);
+        }
+
+        // 全部节点 VO (含未选中的)
+        allNodes = Object.entries(mapData).map(([id, pt]) => {
+          const args = plan.getNodeArgs(id);
+          const isSelected = selectedSet.has(id);
+          return {
+            id,
+            formation: isSelected ? (FORMATION_NAMES[args.formation ?? 2] ?? '复纵阵') : '',
+            night: isSelected ? (args.night ?? false) : false,
+            proceed: isSelected ? (args.proceed ?? true) : true,
+            hasCustomRules: isSelected ? plan.hasCustomArgs(id) : false,
+            note: '',
+            nodeType: pt.type,
+            detour: pt.detour,
+            position: scaledPos.get(id),
+          };
+        });
+
+        // 连线
+        edges = [];
+        for (const [id, pt] of Object.entries(mapData)) {
+          const fromPos = scaledPos.get(id);
+          if (!fromPos) continue;
+          for (const nxt of pt.next) {
+            const toPos = scaledPos.get(nxt);
+            if (toPos) edges.push({ from: fromPos, to: toPos, fromId: id, toId: nxt });
+          }
+        }
+
+      }
+    }
+
     const vo: PlanPreviewViewObject = {
       fileName: plan.fileName.split(/[\\/]/).pop() || plan.fileName,
       chapter: plan.data.chapter,
       map: plan.data.map,
       mapName: plan.mapName,
-      repairMode: resolveRepairModeLabel(plan.repairMode),
-      fightCondition: FIGHT_CONDITION_NAMES[plan.fightCondition] ?? '稳步前进',
+      repairModeValue: Array.isArray(plan.repairMode) ? plan.repairMode[0] ?? 1 : plan.repairMode,
+      fightConditionValue: plan.fightCondition,
+      fleetId: plan.data.fleet_id ?? 1,
       selectedNodes: nodes,
       comment: plan.comment,
+      allNodes,
+      edges,
     };
 
     this.planView.render(vo);
@@ -824,6 +1053,8 @@ export class AppController {
       autoBattle: cfg.daily_automation.auto_battle,
       battleType: cfg.daily_automation.battle_type,
       autoExercise: cfg.daily_automation.auto_exercise,
+      exerciseFleetId: cfg.daily_automation.exercise_fleet_id,
+      battleTimes: cfg.daily_automation.battle_times,
       themeMode: this.getThemeMode(),
       accentColor: this.getAccentColor(),
     };
@@ -850,7 +1081,19 @@ export class AppController {
         auto_battle: collected.autoBattle,
         battle_type: collected.battleType,
         auto_exercise: collected.autoExercise,
+        exercise_fleet_id: collected.exerciseFleetId,
+        battle_times: collected.battleTimes,
       },
+    });
+
+    // 同步定时调度器
+    const da = this.configModel.current.daily_automation;
+    this.cronScheduler.updateConfig({
+      autoExercise: da.auto_exercise,
+      exerciseFleetId: da.exercise_fleet_id,
+      autoBattle: da.auto_battle,
+      battleType: da.battle_type,
+      battleTimes: da.battle_times,
     });
 
     const yamlStr = this.configModel.toYaml();

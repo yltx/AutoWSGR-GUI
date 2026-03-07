@@ -110,6 +110,16 @@ ipcMain.handle('save-file', async (_event, filePath: string, content: string) =>
   fs.writeFileSync(resolved, content, 'utf-8');
 });
 
+ipcMain.handle('save-file-dialog', async (_event, defaultName: string, content: string, filters: Electron.FileFilter[]) => {
+  const result = await dialog.showSaveDialog({
+    defaultPath: defaultName,
+    filters,
+  });
+  if (result.canceled || !result.filePath) return null;
+  fs.writeFileSync(result.filePath, content, 'utf-8');
+  return result.filePath;
+});
+
 ipcMain.handle('read-file', async (_event, filePath: string) => {
   const resolved = resolveAppPath(filePath);
   return fs.readFileSync(resolved, 'utf-8');

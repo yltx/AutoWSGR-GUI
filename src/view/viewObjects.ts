@@ -61,6 +61,15 @@ export interface NodeViewObject {
   note: string;                   // 简要备注
   nodeType: MapNodeType;          // 地图数据中的节点类型
   detour: boolean;                // 是否为迂回点
+  position?: [number, number];    // 地图上的坐标 (已缩放)
+}
+
+/** 地图边 (连线) */
+export interface MapEdgeVO {
+  from: [number, number];
+  to: [number, number];
+  fromId: string;
+  toId: string;
 }
 
 /** Plan 预览 VO */
@@ -69,10 +78,15 @@ export interface PlanPreviewViewObject {
   chapter: number;
   map: number;
   mapName: string;                // "7-4" 格式
-  repairMode: string;             // "中破就修" / "大破才修"
-  fightCondition: string;         // 战况中文名
+  repairModeValue: number;        // 1 或 2
+  fightConditionValue: number;    // 1-5
+  fleetId: number;                // 1-4
   selectedNodes: NodeViewObject[];
   comment: string;                // yaml 文件顶部注释
+  /** 所有地图节点（含未选中的），用于地图可视化 */
+  allNodes?: NodeViewObject[];
+  /** 地图连线 */
+  edges?: MapEdgeVO[];
 }
 
 // ════════════════════════════════════════
@@ -88,6 +102,8 @@ export interface ConfigViewObject {
   autoBattle: boolean;
   battleType: string;
   autoExercise: boolean;
+  exerciseFleetId: number;
+  battleTimes: number;
   themeMode: 'dark' | 'light' | 'system';
   accentColor: string;
 }
