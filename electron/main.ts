@@ -552,6 +552,88 @@ function writeEnvMarker(pythonCmd: string, pythonVersion: string, autowsgrVersio
   } catch { /* ignore */ }
 }
 
+/** 检查 autowsgr 是否有 PyPI 更新，有则自动升级；返回最终的已安装版本 */
+async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
+  try {
+    sendProgress('正在检查 autowsgr 更新…');
+
+    // 单次 Python 调用: 获取本地版本 + PyPI 最新版本
+    const spFwd = localSitePackages().replace(/\\/g, '\\\\');
+    const checkScript = [
+      'import json, sys',
+      `sys.path.insert(0, r'${spFwd}')`,
+      'result = {}',
+      'try:',
+      '    import autowsgr; result["local"] = autowsgr.__version__',
+      'except: result["local"] = None',
+      'try:',
+      '    import urllib.request',
+      '    data = json.loads(urllib.request.urlopen("https://pypi.org/pypi/autowsgr/json", timeout=10).read())',
+      '    result["latest"] = data["info"]["version"]',
+      'except: result["latest"] = None',
+      'print(json.dumps(result))',
+    ].join('\n');
+
+    const scriptPath = path.join(app.getPath('temp'), 'autowsgr_update_check.py');
+    fs.writeFileSync(scriptPath, checkScript, 'utf-8');
+
+    const { stdout } = await execAsync(
+      `"${pythonCmd}" "${scriptPath}"`,
+      { windowsHide: true, timeout: 20000, env: pipEnv() },
+    );
+    try { fs.unlinkSync(scriptPath); } catch { /* ignore */ }
+
+    const info = JSON.parse(stdout.trim());
+    const localVer: string | null = info.local;
+    const latestVer: string | null = info.latest;
+
+    if (!latestVer) {
+      sendProgress('autowsgr 更新检查跳过（无法获取最新版本信息）');
+      return localVer;
+    }
+
+    if (localVer === latestVer) {
+      sendProgress(`autowsgr ${localVer} 已是最新版 ✓`);
+      return localVer;
+    }
+
+    // 有更新，自动升级
+    sendProgress(`发现 autowsgr 更新: ${localVer ?? '未安装'} → ${latestVer}，正在自动升级…`);
+    const targetDir = localSitePackages();
+    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+    const exitCode = await new Promise<number>((resolve) => {
+      const proc = spawn(pythonCmd, [
+        '-m', 'pip', 'install',
+        '--target', targetDir,
+        '--upgrade',
+        'setuptools',
+        'autowsgr',
+      ], {
+        cwd: appRoot(),
+        windowsHide: true,
+        stdio: 'pipe',
+        env: pipEnv(),
+      });
+      proc.stdout?.on('data', () => { /* suppress verbose pip output */ });
+      proc.stderr?.on('data', () => { /* suppress */ });
+      proc.on('close', (code) => resolve(code ?? 1));
+      proc.on('error', () => resolve(1));
+    });
+
+    if (exitCode === 0) {
+      sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
+      return latestVer;
+    } else {
+      sendProgress('WARNING autowsgr 升级失败，使用当前版本继续');
+      return localVer;
+    }
+  } catch {
+    sendProgress('autowsgr 更新检查跳过（网络不可用或超时）');
+    return null;
+  }
+}
+
 /** 检查 Python 环境和所需包 */
 async function checkEnvironment(): Promise<EnvCheckResult> {
   sendProgress('正在检查运行环境…');
@@ -560,8 +642,14 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   // ── 快速路径: 如果标记文件存在且有效，跳过重量级依赖检查 ──
   const marker = readEnvMarker();
   if (marker) {
-    sendProgress(`环境就绪 (缓存: ${marker.pythonVersion}, autowsgr ${marker.autowsgrVersion}) ✓`);
     cachedPythonCmd = marker.pythonCmd;
+    // 每次启动检查并自动更新 autowsgr
+    const updatedVer = await autoUpdateAutowsgr(marker.pythonCmd);
+    const finalVer = updatedVer ?? marker.autowsgrVersion;
+    if (updatedVer && updatedVer !== marker.autowsgrVersion) {
+      writeEnvMarker(marker.pythonCmd, marker.pythonVersion, finalVer);
+    }
+    sendProgress(`环境就绪 (${marker.pythonVersion}, autowsgr ${finalVer}) ✓`);
     return {
       pythonCmd: marker.pythonCmd,
       pythonVersion: marker.pythonVersion,
@@ -648,8 +736,10 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
   const allReady = missingPackages.length === 0;
   if (allReady) {
     sendProgress('依赖检查通过 ✓');
-    // 写入标记文件，下次启动可跳过检查
-    writeEnvMarker(pythonCmd, pythonVersion || '', autowsgrVersion);
+    // 检查并自动更新 autowsgr
+    const updatedVer = await autoUpdateAutowsgr(pythonCmd);
+    const finalVer = updatedVer || autowsgrVersion;
+    writeEnvMarker(pythonCmd, pythonVersion || '', finalVer);
   }
 
   return {
