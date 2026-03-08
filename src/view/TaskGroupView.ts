@@ -25,6 +25,8 @@ export class TaskGroupView {
   onRemoveItem?: (index: number) => void;
   onTimesChange?: (index: number, times: number) => void;
   onMoveItem?: (fromIndex: number, toIndex: number) => void;
+  onExportGroup?: () => void;
+  onImportGroup?: () => void;
 
   constructor() {
     this.selectEl = document.getElementById('task-group-select') as HTMLSelectElement;
@@ -39,6 +41,8 @@ export class TaskGroupView {
     document.getElementById('btn-tg-rename')?.addEventListener('click', () => this.onRenameGroup?.());
     document.getElementById('btn-tg-load-all')?.addEventListener('click', () => this.onLoadAll?.());
     document.getElementById('btn-tg-add-file')?.addEventListener('click', () => this.onAddFile?.());
+    document.getElementById('btn-tg-export')?.addEventListener('click', () => this.onExportGroup?.());
+    document.getElementById('btn-tg-import')?.addEventListener('click', () => this.onImportGroup?.());
   }
 
   render(vo: TaskGroupViewObject): void {

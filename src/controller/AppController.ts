@@ -705,6 +705,10 @@ export class AppController {
 
     this.taskGroupView.onAddFile = () => this.addFileToGroup();
 
+    this.taskGroupView.onExportGroup = () => this.exportTaskGroup();
+
+    this.taskGroupView.onImportGroup = () => this.importTaskGroup();
+
     // 方案预览页「加入任务组」按钮
     document.getElementById('btn-add-to-group')?.addEventListener('click', () => this.addCurrentPlanToGroup());
   }
@@ -717,6 +721,80 @@ export class AppController {
       activeGroupName: this.taskGroupModel.activeGroupName,
       items: active?.items ?? [],
     });
+  }
+
+  /** 导出当前任务列表为 JSON 文件 */
+  private async exportTaskGroup(): Promise<void> {
+    const group = this.taskGroupModel.getActiveGroup();
+    if (!group || group.items.length === 0) {
+      this.appendLocalLog('warn', '当前任务列表为空，无法导出');
+      return;
+    }
+    const bridge = window.electronBridge;
+    if (!bridge) return;
+
+    const data = { name: group.name, items: group.items };
+    const json = JSON.stringify(data, null, 2);
+    const saved = await bridge.saveFileDialog(
+      `${group.name}.taskgroup.json`,
+      json,
+      [{ name: '任务列表模板', extensions: ['taskgroup.json', 'json'] }],
+    );
+    if (saved) {
+      this.appendLocalLog('info', `已导出任务列表「${group.name}」`);
+    }
+  }
+
+  /** 从 JSON 文件导入任务列表 */
+  private async importTaskGroup(): Promise<void> {
+    const bridge = window.electronBridge;
+    if (!bridge) return;
+
+    const result = await bridge.openFileDialog([
+      { name: '任务列表模板', extensions: ['taskgroup.json', 'json'] },
+    ]);
+    if (!result) return;
+
+    let data: { name?: string; items?: unknown[] };
+    try {
+      data = JSON.parse(result.content);
+    } catch {
+      await this.showAlert('导入失败', '文件格式不正确，无法解析 JSON。');
+      return;
+    }
+
+    if (!Array.isArray(data.items) || data.items.length === 0) {
+      await this.showAlert('导入失败', '模板中没有有效的任务条目。');
+      return;
+    }
+
+    // 确定列表名称
+    let groupName = typeof data.name === 'string' && data.name.trim() ? data.name.trim() : '导入的列表';
+    // 如果已有同名列表，加后缀
+    if (this.taskGroupModel.getGroup(groupName)) {
+      let suffix = 2;
+      while (this.taskGroupModel.getGroup(`${groupName} (${suffix})`)) suffix++;
+      groupName = `${groupName} (${suffix})`;
+    }
+
+    this.taskGroupModel.upsertGroup(groupName);
+    this.taskGroupModel.setActiveGroup(groupName);
+
+    for (const raw of data.items) {
+      if (!raw || typeof raw !== 'object') continue;
+      const item = raw as Record<string, unknown>;
+      if (typeof item.path !== 'string' || typeof item.kind !== 'string') continue;
+      this.taskGroupModel.addItem(groupName, {
+        path: item.path,
+        kind: item.kind === 'preset' ? 'preset' : 'plan',
+        times: typeof item.times === 'number' && item.times > 0 ? item.times : 1,
+        label: typeof item.label === 'string' ? item.label : item.path.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? String(item.path),
+      });
+    }
+
+    this.taskGroupModel.save();
+    this.renderTaskGroup();
+    this.appendLocalLog('info', `已导入任务列表「${groupName}」（${data.items.length} 项）`);
   }
 
   /** 将当前方案页预览的方案加入活跃任务组 */
