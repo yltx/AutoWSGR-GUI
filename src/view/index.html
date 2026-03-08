@@ -64,8 +64,15 @@
               <h3>任务列表</h3>
               <div class="task-group-selector">
                 <select class="input input-sm" id="task-group-select"></select>
-                <button class="btn btn-small" id="btn-tg-new" title="新建组">＋</button>
-                <button class="btn btn-small btn-danger" id="btn-tg-delete" title="删除组">🗑</button>
+                <button class="btn btn-small tg-icon-btn" id="btn-tg-new" title="新建组">
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
+                </button>
+                <button class="btn btn-small tg-icon-btn" id="btn-tg-rename" title="重命名">
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-9.5 9.5a.5.5 0 0 1-.168.11l-4 1.5a.5.5 0 0 1-.632-.632l1.5-4a.5.5 0 0 1 .11-.168l9.5-9.5zM11.207 2L2 11.207l-.94 2.507.466.466 2.507-.94L13.207 4.067 11.207 2z"/></svg>
+                </button>
+                <button class="btn btn-small btn-danger tg-icon-btn" id="btn-tg-delete" title="删除组">
+                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1h2a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
+                </button>
               </div>
             </div>
             <div class="task-group-items" id="task-group-items">
@@ -74,7 +81,6 @@
             <div class="task-group-actions">
               <button class="btn btn-primary btn-small" id="btn-tg-load-all">全部加入队列</button>
               <button class="btn btn-small" id="btn-tg-add-file">从文件添加</button>
-              <button class="btn btn-small" id="btn-tg-rename" title="重命名">✎</button>
             </div>
           </div>
 
@@ -84,7 +90,31 @@
         <!-- 右侧：日志 -->
         <div class="main-right">
           <div class="card log-card">
-            <h3>日志</h3>
+            <div class="log-header">
+              <h3>日志</h3>
+              <div class="log-filters" id="log-filters">
+                <button class="log-filter-btn active" data-level="debug" title="调试">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 0-.5.5v1.02a4.5 4.5 0 0 0-1.87 1.16L.94 2.94a.5.5 0 1 0-.38.92l1.2.5A4.5 4.5 0 0 0 1.5 5.5H.5a.5.5 0 0 0 0 1h1.05a4.5 4.5 0 0 0 .55 1.53l-1.16.48a.5.5 0 1 0 .38.92l1.19-.49a4.5 4.5 0 0 0 1.99 1.56v.5a.5.5 0 0 0 1 0v-.16A4.5 4.5 0 0 0 8 11.5a4.5 4.5 0 0 0 2-.44v.44a.5.5 0 0 0 1 0v-.78a4.5 4.5 0 0 0 1.69-1.28l1.19.49a.5.5 0 1 0 .38-.92l-1.16-.48A4.5 4.5 0 0 0 13.5 7h.5a.5.5 0 0 0 0-1h-1a4.5 4.5 0 0 0-.26-1.14l1.2-.5a.5.5 0 1 0-.38-.92l-1.19.74A4.5 4.5 0 0 0 11 2.52V1.5a.5.5 0 0 0-1 0v.68A4.5 4.5 0 0 0 8 1.5a4.5 4.5 0 0 0-2 .68V1.5a.5.5 0 0 0-.5-.5zM8 3a3.5 3.5 0 0 1 3.5 3.5v1A3.5 3.5 0 0 1 8 11a3.5 3.5 0 0 1-3.5-3.5v-1A3.5 3.5 0 0 1 8 3z"/></svg>
+                  <span class="log-filter-label">调试</span>
+                  <span class="log-filter-count" id="log-count-debug">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="info" title="信息">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm0 3a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM7 7.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H8V8h-.5a.5.5 0 0 1-.5-.5z"/></svg>
+                  <span class="log-filter-label">信息</span>
+                  <span class="log-filter-count" id="log-count-info">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="warning" title="警告">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.134 1.503a1 1 0 0 1 1.732 0l6 10.392A1 1 0 0 1 14 13.5H2a1 1 0 0 1-.866-1.5l6-10.497zM8 4.5a.5.5 0 0 0-.5.5v3.5a.5.5 0 0 0 1 0V5a.5.5 0 0 0-.5-.5zm0 6a.625.625 0 1 0 0 1.25.625.625 0 0 0 0-1.25z"/></svg>
+                  <span class="log-filter-label">警告</span>
+                  <span class="log-filter-count" id="log-count-warning">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="error" title="错误">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm2.354 3.146a.5.5 0 0 1 0 .708L8.707 8l1.647 1.646a.5.5 0 0 1-.708.708L8 8.707l-1.646 1.647a.5.5 0 0 1-.708-.708L7.293 8 5.646 6.354a.5.5 0 0 1 .708-.708L8 7.293l1.646-1.647a.5.5 0 0 1 .708 0z"/></svg>
+                  <span class="log-filter-label">错误</span>
+                  <span class="log-filter-count" id="log-count-error">0</span>
+                </button>
+              </div>
+            </div>
             <div class="log-container" id="log-container"></div>
           </div>
         </div>
@@ -346,6 +376,12 @@
             <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
             <button class="btn btn-small" id="btn-reset-accent">重置</button>
           </div>
+        </div>
+
+        <hr class="card-divider">
+
+        <div class="form-group">
+          <label><input type="checkbox" id="cfg-debug-mode"> 调试模式（显示全部日志）</label>
         </div>
       </div>
 

@@ -114,4 +114,5 @@ export interface ConfigViewObject {
   battleTimes: number;
   themeMode: 'dark' | 'light' | 'system';
   accentColor: string;
+  debugMode: boolean;
 }

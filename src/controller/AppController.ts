@@ -122,6 +122,8 @@ export class AppController {
   private api: ApiClient;
   private scheduler: Scheduler;
   private cronScheduler: CronScheduler;
+  private pendingExerciseTaskId: string | null = null;
+  private pendingBattleTaskId: string | null = null;
   private wsConnected = false;
   private expeditionTimerText = '--:--';
   private currentProgress = '';
@@ -167,9 +169,8 @@ export class AppController {
       if (this.getThemeMode() === 'system') this.applyTheme();
     });
 
-    // 窗口关闭时保存定时调度器状态 (用于下次启动时检测错过的刷新)
+    // 窗口关闭时保存任务组状态
     window.addEventListener('beforeunload', () => {
-      this.cronScheduler.saveState();
       this.taskGroupModel.save();
     });
 
@@ -231,8 +232,19 @@ export class AppController {
 
     // ── 3. 加载配置 & 检测模拟器 ──
     await this.loadConfig();
+    // 将磁盘配置同步到定时调度器 (构造时使用的是默认值)
+    const da = this.configModel.current.daily_automation;
+    this.cronScheduler.updateConfig({
+      autoExercise: da.auto_exercise,
+      exerciseFleetId: da.exercise_fleet_id,
+      autoBattle: da.auto_battle,
+      battleType: da.battle_type,
+      battleTimes: da.battle_times,
+    });
     await this.detectAndApplyEmulator();
     this.renderConfig();
+    // 初始化调试模式
+    this.mainView.setDebugMode(localStorage.getItem('debugMode') === 'true');
 
     // ── 4. 启动后端 & 连接 ──
     this.appendLocalLog('info', '正在启动后端服务…');
@@ -365,10 +377,20 @@ export class AppController {
         this.appendLocalLog('error', '系统启动失败 (模拟器连接/游戏启动异常)');
       }
       this.renderMain();
-    }).catch((e) => {
+    }).catch(async (e) => {
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes('abort')) {
-        this.appendLocalLog('error', '系统启动超时 (模拟器连接耗时过长)');
+        // HTTP 超时但后端可能已完成 —— 尝试恢复
+        this.appendLocalLog('warn', '系统启动 HTTP 请求超时，正在检测后端状态…');
+        const alive = await this.scheduler.ping();
+        if (alive) {
+          this.appendLocalLog('info', '后端已就绪，正在恢复连接…');
+          this.scheduler.recoverAfterTimeout();
+          this.cronScheduler.start();
+          this.appendLocalLog('info', '定时调度器已启动');
+        } else {
+          this.appendLocalLog('error', '系统启动超时且后端未响应 (模拟器连接耗时过长)');
+        }
       } else {
         this.appendLocalLog('error', `系统启动异常: ${msg}`);
       }
@@ -821,8 +843,25 @@ export class AppController {
         this.renderMain();
       },
 
-      onTaskCompleted: (_taskId, _success, _result, _error) => {
+      onTaskCompleted: (taskId, success, _result, _error) => {
         this.currentProgress = '';
+        // 演习/战役任务完成后更新时间戳 (或清除 pending 以便重试)
+        if (taskId === this.pendingExerciseTaskId) {
+          if (success) {
+            this.cronScheduler.markExerciseCompleted();
+          } else {
+            this.cronScheduler.clearExercisePending();
+          }
+          this.pendingExerciseTaskId = null;
+        }
+        if (taskId === this.pendingBattleTaskId) {
+          if (success) {
+            this.cronScheduler.markBattleCompleted();
+          } else {
+            this.cronScheduler.clearBattlePending();
+          }
+          this.pendingBattleTaskId = null;
+        }
         this.renderMain();
       },
 
@@ -860,25 +899,27 @@ export class AppController {
   private bindCronCallbacks(): void {
     this.cronScheduler.setCallbacks({
       onExerciseDue: (fleetId) => {
-        this.scheduler.addTask(
+        const id = this.scheduler.addTask(
           '自动演习',
           'exercise',
           { type: 'exercise', fleet_id: fleetId },
           TaskPriority.DAILY,
           1,
         );
+        this.pendingExerciseTaskId = id;
         this.appendLocalLog('info', `自动演习已加入队列 (舰队 ${fleetId})`);
         this.scheduler.startConsuming();
       },
 
       onCampaignDue: (campaignName, times) => {
-        this.scheduler.addTask(
+        const id = this.scheduler.addTask(
           `自动战役·${campaignName}`,
           'campaign',
           { type: 'campaign', campaign_name: campaignName, times },
           TaskPriority.DAILY,
           times,
         );
+        this.pendingBattleTaskId = id;
         this.appendLocalLog('info', `自动战役已加入队列 (${campaignName} ×${times})`);
         this.scheduler.startConsuming();
       },
@@ -1461,6 +1502,7 @@ export class AppController {
       battleTimes: cfg.daily_automation.battle_times,
       themeMode: this.getThemeMode(),
       accentColor: this.getAccentColor(),
+      debugMode: localStorage.getItem('debugMode') === 'true',
     };
     this.configView.render(vo);
   }
@@ -1471,6 +1513,8 @@ export class AppController {
     // 保存界面设置到 localStorage
     localStorage.setItem('themeMode', collected.themeMode);
     localStorage.setItem('accentColor', collected.accentColor);
+    localStorage.setItem('debugMode', String(collected.debugMode));
+    this.mainView.setDebugMode(collected.debugMode);
     this.applyTheme();
 
     this.configModel.update({

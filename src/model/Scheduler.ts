@@ -147,7 +147,7 @@ export class Scheduler {
 
   /** 启动系统 (连接模拟器 + 启动游戏) */
   async start(configPath?: string): Promise<boolean> {
-    const resp = await this.api.systemStart(configPath, 120_000);
+    const resp = await this.api.systemStart(configPath, 300_000);
     if (!resp.success) return false;
 
     this.api.connectWebSockets();
@@ -175,6 +175,16 @@ export class Scheduler {
     } catch {
       return false;
     }
+  }
+
+  /**
+   * HTTP 超时但后端实际已就绪时的恢复:
+   * 建立 WebSocket、设置状态、启动远征检查。
+   */
+  recoverAfterTimeout(): void {
+    this.api.connectWebSockets();
+    this.setStatus('idle');
+    this.startExpeditionTimer();
   }
 
   /** 停止系统 */

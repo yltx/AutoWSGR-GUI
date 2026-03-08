@@ -19,6 +19,7 @@ export class ConfigView {
   private themeMode: HTMLSelectElement;
   private accentColor: HTMLInputElement;
   private accentLabel: HTMLElement;
+  private debugMode: HTMLInputElement;
 
   constructor() {
     this.emuType = document.getElementById('cfg-emu-type') as HTMLSelectElement;
@@ -35,6 +36,7 @@ export class ConfigView {
     this.themeMode = document.getElementById('cfg-theme-mode') as HTMLSelectElement;
     this.accentColor = document.getElementById('cfg-accent-color') as HTMLInputElement;
     this.accentLabel = document.getElementById('cfg-accent-label')!;
+    this.debugMode = document.getElementById('cfg-debug-mode') as HTMLInputElement;
 
     // 调色盘实时预览
     this.accentColor.addEventListener('input', () => {
@@ -58,6 +60,7 @@ export class ConfigView {
     this.themeMode.value = vo.themeMode;
     this.accentColor.value = vo.accentColor;
     this.accentLabel.textContent = vo.accentColor;
+    this.debugMode.checked = vo.debugMode;
   }
 
   /** 从表单收集当前值 (Controller 调用) */
@@ -76,6 +79,7 @@ export class ConfigView {
       battleTimes: Number(this.battleTimes.value) || 3,
       themeMode: this.themeMode.value as 'dark' | 'light' | 'system',
       accentColor: this.accentColor.value,
+      debugMode: this.debugMode.checked,
     };
   }
 }

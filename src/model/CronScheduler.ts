@@ -4,10 +4,13 @@
  * 职责:
  *   - 每分钟检查一次系统时间
  *   - 在演习刷新时间 (0:00 / 12:00 / 18:00) 后自动生成演习任务
- *   - 每日自动生成战役任务
+ *   - 每日 0 点后自动生成战役任务
  *   - 支持 YAML 中 scheduled_time 定时触发
  *
- * 设计: 不直接操作 Scheduler 队列，而是通过回调通知外部 (Controller) 添加任务。
+ * 核心机制:
+ *   通过 localStorage 记录演习/战役任务的【实际完成】时间戳，
+ *   而非记录"是否已触发"。这样即使 App 因 ADB 断开等原因重启，
+ *   只要任务未真正完成、时间戳就不更新，下次启动后仍会补发任务。
  */
 
 // ════════════════════════════════════════
@@ -52,9 +55,9 @@ export interface ScheduledTask {
 // 演习刷新时间点 (小时)
 const EXERCISE_REFRESH_HOURS = [0, 12, 18];
 
-/** localStorage key */
-const LS_KEY_CLOSE_TIME = 'cron_lastCloseTime';
-const LS_KEY_FIRED_EXERCISE = 'cron_firedExercise';
+/** localStorage key — 记录任务实际完成时间 */
+const LS_KEY_LAST_EXERCISE_RUN = 'cron_lastExerciseRun';   // ISO 时间戳
+const LS_KEY_LAST_BATTLE_RUN   = 'cron_lastBattleRun';     // YYYY-MM-DD
 
 // ════════════════════════════════════════
 // CronScheduler 实现
@@ -65,10 +68,13 @@ export class CronScheduler {
   private callbacks: CronCallbacks = {};
   private timer: ReturnType<typeof setInterval> | null = null;
 
-  /** 记录每个演习刷新时段是否已触发 (key = "YYYY-MM-DD_HH") */
-  private firedExercise = new Set<string>();
-  /** 记录今日是否已触发战役 (key = "YYYY-MM-DD") */
-  private firedCampaign = new Set<string>();
+  /** 上一次演习任务实际完成的时间 */
+  private lastExerciseRun: Date | null = null;
+  /** 上一次战役任务实际完成的日期 (YYYY-MM-DD) */
+  private lastBattleRun = '';
+  /** 是否有演习/战役任务正在排队或执行中 (避免同一会话重复入队) */
+  private exercisePending = false;
+  private battlePending = false;
   /** 注册的定时方案任务 */
   private scheduledTasks: ScheduledTask[] = [];
 
@@ -88,102 +94,72 @@ export class CronScheduler {
   /** 启动定时检查 (每分钟) */
   start(): void {
     this.stop();
-    this.loadState();
-    this.checkMissedExercise();
-    // 立即检查一次
+    this.loadTimestamps();
+    this.log('info', `定时调度配置: 演习=${this.config.autoExercise}, 战役=${this.config.autoBattle}`);
+    if (this.lastExerciseRun) {
+      this.log('info', `上次演习完成: ${this.lastExerciseRun.toLocaleString()}`);
+    }
+    if (this.lastBattleRun) {
+      this.log('info', `上次战役完成: ${this.lastBattleRun}`);
+    }
+    // 立即检查一次（处理 App 关闭期间错过的窗口）
     this.tick();
     // 每 60 秒检查
     this.timer = setInterval(() => this.tick(), 60_000);
   }
 
-  /** 停止定时检查，保存关闭时间 */
+  /** 停止定时检查 */
   stop(): void {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
-    this.saveState();
   }
 
-  /**
-   * 保存状态到 localStorage:
-   *   - 当前时间作为关闭时间
-   *   - 已触发的演习时段 (避免重复触发)
-   */
-  saveState(): void {
-    try {
-      localStorage.setItem(LS_KEY_CLOSE_TIME, new Date().toISOString());
-      localStorage.setItem(LS_KEY_FIRED_EXERCISE, JSON.stringify([...this.firedExercise]));
-    } catch { /* localStorage 不可用时静默 */ }
-  }
+  // ── 时间戳记录 ──
 
-  /** 从 localStorage 恢复状态 */
-  private loadState(): void {
+  /** Controller 在演习任务成功完成后调用 */
+  markExerciseCompleted(): void {
+    this.lastExerciseRun = new Date();
+    this.exercisePending = false;
     try {
-      const fired = localStorage.getItem(LS_KEY_FIRED_EXERCISE);
-      if (fired) {
-        const arr: string[] = JSON.parse(fired);
-        // 只恢复今天的记录
-        const today = this.dateKey(new Date());
-        for (const k of arr) {
-          if (k.startsWith(today)) this.firedExercise.add(k);
-        }
-      }
-    } catch { /* 解析失败时忽略 */ }
-  }
-
-  /**
-   * 检查 App 关闭期间是否有演习刷新窗口被错过。
-   * 比较 lastCloseTime 与当前时间之间经过的刷新点，对未触发的时段补发任务。
-   */
-  private checkMissedExercise(): void {
-    if (!this.config.autoExercise) return;
-
-    let lastClose: Date | null = null;
-    try {
-      const raw = localStorage.getItem(LS_KEY_CLOSE_TIME);
-      if (raw) lastClose = new Date(raw);
+      localStorage.setItem(LS_KEY_LAST_EXERCISE_RUN, this.lastExerciseRun.toISOString());
     } catch { /* ignore */ }
-    if (!lastClose || isNaN(lastClose.getTime())) return;
+    this.log('info', '演习任务完成，已记录运行时间');
+  }
 
-    const now = new Date();
-    if (now <= lastClose) return;
+  /** Controller 在战役任务成功完成后调用 */
+  markBattleCompleted(): void {
+    this.lastBattleRun = this.dateKey(new Date());
+    this.battlePending = false;
+    try {
+      localStorage.setItem(LS_KEY_LAST_BATTLE_RUN, this.lastBattleRun);
+    } catch { /* ignore */ }
+    this.log('info', '战役任务完成，已记录运行时间');
+  }
 
-    // 收集 lastClose 到 now 之间所有刷新时间点
-    const missed: { date: Date; slotKey: string }[] = [];
-    const cursor = new Date(lastClose);
-    // 向前对齐到 lastClose 当天 00:00
-    cursor.setHours(0, 0, 0, 0);
+  /** 演习任务失败 — 清除 pending 标记，下次 tick 将重新触发 */
+  clearExercisePending(): void {
+    this.exercisePending = false;
+  }
 
-    // 遍历 lastClose 当天到 now 当天 (最多跨几天)
-    const endDay = new Date(now);
-    endDay.setHours(23, 59, 59, 999);
+  /** 战役任务失败 — 清除 pending 标记，下次 tick 将重新触发 */
+  clearBattlePending(): void {
+    this.battlePending = false;
+  }
 
-    while (cursor <= endDay) {
-      const dateStr = this.dateKey(cursor);
-      for (const h of EXERCISE_REFRESH_HOURS) {
-        const refreshTime = new Date(cursor);
-        refreshTime.setHours(h, 0, 0, 0);
-        // 刷新时间必须在 (lastClose, now] 区间内
-        if (refreshTime > lastClose && refreshTime <= now) {
-          const slotKey = `${dateStr}_${h}`;
-          if (!this.firedExercise.has(slotKey)) {
-            missed.push({ date: refreshTime, slotKey });
-          }
-        }
+  // ── 持久化 ──
+
+  /** 从 localStorage 加载上次运行时间戳 */
+  private loadTimestamps(): void {
+    try {
+      const exRaw = localStorage.getItem(LS_KEY_LAST_EXERCISE_RUN);
+      if (exRaw) {
+        const d = new Date(exRaw);
+        if (!isNaN(d.getTime())) this.lastExerciseRun = d;
       }
-      // 下一天
-      cursor.setDate(cursor.getDate() + 1);
-    }
-
-    if (missed.length === 0) return;
-
-    // 只补发最近一个时段 (避免重开后一次性刷出大量演习任务)
-    const latest = missed[missed.length - 1];
-    this.firedExercise.add(latest.slotKey);
-    const hh = latest.date.getHours();
-    this.log('info', `检测到关闭期间演习刷新 (${hh}:00 时段)，自动补发演习任务`);
-    this.callbacks.onExerciseDue?.(this.config.exerciseFleetId);
+      this.lastBattleRun = localStorage.getItem(LS_KEY_LAST_BATTLE_RUN) || '';
+    } catch { /* ignore */ }
   }
 
   /** 注册一个定时方案任务 */
@@ -222,40 +198,49 @@ export class CronScheduler {
     this.resetDailyFlags(now);
   }
 
-  /** 检查演习: 0/12/18 点后尚未触发则触发 */
+  /**
+   * 检查演习:
+   * 找到当前所属刷新时段的起始时间，若 lastExerciseRun 早于该时间则触发。
+   */
   private checkExercise(now: Date): void {
     if (!this.config.autoExercise) return;
+    if (this.exercisePending) return;
 
-    const dateStr = this.dateKey(now);
     const hour = now.getHours();
-
     // 找到当前所属的刷新时段 (最近一个 ≤ hour 的刷新小时)
-    let currentSlot = -1;
+    let slotHour = -1;
     for (let i = EXERCISE_REFRESH_HOURS.length - 1; i >= 0; i--) {
       if (hour >= EXERCISE_REFRESH_HOURS[i]) {
-        currentSlot = EXERCISE_REFRESH_HOURS[i];
+        slotHour = EXERCISE_REFRESH_HOURS[i];
         break;
       }
     }
-    if (currentSlot < 0) return; // 不应该发生
+    if (slotHour < 0) return;
 
-    const slotKey = `${dateStr}_${currentSlot}`;
-    if (this.firedExercise.has(slotKey)) return;
+    // 当前时段的起始时间
+    const slotStart = new Date(now);
+    slotStart.setHours(slotHour, 0, 0, 0);
 
-    // 标记并触发
-    this.firedExercise.add(slotKey);
-    this.log('info', `自动演习触发 (${currentSlot}:00 时段, 舰队 ${this.config.exerciseFleetId})`);
-    this.callbacks.onExerciseDue?.(this.config.exerciseFleetId);
+    // 上次运行在本时段之前 → 需要触发
+    if (!this.lastExerciseRun || this.lastExerciseRun < slotStart) {
+      this.exercisePending = true;
+      this.log('info', `自动演习触发 (${slotHour}:00 时段, 舰队 ${this.config.exerciseFleetId})`);
+      this.callbacks.onExerciseDue?.(this.config.exerciseFleetId);
+    }
   }
 
-  /** 检查战役: 每日触发一次 */
+  /**
+   * 检查战役:
+   * 战役每日 0 点刷新。若 lastBattleRun 的日期不是今天则触发。
+   */
   private checkCampaign(now: Date): void {
     if (!this.config.autoBattle) return;
+    if (this.battlePending) return;
 
-    const dateStr = this.dateKey(now);
-    if (this.firedCampaign.has(dateStr)) return;
+    const todayStr = this.dateKey(now);
+    if (this.lastBattleRun >= todayStr) return; // 今天已运行过
 
-    this.firedCampaign.add(dateStr);
+    this.battlePending = true;
     this.log('info', `自动战役触发 (${this.config.battleType} ×${this.config.battleTimes})`);
     this.callbacks.onCampaignDue?.(this.config.battleType, this.config.battleTimes);
   }
@@ -276,17 +261,7 @@ export class CronScheduler {
 
   /** 跨日重置: 日期变化时清除 firedToday 标记 */
   private resetDailyFlags(now: Date): void {
-    const dateStr = this.dateKey(now);
-
-    // 清理旧日期的演习和战役记录
-    for (const key of this.firedExercise) {
-      if (!key.startsWith(dateStr)) this.firedExercise.delete(key);
-    }
-    for (const key of this.firedCampaign) {
-      if (key !== dateStr) this.firedCampaign.delete(key);
-    }
-
-    // 重置定时方案的 firedToday (简单检测: 0:00 附近)
+    // 重置定时方案的 firedToday (0:00 附近)
     if (now.getHours() === 0 && now.getMinutes() === 0) {
       for (const task of this.scheduledTasks) {
         task.firedToday = false;

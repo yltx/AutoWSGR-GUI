@@ -1127,8 +1127,22 @@ body {
 }
 
 .input-sm {
-  padding: 3px 8px;
+  padding: 6px 10px;
   font-size: 12px;
+}
+
+/* 任务组工具栏图标按钮：与 select 等高 */
+.tg-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  flex-shrink: 0;
+}
+.tg-icon-btn svg {
+  display: block;
 }
 
 .task-group-items {
@@ -1248,41 +1262,156 @@ body {
 }
 
 /* ═══ 日志面板 ═══ */
+
+/* 日志头：标题 + 过滤按钮 */
+.log-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.log-header h3 { margin: 0; }
+
+/* 过滤按钮行 */
+.log-filters {
+  display: flex;
+  gap: 4px;
+}
+.log-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s;
+  opacity: 0.5;
+  user-select: none;
+}
+.log-filter-btn.active {
+  opacity: 1;
+  border-color: var(--border-strong);
+  background: var(--bg-inset);
+}
+.log-filter-btn[data-level="debug"].active  { color: var(--text-muted); }
+.log-filter-btn[data-level="info"].active    { color: var(--accent); }
+.log-filter-btn[data-level="warning"].active { color: var(--warning); }
+.log-filter-btn[data-level="error"].active   { color: var(--danger); }
+.log-filter-btn:hover { opacity: 1; }
+.log-filter-label { font-weight: 500; }
+.log-filter-count {
+  min-width: 16px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--bg-inset);
+  line-height: 16px;
+}
+
+/* 日志容器 */
 .log-container {
   max-height: 260px;
   overflow-y: auto;
   background: var(--bg-inset);
   border-radius: var(--radius-sm);
-  padding: 10px 14px;
+  padding: 6px 0;
   font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
   font-size: 12px;
-  line-height: 1.7;
+  line-height: 1.6;
 }
 
+/* 日志条目：图标 + 文字联合模式 */
 .log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 4px 12px;
+  border-left: 3px solid transparent;
+  transition: background 0.1s;
+}
+.log-entry:hover {
+  background: var(--bg-inset);
+}
+.log-entry.log-hidden { display: none; }
+
+/* 级别色条 */
+.log-entry.level-debug  { border-left-color: var(--text-muted); }
+.log-entry.level-info   { border-left-color: var(--accent); }
+.log-entry.level-warn,
+.log-entry.level-warning { border-left-color: var(--warning); }
+.log-entry.level-error  { border-left-color: var(--danger); }
+.log-entry.level-critical { border-left-color: #ff6b6b; }
+
+/* 级别背景提示（warning/error 更醒目） */
+.log-entry.level-warning { background: rgba(251, 191, 36, 0.05); }
+.log-entry.level-error   { background: rgba(248, 113, 113, 0.07); }
+.log-entry.level-critical { background: rgba(255, 107, 107, 0.1); }
+
+/* 级别图标 */
+.log-icon {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+}
+.log-entry.level-debug .log-icon  { color: var(--text-muted); }
+.log-entry.level-info  .log-icon  { color: var(--accent); }
+.log-entry.level-warn  .log-icon,
+.log-entry.level-warning .log-icon { color: var(--warning); }
+.log-entry.level-error .log-icon  { color: var(--danger); }
+.log-entry.level-critical .log-icon { color: #ff6b6b; }
+
+/* 日志正文区域 */
+.log-body {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 日志 meta 行：时间 + 频道 */
+.log-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 1px;
+}
+.log-time {
+  color: var(--text-muted);
+  font-size: 11px;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+.log-channel {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 5px;
+  border-radius: 3px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.log-entry.level-debug  .log-channel { color: var(--text-muted); background: rgba(106,106,130,0.1); }
+.log-entry.level-info   .log-channel { color: var(--accent); background: rgba(15,125,255,0.1); }
+.log-entry.level-warn   .log-channel,
+.log-entry.level-warning .log-channel { color: var(--warning); background: rgba(251,191,36,0.1); }
+.log-entry.level-error  .log-channel { color: var(--danger); background: rgba(248,113,113,0.12); }
+.log-entry.level-critical .log-channel { color: #ff6b6b; background: rgba(255,107,107,0.15); }
+
+/* 日志消息文本 */
+.log-msg {
   white-space: pre-wrap;
   word-break: break-all;
-  padding: 1px 0;
 }
-
-.log-entry.level-debug { color: var(--text-muted); }
-.log-entry.level-info  { color: var(--text); }
-.log-entry.level-warn,
-.log-entry.level-warning { color: var(--warning); }
-.log-entry.level-error { color: var(--danger); }
-.log-entry.level-critical { color: #ff6b6b; font-weight: bold; }
-
-.log-entry .log-time {
-  color: var(--text-muted);
-  margin-right: 8px;
-  opacity: 0.7;
-}
-
-.log-entry .log-channel {
-  color: var(--accent);
-  margin-right: 8px;
-  font-weight: 500;
-}
+.log-entry.level-debug  .log-msg { color: var(--text-muted); }
+.log-entry.level-info   .log-msg { color: var(--text); }
+.log-entry.level-warn   .log-msg,
+.log-entry.level-warning .log-msg { color: var(--warning); }
+.log-entry.level-error  .log-msg { color: var(--danger); }
+.log-entry.level-critical .log-msg { color: #ff6b6b; font-weight: bold; }
 
 /* ═══ 表单 ═══ */
 .form-group {
