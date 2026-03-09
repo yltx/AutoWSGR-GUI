@@ -621,13 +621,78 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
       proc.on('error', () => resolve(1));
     });
 
-    if (exitCode === 0) {
-      sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
-      return latestVer;
-    } else {
+    if (exitCode !== 0) {
       sendProgress('WARNING autowsgr 升级失败，使用当前版本继续');
       return localVer;
     }
+
+    // 升级后验证关键传递依赖是否完整
+    const verifyScript = path.join(app.getPath('temp'), 'autowsgr_verify_deps.py');
+    fs.writeFileSync(verifyScript, [
+      'import json, sys',
+      `sys.path.insert(0, r'${spFwd}')`,
+      'missing = []',
+      "for m in ['airtest', 'fastapi', 'uvicorn']:",
+      '    try: __import__(m)',
+      '    except ImportError: missing.append(m)',
+      'print(json.dumps(missing))',
+    ].join('\n'), 'utf-8');
+
+    try {
+      const { stdout: verifyOut } = await execAsync(
+        `"${pythonCmd}" "${verifyScript}"`,
+        { windowsHide: true, timeout: 15000, env: pipEnv() },
+      );
+      try { fs.unlinkSync(verifyScript); } catch { /* ignore */ }
+      const missing: string[] = JSON.parse(verifyOut.trim());
+
+      if (missing.length > 0) {
+        sendProgress(`升级后缺少依赖: ${missing.join(', ')}，正在补装…`);
+        const fixCode = await new Promise<number>((resolve) => {
+          const proc = spawn(pythonCmd, [
+            '-m', 'pip', 'install',
+            '--target', targetDir,
+            '--force-reinstall', '--no-deps',
+            ...missing,
+          ], {
+            cwd: appRoot(),
+            windowsHide: true,
+            stdio: 'pipe',
+            env: pipEnv(),
+          });
+          proc.stdout?.on('data', () => {});
+          proc.stderr?.on('data', () => {});
+          proc.on('close', (code) => resolve(code ?? 1));
+          proc.on('error', () => resolve(1));
+        });
+
+        if (fixCode !== 0) {
+          // --no-deps 失败则完整安装
+          await new Promise<void>((resolve) => {
+            const proc = spawn(pythonCmd, [
+              '-m', 'pip', 'install',
+              '--target', targetDir,
+              ...missing,
+            ], {
+              cwd: appRoot(),
+              windowsHide: true,
+              stdio: 'pipe',
+              env: pipEnv(),
+            });
+            proc.stdout?.on('data', () => {});
+            proc.stderr?.on('data', () => {});
+            proc.on('close', () => resolve());
+            proc.on('error', () => resolve());
+          });
+        }
+        sendProgress(`依赖补装完成 ✓`);
+      }
+    } catch {
+      try { fs.unlinkSync(verifyScript); } catch { /* ignore */ }
+    }
+
+    sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
+    return latestVer;
   } catch {
     sendProgress('autowsgr 更新检查跳过（网络不可用或超时）');
     return null;
@@ -684,7 +749,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
     'import json, sys',
     `sys.path.insert(0, '${spFwd}')`,
     'r = {}',
-    "for p in ['uvicorn', 'fastapi']:",
+    "for p in ['uvicorn', 'fastapi', 'airtest']:",
     '    try:',
     '        __import__(p); r[p] = True',
     '    except ImportError:',
@@ -705,7 +770,7 @@ async function checkEnvironment(): Promise<EnvCheckResult> {
     try { fs.unlinkSync(checkScript); } catch { /* ignore */ }
     const depResult = JSON.parse(depOut.trim());
 
-    for (const pkg of ['uvicorn', 'fastapi']) {
+    for (const pkg of ['uvicorn', 'fastapi', 'airtest']) {
       if (depResult[pkg]) {
         sendProgress(`  ${pkg} \u2713`);
       } else {
