@@ -68,12 +68,12 @@ jobs:
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           generate_release_notes: true
           files: |
-            release/*-portable.exe
+            release/*-Setup-*.exe
           body: |
             ## AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
 
             ### 使用方法
-            1. 下载 `AutoWSGR-GUI-*-portable.exe`（免安装便携版，双击即用）
+            1. 下载 `AutoWSGR-GUI-Setup-*.exe`（安装版）
             2. 软件已内置 Python 3.12，无需单独安装
             3. 首次运行时程序会自动安装 Python 依赖（需联网）
 
