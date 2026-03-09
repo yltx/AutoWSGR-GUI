@@ -521,7 +521,7 @@ async function ensureVCRedist(): Promise<void> {
 const ENV_READY_MARKER = () => path.join(appRoot(), '.env_ready');
 
 /** 最低 autowsgr 版本要求 */
-const MIN_AUTOWSGR_VERSION = [2, 1, 1];
+const MIN_AUTOWSGR_VERSION = [2, 1, 0];
 
 /** 检查 autowsgr 版本是否满足最低要求 */
 function isVersionOk(ver: string): boolean {
