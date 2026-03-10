@@ -35,6 +35,10 @@ export class MainView {
   /** Controller 设置的回调 */
   onRemoveQueueItem?: (taskId: string) => void;
   onMoveQueueItem?: (fromIndex: number, toIndex: number) => void;
+  /** 从任务列表拖拽到队列 */
+  onDropFromTaskGroup?: (itemIndex: number) => void;
+  /** 右键编辑队列任务 */
+  onEditQueueItem?: (taskId: string, x: number, y: number) => void;
 
   constructor() {
     this.statusDot = document.getElementById('status-dot')!;
@@ -45,6 +49,33 @@ export class MainView {
     this.taskQueueList = document.getElementById('task-queue-list')!;
     this.logContainer = document.getElementById('log-container')!;
     this.initLogFilters();
+    this.initDropZone();
+  }
+
+  /** 初始化任务区域为拖放目标（接受从任务列表拖入的条目） */
+  private initDropZone(): void {
+    const card = document.getElementById('task-area-card')!;
+    card.addEventListener('dragover', (e) => {
+      if (e.dataTransfer?.types.includes('application/x-tg-item')) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        card.classList.add('drop-highlight');
+      }
+    });
+    card.addEventListener('dragleave', (e) => {
+      // 只在离开 card 本身时移除高亮
+      if (!card.contains(e.relatedTarget as Node)) {
+        card.classList.remove('drop-highlight');
+      }
+    });
+    card.addEventListener('drop', (e) => {
+      card.classList.remove('drop-highlight');
+      const idxStr = e.dataTransfer?.getData('application/x-tg-item');
+      if (idxStr != null && idxStr !== '') {
+        e.preventDefault();
+        this.onDropFromTaskGroup?.(parseInt(idxStr, 10));
+      }
+    });
   }
 
   /** 接收 ViewObject 并渲染 */
@@ -147,6 +178,12 @@ export class MainView {
           });
           div.appendChild(removeBtn);
         }
+
+        // 右键菜单
+        div.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          this.onEditQueueItem?.(item.id, e.clientX, e.clientY);
+        });
 
         this.taskQueueList.appendChild(div);
       }

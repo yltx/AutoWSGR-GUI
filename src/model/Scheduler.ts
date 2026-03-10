@@ -258,6 +258,16 @@ export class Scheduler {
     return resp.success;
   }
 
+  /** 立即停止当前任务并清除运行状态（不删除队列，不自动消费下一个） */
+  async stopRunning(): Promise<void> {
+    if (this.currentTask) {
+      try { await this.api.taskStop(); } catch { /* ignore */ }
+      this.currentTask = null;
+    }
+    this.setStatus('idle');
+    this.notifyQueueChange();
+  }
+
   /** 清空队列 (不影响当前正在运行的) */
   clearQueue(): void {
     this.queue = [];

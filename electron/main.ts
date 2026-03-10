@@ -622,11 +622,25 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
     const targetDir = localSitePackages();
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
+    // 清理旧版 autowsgr 文件，避免 pip --target 的 dist-info 残留导致版本检测错误
+    try {
+      for (const entry of fs.readdirSync(targetDir)) {
+        if (entry === 'autowsgr' || entry.startsWith('autowsgr-')) {
+          fs.rmSync(path.join(targetDir, entry), { recursive: true, force: true });
+        }
+      }
+    } catch { /* ignore cleanup errors */ }
+
+    // 确保 pip 可用
+    if (!(await ensurePip(pythonCmd))) {
+      sendProgress('WARNING pip 不可用，autowsgr 升级跳过');
+      return localVer;
+    }
+
     const exitCode = await new Promise<number>((resolve) => {
       const proc = spawn(pythonCmd, [
         '-m', 'pip', 'install',
         '--target', targetDir,
-        '--upgrade',
         'setuptools',
         'autowsgr',
         'airtest-openwsgr',
@@ -714,6 +728,32 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
       }
     } catch {
       try { fs.unlinkSync(verifyScript); } catch { /* ignore */ }
+    }
+
+    // 升级后验证实际版本
+    const verCheckScript = path.join(app.getPath('temp'), 'autowsgr_ver_check.py');
+    fs.writeFileSync(verCheckScript, [
+      'import sys',
+      `sys.path.insert(0, r'${spFwd}')`,
+      'try:',
+      '    import autowsgr; print(autowsgr.__version__)',
+      'except: print("unknown")',
+    ].join('\n'), 'utf-8');
+    try {
+      const { stdout: verOut } = await execAsync(
+        `"${pythonCmd}" "${verCheckScript}"`,
+        { windowsHide: true, timeout: 15000, env: pipEnv() },
+      );
+      try { fs.unlinkSync(verCheckScript); } catch { /* ignore */ }
+      const actualVer = verOut.trim();
+      if (actualVer === latestVer) {
+        sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
+        return latestVer;
+      }
+      sendProgress(`autowsgr 已升级至 ${actualVer}（期望 ${latestVer}）`);
+      return actualVer;
+    } catch {
+      try { fs.unlinkSync(verCheckScript); } catch { /* ignore */ }
     }
 
     sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
@@ -941,10 +981,40 @@ function findPythonSync(): string | null {
   return null;
 }
 
+/** 确保 pip 可用，缺失时自动安装 */
+async function ensurePip(pythonCmd: string): Promise<boolean> {
+  try {
+    await execAsync(`"${pythonCmd}" -m pip --version`, { windowsHide: true, timeout: 15000 });
+    return true;
+  } catch { /* pip not available */ }
+
+  if (isLocalPython(pythonCmd)) ensurePthFile();
+
+  sendProgress('pip 未就绪，正在安装…');
+  const getPipPath = path.join(app.getPath('temp'), 'get-pip.py');
+  try {
+    await execAsync(`curl -sSL -o "${getPipPath}" "https://bootstrap.pypa.io/get-pip.py"`, { windowsHide: true, timeout: 60000 });
+    await execAsync(`"${pythonCmd}" "${getPipPath}"`, { windowsHide: true, timeout: 120000 });
+    try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+    sendProgress('pip 安装完成 ✓');
+    return true;
+  } catch {
+    sendProgress('ERROR pip 安装失败');
+    try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+    return false;
+  }
+}
+
 /** 自动安装依赖 (pip install autowsgr)，始终安装到项目目录，不动全局 */
-function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
+async function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
   // 安装后环境变化，清除标记以便下次重新检查
   try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* ignore */ }
+
+  // 确保 pip 可用
+  if (!(await ensurePip(pythonCmd))) {
+    return { success: false, output: 'pip 安装失败，无法安装依赖' };
+  }
+
   return new Promise((resolve) => {
     const cwd = appRoot();
     const targetDir = localSitePackages();

@@ -4,11 +4,27 @@
  */
 import type { TaskGroup, TaskGroupItem } from '../model/TaskGroupModel';
 
+/** 任务条目的元数据（从 YAML 异步解析） */
+export interface TaskGroupItemMeta {
+  /** 地图标识，如 "9-2" 或 "Ex-3" */
+  mapName?: string;
+  /** 编队号 */
+  fleetId?: number;
+  /** 维修模式文本 */
+  repairMode?: string;
+  /** 任务类型标签 (预设) */
+  typeLabel?: string;
+  /** 编队舰船列表 */
+  fleet?: string[];
+}
+
 /** 渲染所需的 VO */
 export interface TaskGroupViewObject {
   groups: ReadonlyArray<{ name: string; itemCount: number }>;
   activeGroupName: string;
   items: ReadonlyArray<TaskGroupItem>;
+  /** 各条目的元数据（按 index 对应） */
+  itemMetas?: ReadonlyArray<TaskGroupItemMeta | null>;
 }
 
 export class TaskGroupView {
@@ -27,6 +43,10 @@ export class TaskGroupView {
   onMoveItem?: (fromIndex: number, toIndex: number) => void;
   onExportGroup?: () => void;
   onImportGroup?: () => void;
+  /** 将指定 index 的任务拖放到队列 */
+  onDropToQueue?: (index: number) => void;
+  /** 右键编辑 */
+  onEditItem?: (index: number, x: number, y: number) => void;
 
   constructor() {
     this.selectEl = document.getElementById('task-group-select') as HTMLSelectElement;
@@ -73,11 +93,12 @@ export class TaskGroupView {
 
     for (let i = 0; i < vo.items.length; i++) {
       const item = vo.items[i];
-      this.itemsEl.appendChild(this.createItemRow(item, i));
+      const meta = vo.itemMetas?.[i] ?? null;
+      this.itemsEl.appendChild(this.createItemRow(item, i, meta));
     }
   }
 
-  private createItemRow(item: TaskGroupItem, index: number): HTMLElement {
+  private createItemRow(item: TaskGroupItem, index: number, meta: TaskGroupItemMeta | null): HTMLElement {
     const row = document.createElement('div');
     row.className = 'tg-item';
     row.draggable = true;
@@ -101,6 +122,25 @@ export class TaskGroupView {
     kind.className = 'tg-kind';
     kind.textContent = item.kind === 'plan' ? '方案' : '预设';
     row.appendChild(kind);
+
+    // 详情：显示任务元数据（与名称同行）
+    const detail = document.createElement('span');
+    detail.className = 'tg-detail';
+    if (meta) {
+      const parts: string[] = [];
+      if (meta.typeLabel) parts.push(meta.typeLabel);
+      if (meta.mapName) parts.push(meta.mapName);
+      if (meta.fleetId) parts.push(`编队${meta.fleetId}`);
+      if (meta.repairMode) parts.push(meta.repairMode);
+      if (meta.fleet && meta.fleet.length > 0) {
+        parts.push(meta.fleet.filter(Boolean).join(' / '));
+      }
+      detail.textContent = parts.join(' · ') || item.path;
+    } else {
+      detail.textContent = item.path;
+    }
+    detail.title = item.path;
+    row.appendChild(detail);
 
     // 次数标签 + 输入
     const timesLabel = document.createElement('span');
@@ -128,11 +168,18 @@ export class TaskGroupView {
     remove.addEventListener('click', () => this.onRemoveItem?.(index));
     row.appendChild(remove);
 
+    // ── 右键菜单 ──
+    row.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      this.onEditItem?.(index, e.clientX, e.clientY);
+    });
+
     // ── 拖拽事件 ──
     row.addEventListener('dragstart', (e) => {
       row.classList.add('dragging');
-      e.dataTransfer!.effectAllowed = 'move';
+      e.dataTransfer!.effectAllowed = 'copyMove';
       e.dataTransfer!.setData('text/plain', String(index));
+      e.dataTransfer!.setData('application/x-tg-item', String(index));
     });
     row.addEventListener('dragend', () => {
       row.classList.remove('dragging');

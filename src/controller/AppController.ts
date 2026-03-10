@@ -7,7 +7,7 @@
 import { MainView } from '../view/MainView';
 import { PlanPreviewView } from '../view/PlanPreviewView';
 import { ConfigView } from '../view/ConfigView';
-import { TaskGroupView } from '../view/TaskGroupView';
+import { TaskGroupView, type TaskGroupItemMeta } from '../view/TaskGroupView';
 import type {
   MainViewObject,
   PlanPreviewViewObject,
@@ -562,8 +562,12 @@ export class AppController {
       }
     });
 
-    // 停止当前任务
-    document.getElementById('btn-stop-task')?.addEventListener('click', () => this.scheduler.stopCurrentTask());
+    // 停止当前任务（立即清除运行状态，不删除队列项）
+    document.getElementById('btn-stop-task')?.addEventListener('click', async () => {
+      await this.scheduler.stopRunning();
+      this.renderMain();
+      this.appendLocalLog('info', '已停止当前任务');
+    });
 
     // 清空队列
     document.getElementById('btn-clear-queue')?.addEventListener('click', () => {
@@ -669,12 +673,18 @@ export class AppController {
         `<option value="${i + 1}">${i + 1}</option>`).join('');
     });
 
-    // 方案：plan-level 字段修改回调
+    // 方案：plan-level 字段修改回调（即时保存）
     this.planView.onPlanFieldChange = (field, value) => {
       if (!this.currentPlan) return;
       if (field === 'repair_mode') this.currentPlan.data.repair_mode = value;
       else if (field === 'fight_condition') this.currentPlan.data.fight_condition = value;
       else if (field === 'fleet_id') this.currentPlan.data.fleet_id = value;
+
+      // 即时保存到文件
+      if (this.currentPlan.fileName) {
+        const bridge = window.electronBridge;
+        bridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
+      }
     };
   }
 
@@ -758,6 +768,22 @@ export class AppController {
 
     this.taskGroupView.onImportGroup = () => this.importTaskGroup();
 
+    // 从任务列表拖拽单个条目到队列
+    this.taskGroupView.onDropToQueue = () => {};  // 由 MainView drop zone 触发
+    this.mainView.onDropFromTaskGroup = (index) => this.loadSingleItemToQueue(index);
+
+    // 右键编辑：任务列表条目
+    this.taskGroupView.onEditItem = (index, x, y) => this.showContextMenuForItem('taskgroup', index, x, y);
+
+    // 右键编辑：队列条目
+    this.mainView.onEditQueueItem = (taskId, x, y) => this.showContextMenuForItem('queue', taskId, x, y);
+
+    // 点击其他区域关闭上下文菜单
+    document.addEventListener('click', () => this.hideContextMenu());
+
+    // 上下文菜单「编辑」
+    document.getElementById('ctx-edit')?.addEventListener('click', () => this.handleContextMenuEdit());
+
     // 方案预览页「加入任务组」按钮
     document.getElementById('btn-add-to-group')?.addEventListener('click', () => this.addCurrentPlanToGroup());
 
@@ -774,11 +800,78 @@ export class AppController {
   private renderTaskGroup(): void {
     const groups = this.taskGroupModel.groups;
     const active = this.taskGroupModel.getActiveGroup();
+    const items = active?.items ?? [];
+
+    // 先用无元数据快速渲染
     this.taskGroupView.render({
       groups: groups.map(g => ({ name: g.name, itemCount: g.items.length })),
       activeGroupName: this.taskGroupModel.activeGroupName,
-      items: active?.items ?? [],
+      items,
     });
+
+    // 异步加载元数据后重新渲染
+    if (items.length > 0) {
+      this.loadItemMetas(items).then(metas => {
+        // 确保活跃组未切换
+        if (this.taskGroupModel.getActiveGroup()?.name !== active?.name) return;
+        this.taskGroupView.render({
+          groups: groups.map(g => ({ name: g.name, itemCount: g.items.length })),
+          activeGroupName: this.taskGroupModel.activeGroupName,
+          items,
+          itemMetas: metas,
+        });
+      });
+    }
+  }
+
+  /** 从 YAML 文件中异步加载任务条目元数据 */
+  private async loadItemMetas(items: ReadonlyArray<import('../model/TaskGroupModel').TaskGroupItem>): Promise<(TaskGroupItemMeta | null)[]> {
+    const bridge = window.electronBridge;
+    if (!bridge) return items.map(() => null);
+
+    const REPAIR: Record<number, string> = { 1: '中破就修', 2: '大破才修' };
+    const TYPE_LABELS: Record<string, string> = {
+      normal_fight: '普通出击', event_fight: '活动出击',
+      exercise: '演习', campaign: '战役', decisive: '决战',
+    };
+
+    return Promise.all(items.map(async (item): Promise<TaskGroupItemMeta | null> => {
+      try {
+        const content = await bridge.readFile(item.path);
+        const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
+        if (!parsed || typeof parsed !== 'object') return null;
+
+        const meta: TaskGroupItemMeta = {};
+
+        if ('chapter' in parsed && 'map' in parsed) {
+          const ch = Number(parsed.chapter);
+          const mp = Number(parsed.map);
+          meta.mapName = ch === 99 ? `Ex-${mp}` : `${ch}-${mp}`;
+        }
+
+        if ('fleet_id' in parsed) {
+          meta.fleetId = Number(parsed.fleet_id) || undefined;
+        }
+
+        if ('repair_mode' in parsed) {
+          const rm = parsed.repair_mode;
+          if (typeof rm === 'number') meta.repairMode = REPAIR[rm] ?? `修理${rm}`;
+          else if (Array.isArray(rm)) meta.repairMode = REPAIR[rm[0]] ?? `修理${rm[0]}`;
+        }
+
+        if ('task_type' in parsed && !('chapter' in parsed)) {
+          meta.typeLabel = TYPE_LABELS[String(parsed.task_type)] ?? String(parsed.task_type);
+        }
+
+        if ('fleet' in parsed && Array.isArray(parsed.fleet)) {
+          meta.fleet = (parsed.fleet as unknown[]).map(s => String(s || '')).filter(Boolean);
+        }
+
+        return meta;
+      } catch {
+        return null;
+      }
+    }));
   }
 
   /** 导出当前任务列表为 JSON 文件 */
@@ -961,6 +1054,121 @@ export class AppController {
       this.appendLocalLog('info', `已从任务组「${group.name}」加载 ${loadedCount} 个任务到队列`);
       this.switchPage('main');
       this.renderMain();
+    }
+  }
+
+  /** 从任务列表拖拽单个条目加入队列 */
+  private async loadSingleItemToQueue(index: number): Promise<void> {
+    const group = this.taskGroupModel.getActiveGroup();
+    if (!group) return;
+    const item = group.items[index];
+    if (!item) return;
+
+    const bridge = window.electronBridge;
+    if (!bridge) return;
+
+    try {
+      const content = await bridge.readFile(item.path);
+      const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object') return;
+
+      if (item.kind === 'preset' || ('task_type' in parsed && !('chapter' in parsed))) {
+        this.importTaskPreset(parsed as unknown as TaskPreset, item.path);
+      } else {
+        const plan = PlanModel.fromYaml(content, item.path);
+        const req: NormalFightReq = {
+          type: 'normal_fight',
+          plan_id: plan.fileName,
+          times: 1,
+          gap: plan.data.gap ?? 0,
+        };
+        this.scheduler.addTask(plan.mapName, 'normal_fight', req, TaskPriority.USER_TASK, item.times, plan.data.stop_condition);
+      }
+
+      this.appendLocalLog('info', `已将「${item.label}」加入队列`);
+      this.renderMain();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.appendLocalLog('error', `加载「${item.label}」失败: ${msg}`);
+    }
+  }
+
+  // ── 右键上下文菜单 ──
+
+  private contextMenuTarget: { source: 'taskgroup' | 'queue'; id: number | string } | null = null;
+
+  private showContextMenuForItem(source: 'taskgroup' | 'queue', id: number | string, x: number, y: number): void {
+    this.contextMenuTarget = { source, id };
+    const menu = document.getElementById('context-menu');
+    if (!menu) return;
+    menu.style.left = `${x}px`;
+    menu.style.top = `${y}px`;
+    menu.style.display = '';
+  }
+
+  private hideContextMenu(): void {
+    const menu = document.getElementById('context-menu');
+    if (menu) menu.style.display = 'none';
+  }
+
+  private async handleContextMenuEdit(): Promise<void> {
+    this.hideContextMenu();
+    const target = this.contextMenuTarget;
+    if (!target) return;
+    this.contextMenuTarget = null;
+
+    if (target.source === 'taskgroup') {
+      // 打开任务列表中的条目进行编辑
+      const group = this.taskGroupModel.getActiveGroup();
+      if (!group) return;
+      const item = group.items[target.id as number];
+      if (!item) return;
+      await this.openItemForEdit(item.path, item.kind);
+    } else {
+      // 从队列中查找任务
+      const taskId = target.id as string;
+      const running = this.scheduler.currentRunningTask;
+      const task = (running?.id === taskId) ? running : this.scheduler.taskQueue.find(t => t.id === taskId);
+      if (!task) return;
+
+      // normal_fight / event_fight 有 plan_id 可以打开文件编辑
+      const req = task.request;
+      let planId: string | undefined;
+      if (req.type === 'normal_fight' || req.type === 'event_fight') {
+        planId = req.plan_id ?? undefined;
+      }
+      if (planId) {
+        await this.openItemForEdit(planId, 'plan');
+      } else {
+        this.appendLocalLog('warn', `「${task.name}」没有关联的方案文件`);
+      }
+    }
+  }
+
+  /** 打开指定文件到预览/编辑页面 */
+  private async openItemForEdit(filePath: string, kind: 'plan' | 'preset'): Promise<void> {
+    const bridge = window.electronBridge;
+    if (!bridge) return;
+
+    try {
+      const content = await bridge.readFile(filePath);
+      const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
+      if (!parsed || typeof parsed !== 'object') return;
+
+      if (kind === 'preset' || ('task_type' in parsed && !('chapter' in parsed))) {
+        this.importTaskPreset(parsed as unknown as TaskPreset, filePath);
+      } else {
+        this.currentPlan = PlanModel.fromYaml(content, filePath);
+        const { chapter, map } = this.currentPlan.data;
+        this.currentMapData = chapter === 99
+          ? await loadExMapData(map)
+          : await loadMapData(chapter, map);
+        this.renderPlanPreview();
+      }
+      this.switchPage('plan');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.appendLocalLog('error', `打开编辑失败: ${msg}`);
     }
   }
 
@@ -1382,6 +1590,12 @@ export class AppController {
       proceed: vals.proceed,
       enemy_rules: rules.length > 0 ? rules : undefined,
     };
+
+    // 即时保存到文件
+    if (this.currentPlan.fileName) {
+      const bridge = window.electronBridge;
+      bridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
+    }
 
     this.planView.hideNodeEditor();
     this.editingNodeId = null;
