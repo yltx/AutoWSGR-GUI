@@ -287,6 +287,25 @@ export class Scheduler {
     this.notifyQueueChange();
   }
 
+  /** 处理后端进程 stdout 日志行（用于解析 OCR 数据和触发停止条件） */
+  processBackendLog(message: string): void {
+    const loot = parseUiCount(message, '战利品数量');
+    const ship = parseUiCount(message, '舰船数量');
+    if (loot != null) {
+      this.trackedLootCount = loot;
+      Logger.debug(`[StopCond] stdout 解析到战利品数量: ${loot}`, 'scheduler');
+    }
+    if (ship != null) {
+      this.trackedShipCount = ship;
+      Logger.debug(`[StopCond] stdout 解析到舰船数量: ${ship}`, 'scheduler');
+    }
+
+    if ((loot != null || ship != null) && this.currentTask?.stopCondition) {
+      Logger.debug(`[StopCond] 当前任务有停止条件，检查是否满足`, 'scheduler');
+      this.checkAndStopRunningTask(this.currentTask.stopCondition);
+    }
+  }
+
   /** 清空队列 (不影响当前正在运行的) */
   clearQueue(): void {
     this.queue = [];
@@ -331,6 +350,19 @@ export class Scheduler {
       this.currentTask = null;
       this.consumeNext();
       return;
+    }
+
+    // 发起前预检停止条件：仅依赖 OCR 识别结果
+    // 调用 /api/game/acquisition 读取当前战利品/舰船数量
+    if (task.stopCondition) {
+      const preflightMet = await this.preflightStopCheck(task.stopCondition, task.name);
+      if (preflightMet) {
+        this.emitLog('info', `任务「${task.name}」启动前已满足停止条件，跳过`);
+        this.callbacks.onTaskCompleted?.(task.id, true, null, null);
+        this.currentTask = null;
+        this.consumeNext();
+        return;
+      }
     }
 
     try {
@@ -440,6 +472,62 @@ export class Scheduler {
     this.currentTask = null;
     // 继续消费下一个任务
     this.consumeNext();
+  }
+
+  /** 任务执行中实时检查停止条件，满足则立即发送 taskStop */
+  private checkAndStopRunningTask(cond: StopCondition): void {
+    let met = false;
+    if (cond.loot_count_ge != null && this.trackedLootCount != null && this.trackedLootCount >= cond.loot_count_ge) {
+      this.emitLog('info', `战利品已达 ${this.trackedLootCount}/${cond.loot_count_ge}，实时触发停止`);
+      met = true;
+    }
+    if (cond.ship_count_ge != null && this.trackedShipCount != null && this.trackedShipCount >= cond.ship_count_ge) {
+      this.emitLog('info', `舰船已达 ${this.trackedShipCount}/${cond.ship_count_ge}，实时触发停止`);
+      met = true;
+    }
+    if (met) {
+      this._stopped = true;
+      this.api.taskStop().catch(() => {});
+    }
+  }
+
+  /**
+   * 预飞检查：在发起 taskStart 之前确认停止条件是否已满足。
+   *
+   * 仅依赖 OCR：调用 /api/game/acquisition 读取出征面板数量。
+   * 不使用本地跟踪值，也不使用 gameContext 计数器。
+   */
+  private async preflightStopCheck(cond: StopCondition, taskName: string): Promise<boolean> {
+    Logger.debug(`[StopCond] 预飞OCR检查: 「${taskName}」 条件=${JSON.stringify(cond)}`, 'scheduler');
+
+    try {
+      const resp = await this.api.gameAcquisition();
+      if (resp.success && resp.data) {
+        const { loot_count, ship_count } = resp.data;
+        Logger.debug(`[StopCond] acquisition OCR: loot=${loot_count} ship=${ship_count}`, 'scheduler');
+
+        if (loot_count != null) this.trackedLootCount = loot_count;
+        if (ship_count != null) this.trackedShipCount = ship_count;
+
+        if (cond.loot_count_ge != null && loot_count != null && loot_count >= cond.loot_count_ge) {
+          this.emitLog('info', `[预飞] OCR: 战利品 ${loot_count} ≥ ${cond.loot_count_ge}，满足停止条件`);
+          return true;
+        }
+        if (cond.ship_count_ge != null && ship_count != null && ship_count >= cond.ship_count_ge) {
+          this.emitLog('info', `[预飞] OCR: 舰船 ${ship_count} ≥ ${cond.ship_count_ge}，满足停止条件`);
+          return true;
+        }
+
+        this.emitLog('info', `[预飞] OCR: 战利品=${loot_count ?? '-'} 舰船=${ship_count ?? '-'}，未达停止条件`);
+      } else {
+        this.emitLog('warn', `[预飞] OCR 检查失败: ${resp.error ?? 'unknown error'}`);
+      }
+    } catch (e) {
+      this.emitLog('warn', `[预飞] OCR 检查异常: ${String(e)}`);
+    }
+
+    Logger.debug(`[StopCond] 预飞OCR检查: 未满足停止条件，任务将启动`, 'scheduler');
+    return false;
   }
 
   /** 检查停止条件是否满足（优先使用 OCR 日志中跟踪的计数，回退到 gameContext API） */
@@ -556,6 +644,12 @@ export class Scheduler {
         const ship = parseUiCount(msg.message, '舰船数量');
         if (loot != null) this.trackedLootCount = loot;
         if (ship != null) this.trackedShipCount = ship;
+
+        // 实时停止：任务执行中收到 OCR 数据后，立即检查是否满足停止条件
+        if ((loot != null || ship != null) && this.currentTask?.stopCondition) {
+          this.checkAndStopRunningTask(this.currentTask.stopCondition);
+        }
+
         this.callbacks.onLog?.(msg);
       },
 

@@ -88,6 +88,10 @@ interface ElectronBridge {
   startBackend: () => Promise<{ success: boolean; message: string }>;
   runSetup: () => Promise<{ success: boolean; output: string }>;
   installPortablePython: () => Promise<{ success: boolean }>;
+  checkGuiUpdates: () => Promise<{ version: string } | null>;
+  downloadGuiUpdate: () => Promise<{ success: boolean; message?: string }>;
+  installGuiUpdate: () => void;
+  onUpdateStatus: (callback: (status: any) => void) => void;
   onBackendLog: (callback: (line: string) => void) => void;
   onSetupLog: (callback: (text: string) => void) => void;
 }
@@ -268,6 +272,9 @@ export class AppController {
         const msgMatch = clean.match(/\|\s*(?:INFO|WARNING|ERROR)\s*\|\s*\S+\s*\|\s*(.+)/);
         const message = msgMatch ? msgMatch[1].trim() : clean;
         Logger.logLevel(level, message);
+
+        // 将提取的消息传给调度器，用于 OCR 停止条件检测
+        this.scheduler.processBackendLog(message);
       });
     }
 
@@ -361,13 +368,51 @@ export class AppController {
 
   /** 检查 git 更新 (非阻塞, 仅日志提示) */
   private async checkForUpdates(bridge: ElectronBridge): Promise<void> {
+    // 后端 (autowsgr PyPI) 更新检查
     try {
       const updates = await bridge.checkUpdates();
       if (updates.hasUpdates) {
         Logger.warn(`发现 ${updates.behindCount} 个新提交可更新，可通过「配置 → 检查更新」拉取`);
       }
     } catch { /* 忽略 */ }
+
+    // GUI 增量更新检查
+    this.initGuiAutoUpdate(bridge);
   }
+
+  /** 初始化 GUI 自动更新监听 + 首次检查 */
+  private initGuiAutoUpdate(bridge: ElectronBridge): void {
+    if (!bridge.onUpdateStatus) return;
+
+    bridge.onUpdateStatus((status) => {
+      switch (status.status) {
+        case 'available':
+          Logger.info(`发现 GUI 新版本 v${status.version}，正在自动下载增量更新…`);
+          bridge.downloadGuiUpdate?.();
+          break;
+        case 'downloading':
+          if (status.percent != null && status.percent % 25 === 0) {
+            Logger.info(`GUI 更新下载中… ${status.percent}%`);
+          }
+          break;
+        case 'downloaded':
+          Logger.info(`GUI v${status.version} 下载完成，将在退出时自动安装`);
+          this.pendingGuiVersion = status.version;
+          break;
+        case 'error':
+          Logger.warn(`GUI 更新检查失败: ${status.message || '未知错误'}`);
+          break;
+      }
+    });
+
+    // 延迟 5 秒后静默检查
+    setTimeout(() => {
+      bridge.checkGuiUpdates?.().catch(() => {});
+    }, 5000);
+  }
+
+  /** 待安装的 GUI 版本号 */
+  private pendingGuiVersion: string | null = null;
 
   /** 等待后端 HTTP 服务就绪, 然后启动系统 */
   private waitForBackendAndConnect(retries = 30): void {
@@ -1290,7 +1335,7 @@ export class AppController {
         const id = this.scheduler.addTask(
           `自动战役·${campaignName}`,
           'campaign',
-          { type: 'campaign', campaign_name: campaignName, times },
+          { type: 'campaign', campaign_name: campaignName, times: 1 },
           TaskPriority.DAILY,
           times,
         );
@@ -1478,8 +1523,8 @@ export class AppController {
     // 公共字段
     const timesGroup = document.getElementById('tp-times-group')!;
     const timesEl = document.getElementById('tp-times') as HTMLInputElement;
-    if (preset.task_type === 'exercise' || preset.task_type === 'campaign') {
-      // 演习：打完所有已刷新演习；战役：配置页已有自动战役设置
+    if (preset.task_type === 'exercise') {
+      // 演习：打完所有已刷新演习
       timesGroup.style.display = 'none';
     } else {
       timesGroup.style.display = '';
@@ -1521,6 +1566,7 @@ export class AppController {
         req = {
           type: 'campaign',
           campaign_name: (document.getElementById('tp-campaign-name') as HTMLSelectElement).value,
+          times: 1,
         };
         break;
       case 'decisive': {
@@ -1555,7 +1601,7 @@ export class AppController {
         break;
     }
 
-    const effectiveTimes = (preset.task_type === 'exercise' || preset.task_type === 'decisive' || preset.task_type === 'campaign') ? 1 : times;
+    const effectiveTimes = (preset.task_type === 'exercise' || preset.task_type === 'decisive') ? 1 : times;
     const stopCondition = preset.stop_condition;
 
     this.scheduler.addTask(name, preset.task_type, req, TaskPriority.USER_TASK, effectiveTimes, stopCondition);
@@ -2547,7 +2593,7 @@ export class AppController {
         req = { type: 'exercise', fleet_id: tpl.fleet_id ?? 1 };
         break;
       case 'campaign':
-        req = { type: 'campaign', campaign_name: tpl.campaign_name ?? '困难潜艇', times };
+        req = { type: 'campaign', campaign_name: tpl.campaign_name ?? '困难潜艇', times: 1 };
         break;
       case 'decisive':
         req = {
@@ -2583,6 +2629,7 @@ export class AppController {
     }
 
     const effectiveTimes = (tpl.type === 'exercise' || tpl.type === 'decisive') ? 1 : times;
+    // campaign: 后端只执行单次，前端通过 follow-up 管理重复次数
 
     this.scheduler.addTask(
       tpl.name,

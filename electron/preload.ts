@@ -80,6 +80,23 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('install-portable-python');
   },
 
+  // ── GUI 自动更新 ──
+  checkGuiUpdates: () => {
+    return ipcRenderer.invoke('check-gui-updates');
+  },
+
+  downloadGuiUpdate: () => {
+    return ipcRenderer.invoke('download-gui-update');
+  },
+
+  installGuiUpdate: () => {
+    return ipcRenderer.invoke('install-gui-update');
+  },
+
+  onUpdateStatus: (callback: (status: any) => void) => {
+    ipcRenderer.on('update-status', (_event, status) => callback(status));
+  },
+
   onBackendLog: (callback: (line: string) => void) => {
     ipcRenderer.on('backend-log', (_event, line: string) => callback(line));
   },

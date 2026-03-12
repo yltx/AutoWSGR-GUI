@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { exec, execSync, spawn, ChildProcess } from 'child_process';
 import { promisify } from 'util';
+import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater';
 
 const execAsync = promisify(exec);
 
@@ -40,11 +41,37 @@ function resourceRoot(): string {
 /** 将相对路径解析为绝对路径 */
 function resolveAppPath(filePath: string): string {
   if (path.isAbsolute(filePath)) return filePath;
-  // resource/ 和 plans/ 在打包后位于 extraResources
-  if (filePath.startsWith('resource') || filePath.startsWith('plans')) {
+  // resource/ 在打包后位于 extraResources（只读）
+  if (filePath.startsWith('resource')) {
     return path.join(resourceRoot(), filePath);
   }
+  // plans/ 及其他文件在 appRoot（可写，用户数据不会被覆盖安装覆盖）
   return path.join(appRoot(), filePath);
+}
+
+/**
+ * 初始化用户方案目录：将 extraResources 中的默认方案
+ * 复制到 appRoot/plans（不覆盖已有文件，保留用户自定义方案）。
+ */
+function initUserPlansDir(): void {
+  const bundledDir = path.join(resourceRoot(), 'plans');
+  const userDir = path.join(appRoot(), 'plans');
+  if (!fs.existsSync(bundledDir)) return;
+  copyDirNoOverwrite(bundledDir, userDir);
+}
+
+/** 递归复制目录，跳过已存在的文件 */
+function copyDirNoOverwrite(src: string, dest: string): void {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath = path.join(src, entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      copyDirNoOverwrite(srcPath, destPath);
+    } else if (!fs.existsSync(destPath)) {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 function createWindow(): BrowserWindow {
@@ -329,6 +356,73 @@ ipcMain.handle('start-backend', async () => {
   if (backendProcess) return { success: true, message: '后端已在运行' };
   await startBackend();
   return { success: true, message: '后端启动中' };
+});
+
+// ════════════════════════════════════════
+// GUI 自动更新 (electron-updater)
+// ════════════════════════════════════════
+
+/** 初始化自动更新 */
+function initAutoUpdater(): void {
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on('update-available', (info: UpdateInfo) => {
+    mainWindow?.webContents.send('update-status', {
+      status: 'available',
+      version: info.version,
+      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
+    });
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    mainWindow?.webContents.send('update-status', { status: 'up-to-date' });
+  });
+
+  autoUpdater.on('download-progress', (progress: ProgressInfo) => {
+    mainWindow?.webContents.send('update-status', {
+      status: 'downloading',
+      percent: Math.round(progress.percent),
+      transferred: progress.transferred,
+      total: progress.total,
+    });
+  });
+
+  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
+    mainWindow?.webContents.send('update-status', {
+      status: 'downloaded',
+      version: info.version,
+    });
+  });
+
+  autoUpdater.on('error', (err: Error) => {
+    mainWindow?.webContents.send('update-status', {
+      status: 'error',
+      message: err.message,
+    });
+  });
+}
+
+ipcMain.handle('check-gui-updates', async () => {
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    return result?.updateInfo ? { version: result.updateInfo.version } : null;
+  } catch {
+    return null;
+  }
+});
+
+ipcMain.handle('download-gui-update', async () => {
+  try {
+    await autoUpdater.downloadUpdate();
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, message: err.message };
+  }
+});
+
+ipcMain.handle('install-gui-update', () => {
+  autoUpdater.quitAndInstall(false, true);
 });
 
 // ════════════════════════════════════════
@@ -1255,6 +1349,8 @@ function stopBackend(): void {
 // ════════════════════════════════════════
 
 app.whenReady().then(() => {
+  initUserPlansDir();
+  initAutoUpdater();
   createWindow();
 
   app.on('activate', () => {

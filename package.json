@@ -1,6 +1,6 @@
 {
   "name": "wsgrgui",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "AutoWSGR 图形界面 — MVP",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -21,6 +21,7 @@
     "typescript": "^5.6.0"
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "js-yaml": "^4.1.0"
   },
   "build": {
@@ -39,12 +40,16 @@
       {
         "from": "resource",
         "to": "resource",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "plans",
         "to": "plans",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "setup.bat",
@@ -59,17 +64,25 @@
       {
         "from": "python",
         "to": "python",
-        "filter": ["**/*", "!site-packages", "!site-packages/**"]
+        "filter": [
+          "**/*",
+          "!site-packages",
+          "!site-packages/**"
+        ]
       },
       {
         "from": "redist",
         "to": "redist",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "adb",
         "to": "adb",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
@@ -77,7 +90,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },
@@ -89,6 +104,10 @@
       "include": "build/installer.nsh",
       "artifactName": "${productName}-Setup-${version}.${ext}"
     },
-    "publish": null
+    "publish": {
+      "provider": "github",
+      "owner": "yltx",
+      "repo": "AutoWSGR-GUI"
+    }
   }
 }

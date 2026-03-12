@@ -161,8 +161,22 @@ export class MainView {
           const progSpan = document.createElement('span');
           progSpan.className = 'tq-progress';
           if (item.totalTimes > 1) {
-            const currentRound = item.totalTimes - item.remaining + 1;
-            progSpan.textContent = `${currentRound}/${item.totalTimes}`;
+            // 前端管理多轮任务时，后端常上报单轮进度 1/1；此时优先显示队列轮次进度。
+            let useBackendProgress = false;
+            if (item.progress) {
+              const parts = item.progress.split('/');
+              if (parts.length === 2) {
+                const backendTotal = parseInt(parts[1], 10);
+                useBackendProgress = Number.isFinite(backendTotal) && backendTotal > 1;
+              }
+            }
+
+            if (useBackendProgress && item.progress) {
+              progSpan.textContent = item.progress;
+            } else {
+              const currentRound = item.totalTimes - item.remaining + 1;
+              progSpan.textContent = `${currentRound}/${item.totalTimes}`;
+            }
           } else if (item.progress) {
             progSpan.textContent = item.progress;
           }
