@@ -482,10 +482,318 @@ body {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  margin: 4px 0;
+  transition: background 0.15s;
+}
+
+.plan-comment:hover {
+  background: var(--bg-hover);
 }
 
 .plan-comment:empty {
+  display: block;
+  min-height: 22px;
+}
+
+.plan-comment:empty::before {
+  content: '点击编辑任务说明…';
+  color: var(--text-muted);
+  opacity: 0.5;
+}
+
+.plan-comment-editing {
+  font-size: 12px;
+  color: var(--text);
+  white-space: pre-wrap;
+  line-height: 1.5;
+  padding: 4px 6px;
+  margin: 4px 0;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  outline: none;
+  min-height: 40px;
+  resize: vertical;
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+/* ═══ 编队预设选择器 ═══ */
+.fleet-preset-card {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+}
+
+.fleet-preset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.fleet-preset-title {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.fleet-preset-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.fleet-preset-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fleet-preset-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: all 0.15s;
+  background: transparent;
+  position: relative;
+}
+
+.fleet-preset-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.fleet-preset-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.fleet-preset-item.unavailable {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.fleet-preset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.fleet-preset-name {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.fleet-preset-item-actions {
   display: none;
+  gap: 2px;
+}
+
+.fleet-preset-item:hover .fleet-preset-item-actions {
+  display: flex;
+}
+
+.fleet-preset-item-actions button {
+  font-size: 12px;
+  padding: 2px 8px;
+  line-height: 20px;
+  border: none;
+  background: var(--bg-inset);
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.fleet-preset-item-actions button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.fleet-preset-item-actions button.btn-delete:hover {
+  color: var(--danger);
+}
+
+.fleet-preset-ships {
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.fleet-preset-ships .ship-tag {
+  background: var(--bg-inset);
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  line-height: 18px;
+}
+
+.fleet-preset-ships .ship-tag.ship-missing {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+/* ═══ 任务配置区 ═══ */
+.plan-task-config {
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+.plan-task-config-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.plan-task-config-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 8px;
+  align-items: center;
+}
+
+.plan-task-label {
+  font-size: 11px;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.plan-task-config .input-small {
+  width: 100%;
+  max-width: 90px;
+  font-size: 11px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+}
+
+.plan-task-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  display: block;
+}
+
+.fleet-select-label {
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+/* 编队预设编辑弹窗 */
+.fleet-edit-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.fleet-edit-dialog {
+  background: var(--bg-card-solid);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-elevated);
+  padding: 20px;
+  width: 400px;
+  max-width: 90vw;
+}
+
+.fleet-edit-dialog h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.fleet-edit-dialog .form-group {
+  margin-bottom: 10px;
+}
+
+.fleet-edit-dialog .form-group label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 4px;
+}
+
+.fleet-edit-dialog .fleet-edit-ships-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ship-input-wrapper {
+  position: relative;
+}
+
+.fleet-edit-dialog .fleet-edit-ships-grid input {
+  font-size: 13px;
+  padding: 5px 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 舰船自动补全下拉 */
+.ship-autocomplete-list {
+  display: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  z-index: 1010;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-elevated);
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.ship-autocomplete-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 10px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.ship-autocomplete-item:hover,
+.ship-autocomplete-item.active {
+  background: var(--bg-hover);
+}
+
+.ship-ac-name mark {
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+.ship-ac-type {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.fleet-edit-dialog .fleet-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
 }
 
 /* ═══ 节点列表 ═══ */
@@ -1655,17 +1963,18 @@ select.input {
 }
 
 .plan-left {
-  width: 320px;
-  min-width: 280px;
+  width: 360px;
+  min-width: 300px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .plan-editor-area {
-  flex: 1;
-  min-height: 0;
+  flex: 1 1 0;
+  min-height: 100px;
   overflow-y: auto;
 }
 
@@ -1895,6 +2204,28 @@ input[type="checkbox"]:focus-visible {
 
 .auto-section-body .form-group:last-child {
   margin-bottom: 0;
+}
+
+/* ═══ ADB 状态指示器 ═══ */
+.adb-status {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.adb-status-online {
+  color: var(--success);
+  background: var(--success-bg);
+}
+.adb-status-offline {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.adb-status-unknown {
+  color: var(--text-muted);
+  background: var(--bg-inset);
 }
 
 .config-hint {

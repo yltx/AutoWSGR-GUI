@@ -33,3 +33,12 @@ export const ALL_SHIPS: ShipInfo[] = (rawShips as any[]).map(s => ({
   nation: s.nation as string,
   ship_type: s.ship_type as string,
 }));
+
+/**
+ * 将前端显示名转换为后端 API 使用的名称。
+ * 规则：去掉 "·改" 后缀（改造型在游戏内与原型同名）。
+ * 例: "飞龙·改" → "飞龙", "岛风(岛风型驱逐舰)·改" → "岛风(岛风型驱逐舰)"
+ */
+export function toBackendName(displayName: string): string {
+  return displayName.endsWith('·改') ? displayName.slice(0, -2) : displayName;
+}

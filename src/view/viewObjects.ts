@@ -97,6 +97,19 @@ export interface PlanPreviewViewObject {
   allNodes?: NodeViewObject[];
   /** 地图连线 */
   edges?: MapEdgeVO[];
+  /** 编队预设列表 */
+  fleetPresets?: FleetPresetVO[];
+  /** 任务配置 */
+  times?: number;
+  gap?: number;
+  lootCountGe?: number;
+  shipCountGe?: number;
+}
+
+/** 编队预设 VO */
+export interface FleetPresetVO {
+  name: string;
+  ships: string[];
 }
 
 // ════════════════════════════════════════

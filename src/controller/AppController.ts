@@ -39,7 +39,7 @@ import {
   type TaskTemplate,
 } from '../model/types';
 import { loadMapData, loadExMapData, getNodeType, isDetourNode, isNightNode } from '../model/MapDataLoader';
-import { ALL_SHIPS, shipTypeLabel } from '../data/shipData';
+import { ALL_SHIPS, shipTypeLabel, toBackendName } from '../data/shipData';
 import { Logger } from '../utils/Logger';
 
 /** 将 repair_mode（数字或数组）转换为显示文本 */
@@ -144,6 +144,7 @@ export class AppController {
   private appRoot = '';
   private plansDir = '';
   private configDir = '';
+  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private editingNodeId: string | null = null;
   private wizardStep = 1;
   private currentPreset: TaskPreset | null = null;
@@ -450,6 +451,7 @@ export class AppController {
         Logger.info('系统启动成功 ✓');
         this.cronScheduler.start();
         Logger.info('定时调度器已启动');
+        this.startHeartbeat();
       } else {
         Logger.error('系统启动失败 (模拟器连接/游戏启动异常)');
       }
@@ -465,6 +467,7 @@ export class AppController {
           this.scheduler.recoverAfterTimeout();
           this.cronScheduler.start();
           Logger.info('定时调度器已启动');
+          this.startHeartbeat();
         } else {
           Logger.error('系统启动超时且后端未响应 (模拟器连接耗时过长)');
         }
@@ -561,6 +564,68 @@ export class AppController {
     // 切换页面可见性
     document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
     document.getElementById(`page-${pageId}`)?.classList.add('active');
+
+    // 切到配置页时自动刷新 ADB 状态
+    if (pageId === 'config') this.refreshAdbStatus();
+  }
+
+  /** 刷新配置页的 ADB 状态指示器 */
+  private async refreshAdbStatus(): Promise<void> {
+    const el = document.getElementById('cfg-adb-status');
+    if (!el) return;
+    const bridge = window.electronBridge;
+    if (!bridge?.checkAdbDevices) return;
+    el.textContent = '检测中…';
+    el.className = 'adb-status adb-status-unknown';
+    try {
+      const devices = await bridge.checkAdbDevices();
+      const online = devices.filter(d => d.status === 'device');
+      if (online.length > 0) {
+        el.textContent = `在线 (${online.map(d => d.serial).join(', ')})`;
+        el.className = 'adb-status adb-status-online';
+      } else {
+        el.textContent = '未发现在线设备';
+        el.className = 'adb-status adb-status-offline';
+      }
+    } catch {
+      el.textContent = '检测失败';
+      el.className = 'adb-status adb-status-offline';
+    }
+  }
+
+  /** 启动后端心跳检测 (30 秒一次) */
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    let consecutiveFails = 0;
+    this.heartbeatTimer = setInterval(async () => {
+      try {
+        const alive = await this.scheduler.ping();
+        if (alive) {
+          consecutiveFails = 0;
+        } else {
+          consecutiveFails++;
+        }
+      } catch {
+        consecutiveFails++;
+      }
+
+      if (consecutiveFails >= 3) {
+        Logger.error('后端连续 3 次心跳失败，尝试自动重启…');
+        this.stopHeartbeat();
+        const bridge = window.electronBridge;
+        if (bridge?.startBackend) {
+          await bridge.startBackend();
+          this.waitForBackendAndConnect();
+        }
+      }
+    }, 30_000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
   }
 
   // ════════════════════════════════════════
@@ -742,11 +807,62 @@ export class AppController {
     // 方案：plan-level 字段修改回调（即时保存）
     this.planView.onPlanFieldChange = (field, value) => {
       if (!this.currentPlan) return;
-      if (field === 'repair_mode') this.currentPlan.data.repair_mode = value;
-      else if (field === 'fight_condition') this.currentPlan.data.fight_condition = value;
-      else if (field === 'fleet_id') this.currentPlan.data.fleet_id = value;
+      if (field === 'repair_mode') this.currentPlan.data.repair_mode = value as number;
+      else if (field === 'fight_condition') this.currentPlan.data.fight_condition = value as number;
+      else if (field === 'fleet_id') this.currentPlan.data.fleet_id = value as number;
+      else if (field === 'times') this.currentPlan.data.times = value as number;
+      else if (field === 'gap') this.currentPlan.data.gap = value as number;
+      else if (field === 'loot_count_ge' || field === 'ship_count_ge') {
+        if (!this.currentPlan.data.stop_condition) {
+          this.currentPlan.data.stop_condition = {};
+        }
+        this.currentPlan.data.stop_condition[field] = value as number | undefined;
+        // 清理空的 stop_condition 对象
+        const sc = this.currentPlan.data.stop_condition;
+        if (sc.loot_count_ge == null && sc.ship_count_ge == null) {
+          this.currentPlan.data.stop_condition = undefined;
+        }
+      }
 
       // 即时保存到文件
+      if (this.currentPlan.fileName) {
+        const bridge = window.electronBridge;
+        bridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
+      }
+    };
+
+    // 编队预设 CRUD 回调（add / edit / delete → 即时保存）
+    this.planView.onFleetPresetChange = (action, index, preset) => {
+      if (!this.currentPlan) return;
+      if (!this.currentPlan.data.fleet_presets) {
+        this.currentPlan.data.fleet_presets = [];
+      }
+      const presets = this.currentPlan.data.fleet_presets;
+
+      if (action === 'add' && preset) {
+        presets.push({ name: preset.name, ships: preset.ships });
+      } else if (action === 'edit' && preset && index >= 0 && index < presets.length) {
+        presets[index] = { name: preset.name, ships: preset.ships };
+      } else if (action === 'delete' && index >= 0 && index < presets.length) {
+        presets.splice(index, 1);
+      }
+
+      // 即时保存到文件
+      if (this.currentPlan.fileName) {
+        const bridge = window.electronBridge;
+        bridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
+      }
+
+      // 重新渲染预设列表
+      this.planView.renderFleetPresets(
+        presets.map(p => ({ name: p.name, ships: p.ships }))
+      );
+    };
+
+    // 注释/说明修改回调（即时保存）
+    this.planView.onCommentChange = (comment) => {
+      if (!this.currentPlan) return;
+      this.currentPlan.comment = comment;
       if (this.currentPlan.fileName) {
         const bridge = window.electronBridge;
         bridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
@@ -1027,8 +1143,7 @@ export class AppController {
       this.taskGroupModel.setActiveGroup('默认');
       group = this.taskGroupModel.getActiveGroup()!;
     }
-    const timesInput = document.getElementById('plan-times') as HTMLInputElement;
-    const times = Math.max(1, parseInt(timesInput.value, 10) || 1);
+    const times = this.currentPlan.data.times ?? 1;
     const fileName = this.currentPlan.fileName;
     const label = fileName.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? fileName;
 
@@ -1257,7 +1372,7 @@ export class AppController {
         this.currentProgress = '';
         this.trackedLoot = '';
         this.trackedShip = '';
-        // 演习/战役任务完成后更新时间戳 (或清除 pending 以便重试)
+        // 演习/战役任务完成后的调度处理
         if (taskId === this.pendingExerciseTaskId) {
           if (success) {
             this.cronScheduler.markExerciseCompleted();
@@ -1267,11 +1382,9 @@ export class AppController {
           this.pendingExerciseTaskId = null;
         }
         if (taskId === this.pendingBattleTaskId) {
-          if (success) {
-            this.cronScheduler.markBattleCompleted();
-          } else {
-            this.cronScheduler.clearBattlePending();
-          }
+          // 战役次数按“每日 0 点刷新”处理：无论成功/失败，今日均视为已处理，
+          // 避免同一天内像演习时段一样反复重触发。
+          this.cronScheduler.markBattleHandled();
           this.pendingBattleTaskId = null;
         }
         this.renderMain();
@@ -1650,12 +1763,16 @@ export class AppController {
   private executePlan(): void {
     if (!this.currentPlan) return;
 
-    const timesInput = document.getElementById('plan-times') as HTMLInputElement;
     const plan = this.currentPlan;
 
-    // 优先使用 plan 内嵌的 times，否则使用 UI 输入
-    const times = plan.data.times ?? Math.max(1, parseInt(timesInput.value, 10) || 1);
+    const times = plan.data.times ?? 1;
     const stopCondition = plan.data.stop_condition;
+
+    // 检查是否选中了编队预设
+    const presetIdx = this.planView.selectedFleetPresetIndex;
+    const selectedFleet = (presetIdx >= 0 && plan.data.fleet_presets)
+      ? plan.data.fleet_presets[presetIdx]?.ships
+      : undefined;
 
     const req: NormalFightReq = {
       type: 'normal_fight',
@@ -1663,6 +1780,14 @@ export class AppController {
       times: 1, // 调度器 remainingTimes 控制重复
       gap: plan.data.gap ?? 0,
     };
+
+    // 如果选中了编队预设，将舰船列表附加到请求中（转换为后端名称）
+    if (selectedFleet && selectedFleet.length > 0) {
+      req.plan = {
+        fleet: selectedFleet.map(toBackendName),
+        fleet_id: plan.data.fleet_id,
+      };
+    }
 
     this.scheduler.addTask(
       plan.mapName,
@@ -1672,7 +1797,10 @@ export class AppController {
       times,
       stopCondition,
     );
-    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${plan.fileName} times=${times} gap=${req.gap}`);
+    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${plan.fileName} times=${times} gap=${req.gap}${selectedFleet ? ' fleet=' + selectedFleet.join(',') : ''}`);
+
+    // 重置编队选择
+    this.planView.selectedFleetPresetIndex = -1;
 
     this.switchPage('main');
     this.renderMain();
@@ -2091,6 +2219,11 @@ export class AppController {
       comment: plan.comment,
       allNodes,
       edges,
+      fleetPresets: plan.data.fleet_presets?.map(p => ({ name: p.name, ships: p.ships })),
+      times: plan.data.times,
+      gap: plan.data.gap,
+      lootCountGe: plan.data.stop_condition?.loot_count_ge,
+      shipCountGe: plan.data.stop_condition?.ship_count_ge,
     };
 
     this.planView.render(vo);
@@ -2100,12 +2233,6 @@ export class AppController {
     const presetEl = document.getElementById('task-preset-detail');
     if (tplCard) tplCard.style.display = 'none';
     if (presetEl) presetEl.style.display = 'none';
-
-    // 内嵌了 times 的方案：预填次数输入框
-    if (plan.data.times != null) {
-      const timesInput = document.getElementById('plan-times') as HTMLInputElement;
-      if (timesInput) timesInput.value = String(plan.data.times);
-    }
   }
 
   private renderConfig(): void {

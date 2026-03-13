@@ -2,7 +2,8 @@
  * PlanPreviewView —— 方案预览纯渲染组件。
  * 只接收 PlanPreviewViewObject 并将其渲染到 DOM，不做任何业务判断。
  */
-import type { PlanPreviewViewObject, NodeViewObject, MapNodeType, MapEdgeVO } from './viewObjects';
+import type { PlanPreviewViewObject, NodeViewObject, MapNodeType, MapEdgeVO, FleetPresetVO } from './viewObjects';
+import { ALL_SHIPS, shipTypeLabel } from '../data/shipData';
 
 const FORMATION_SHORT: Record<string, string> = {
   '单纵阵': '单纵',
@@ -56,11 +57,26 @@ export class PlanPreviewView {
   private nodeEditorIdEl: HTMLElement;
   private nodeEditorPlaceholderEl: HTMLElement;
   private nodeInfoEl: HTMLElement;
+  private fleetPresetSection: HTMLElement;
+  private fleetPresetListEl: HTMLElement;
+  private fleetPresetAddBtn: HTMLElement;
+  private timesInput: HTMLInputElement;
+  private gapInput: HTMLInputElement;
+  private lootGeInput: HTMLInputElement;
+  private shipGeInput: HTMLInputElement;
+  private taskConfigEl: HTMLElement;
+
+  /** 当前选中的编队预设索引 (-1 = 未选择) */
+  selectedFleetPresetIndex = -1;
 
   /** 外部回调：用户点击某个节点 chip 时触发 */
   onNodeClick?: (nodeId: string) => void;
   /** 外部回调：方案级别字段修改 */
-  onPlanFieldChange?: (field: 'repair_mode' | 'fight_condition' | 'fleet_id', value: number) => void;
+  onPlanFieldChange?: (field: 'repair_mode' | 'fight_condition' | 'fleet_id' | 'times' | 'gap' | 'loot_count_ge' | 'ship_count_ge', value: number | undefined) => void;
+  /** 外部回调：编队预设变更 (add / edit / delete) */
+  onFleetPresetChange?: (action: 'add' | 'edit' | 'delete', index: number, preset?: FleetPresetVO) => void;
+  /** 外部回调：注释/说明修改 */
+  onCommentChange?: (comment: string) => void;
 
   constructor() {
     this.emptyEl = document.getElementById('plan-empty')!;
@@ -76,6 +92,19 @@ export class PlanPreviewView {
     this.nodeEditorIdEl = document.getElementById('node-editor-id')!;
     this.nodeEditorPlaceholderEl = document.getElementById('node-editor-placeholder')!;
     this.nodeInfoEl = document.getElementById('node-info')!;
+    this.fleetPresetSection = document.getElementById('fleet-preset-section')!;
+    this.fleetPresetListEl = document.getElementById('fleet-preset-list')!;
+    this.fleetPresetAddBtn = document.getElementById('fleet-preset-add')!;
+    this.timesInput = document.getElementById('plan-edit-times') as HTMLInputElement;
+    this.gapInput = document.getElementById('plan-edit-gap') as HTMLInputElement;
+    this.lootGeInput = document.getElementById('plan-edit-loot-ge') as HTMLInputElement;
+    this.shipGeInput = document.getElementById('plan-edit-ship-ge') as HTMLInputElement;
+    this.taskConfigEl = document.getElementById('plan-task-config')!;
+
+    // 新增编队按钮
+    this.fleetPresetAddBtn.addEventListener('click', () => {
+      this.showFleetEditDialog(-1);
+    });
 
     // 方案级别字段变更事件
     this.repairSelect.addEventListener('change', () => {
@@ -86,6 +115,59 @@ export class PlanPreviewView {
     });
     this.fleetSelect.addEventListener('change', () => {
       this.onPlanFieldChange?.('fleet_id', Number(this.fleetSelect.value));
+    });
+
+    // 任务配置字段变更事件
+    this.timesInput.addEventListener('change', () => {
+      const v = parseInt(this.timesInput.value, 10);
+      this.onPlanFieldChange?.('times', v > 0 ? v : 1);
+    });
+    this.gapInput.addEventListener('change', () => {
+      const v = parseInt(this.gapInput.value, 10);
+      this.onPlanFieldChange?.('gap', v >= 0 ? v : 0);
+    });
+    this.lootGeInput.addEventListener('change', () => {
+      const v = parseInt(this.lootGeInput.value, 10);
+      this.onPlanFieldChange?.('loot_count_ge', v >= 0 ? v : undefined);
+    });
+    this.shipGeInput.addEventListener('change', () => {
+      const v = parseInt(this.shipGeInput.value, 10);
+      this.onPlanFieldChange?.('ship_count_ge', v >= 0 ? v : undefined);
+    });
+
+    // 点击注释区域进入编辑模式
+    this.commentEl.addEventListener('click', () => {
+      this.startCommentEdit();
+    });
+  }
+
+  /** 进入注释编辑模式 */
+  private startCommentEdit(): void {
+    const currentText = this.commentEl.textContent || '';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'plan-comment-editing';
+    textarea.value = currentText;
+    textarea.rows = Math.max(2, currentText.split('\n').length + 1);
+
+    this.commentEl.style.display = 'none';
+    this.commentEl.parentElement!.insertBefore(textarea, this.commentEl.nextSibling);
+    textarea.focus();
+
+    const commit = () => {
+      const newText = textarea.value.trim();
+      this.commentEl.textContent = newText;
+      this.commentEl.style.display = '';
+      textarea.remove();
+      this.onCommentChange?.(newText);
+    };
+
+    textarea.addEventListener('blur', commit);
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        // 取消编辑
+        this.commentEl.style.display = '';
+        textarea.remove();
+      }
     });
   }
 
@@ -106,6 +188,15 @@ export class PlanPreviewView {
     this.fightCondSelect.value = String(vo.fightConditionValue);
     this.fleetSelect.value = String(vo.fleetId);
     this.commentEl.textContent = vo.comment || '';
+
+    // 任务配置
+    this.timesInput.value = String(vo.times ?? 1);
+    this.gapInput.value = String(vo.gap ?? 0);
+    this.lootGeInput.value = vo.lootCountGe != null ? String(vo.lootCountGe) : '-1';
+    this.shipGeInput.value = vo.shipCountGe != null ? String(vo.shipCountGe) : '-1';
+
+    // 渲染编队预设
+    this.renderFleetPresets(vo.fleetPresets);
 
     // 渲染节点列表
     this.nodeListEl.innerHTML = '';
@@ -267,6 +358,9 @@ export class PlanPreviewView {
     (document.getElementById('node-edit-rules') as HTMLTextAreaElement).value = args.enemyRules;
     this.nodeEditorPlaceholderEl.style.display = 'none';
     this.nodeEditorEl.style.display = '';
+    // 隐藏编队配置和任务配置
+    this.fleetPresetSection.style.display = 'none';
+    this.taskConfigEl.style.display = 'none';
   }
 
   /** 显示非战斗节点的信息面板 */
@@ -274,6 +368,9 @@ export class PlanPreviewView {
     this.nodeEditorEl.style.display = 'none';
     this.nodeEditorPlaceholderEl.style.display = 'none';
     this.nodeInfoEl.style.display = '';
+    // 隐藏编队配置和任务配置
+    this.fleetPresetSection.style.display = 'none';
+    this.taskConfigEl.style.display = 'none';
 
     const icon = NODE_TYPE_ICON[nodeType] || '';
     const name = NODE_TYPE_NAME[nodeType];
@@ -305,6 +402,9 @@ export class PlanPreviewView {
     this.nodeEditorEl.style.display = 'none';
     this.nodeInfoEl.style.display = 'none';
     this.nodeEditorPlaceholderEl.style.display = '';
+    // 恢复编队配置和任务配置
+    this.fleetPresetSection.style.display = '';
+    this.taskConfigEl.style.display = '';
     this.nodeListEl.querySelectorAll('.node-chip,.map-node').forEach(c => c.classList.remove('selected'));
   }
 
@@ -322,5 +422,256 @@ export class PlanPreviewView {
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  /** 渲染编队预设选择器 */
+  renderFleetPresets(presets?: FleetPresetVO[]): void {
+    this.fleetPresetSection.style.display = '';
+    this.fleetPresetListEl.innerHTML = '';
+
+    if (!presets || presets.length === 0) {
+      this.selectedFleetPresetIndex = -1;
+      return;
+    }
+    this.fleetPresetListEl.innerHTML = '';
+
+    presets.forEach((preset, index) => {
+      const item = document.createElement('div');
+      item.className = 'fleet-preset-item' + (index === this.selectedFleetPresetIndex ? ' selected' : '');
+
+      // 第一行：名称 + 操作按钮
+      const row = document.createElement('div');
+      row.className = 'fleet-preset-row';
+
+      const nameEl = document.createElement('span');
+      nameEl.className = 'fleet-preset-name';
+      nameEl.textContent = preset.name;
+      row.appendChild(nameEl);
+
+      const actionsEl = document.createElement('span');
+      actionsEl.className = 'fleet-preset-item-actions';
+
+      const editBtn = document.createElement('button');
+      editBtn.textContent = '编辑';
+      editBtn.title = '编辑编队';
+      editBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.showFleetEditDialog(index, preset);
+      });
+      actionsEl.appendChild(editBtn);
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn-delete';
+      deleteBtn.textContent = '删除';
+      deleteBtn.title = '删除编队';
+      deleteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.selectedFleetPresetIndex === index) {
+          this.selectedFleetPresetIndex = -1;
+        } else if (this.selectedFleetPresetIndex > index) {
+          this.selectedFleetPresetIndex--;
+        }
+        this.onFleetPresetChange?.('delete', index);
+      });
+      actionsEl.appendChild(deleteBtn);
+
+      row.appendChild(actionsEl);
+      item.appendChild(row);
+
+      // 第二行：舰船标签
+      const shipsEl = document.createElement('div');
+      shipsEl.className = 'fleet-preset-ships';
+      for (const ship of preset.ships) {
+        const tag = document.createElement('span');
+        tag.className = 'ship-tag';
+        tag.textContent = ship;
+        shipsEl.appendChild(tag);
+      }
+      item.appendChild(shipsEl);
+
+      item.addEventListener('click', () => {
+        if (this.selectedFleetPresetIndex === index) {
+          this.selectedFleetPresetIndex = -1;
+        } else {
+          this.selectedFleetPresetIndex = index;
+        }
+        this.fleetPresetListEl.querySelectorAll('.fleet-preset-item').forEach((el, i) => {
+          el.classList.toggle('selected', i === this.selectedFleetPresetIndex);
+        });
+      });
+
+      this.fleetPresetListEl.appendChild(item);
+    });
+  }
+
+  /** 显示编队预设编辑弹窗 */
+  private showFleetEditDialog(index: number, preset?: FleetPresetVO): void {
+    const isNew = index < 0;
+    const name = preset?.name ?? '';
+    const ships = preset?.ships ?? [];
+
+    const overlay = document.createElement('div');
+    overlay.className = 'fleet-edit-overlay';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'fleet-edit-dialog';
+    dialog.innerHTML = `
+      <h3>${isNew ? '新增编队' : '编辑编队'}</h3>
+      <div class="form-group">
+        <label>编队名称</label>
+        <input type="text" id="fleet-edit-name" class="input" value="${this.escapeHtml(name)}" placeholder="例如：传统AIII双装母" />
+      </div>
+      <div class="form-group">
+        <label>舰船（1~6号位，留空表示该位置无舰船）</label>
+        <div class="fleet-edit-ships-grid">
+          ${[0, 1, 2, 3, 4, 5].map(i => `
+            <div class="ship-input-wrapper">
+              <input type="text" class="input fleet-edit-ship" placeholder="${i + 1}号位" value="${this.escapeHtml(ships[i] ?? '')}" autocomplete="off" />
+              <div class="ship-autocomplete-list"></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="fleet-edit-actions">
+        <button class="btn btn-outline" id="fleet-edit-cancel">取消</button>
+        <button class="btn btn-primary" id="fleet-edit-save">保存</button>
+      </div>
+    `;
+
+    overlay.appendChild(dialog);
+    document.body.appendChild(overlay);
+
+    // 为每个舰船输入框绑定自动补全
+    const shipWrappers = dialog.querySelectorAll('.ship-input-wrapper');
+    shipWrappers.forEach(wrapper => {
+      const input = wrapper.querySelector('.fleet-edit-ship') as HTMLInputElement;
+      const listEl = wrapper.querySelector('.ship-autocomplete-list') as HTMLElement;
+      let selectedIdx = -1;
+
+      const updateList = () => {
+        const query = input.value.trim();
+        listEl.innerHTML = '';
+        selectedIdx = -1;
+
+        if (!query) {
+          listEl.style.display = 'none';
+          return;
+        }
+
+        const lowerQ = query.toLowerCase();
+        const matches = ALL_SHIPS.filter(s => s.name.toLowerCase().includes(lowerQ)).slice(0, 12);
+
+        if (matches.length === 0) {
+          listEl.style.display = 'none';
+          return;
+        }
+
+        // 如果精确匹配唯一结果，不显示下拉
+        if (matches.length === 1 && matches[0].name === query) {
+          listEl.style.display = 'none';
+          return;
+        }
+
+        for (const ship of matches) {
+          const item = document.createElement('div');
+          item.className = 'ship-autocomplete-item';
+
+          // 高亮匹配文字
+          const nameStr = ship.name;
+          const matchIdx = nameStr.toLowerCase().indexOf(lowerQ);
+          const before = nameStr.substring(0, matchIdx);
+          const matched = nameStr.substring(matchIdx, matchIdx + query.length);
+          const after = nameStr.substring(matchIdx + query.length);
+
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'ship-ac-name';
+          nameSpan.innerHTML = this.escapeHtml(before)
+            + '<mark>' + this.escapeHtml(matched) + '</mark>'
+            + this.escapeHtml(after);
+
+          const typeSpan = document.createElement('span');
+          typeSpan.className = 'ship-ac-type';
+          typeSpan.textContent = shipTypeLabel(ship.ship_type);
+
+          item.appendChild(nameSpan);
+          item.appendChild(typeSpan);
+
+          item.addEventListener('mousedown', (e) => {
+            e.preventDefault(); // 防止 input 失焦
+            input.value = ship.name;
+            listEl.style.display = 'none';
+          });
+          listEl.appendChild(item);
+        }
+
+        listEl.style.display = 'block';
+      };
+
+      input.addEventListener('input', updateList);
+      input.addEventListener('focus', updateList);
+      input.addEventListener('blur', () => {
+        // 延迟隐藏以允许点击选中
+        setTimeout(() => { listEl.style.display = 'none'; }, 150);
+      });
+
+      input.addEventListener('keydown', (e) => {
+        const items = listEl.querySelectorAll('.ship-autocomplete-item');
+        if (items.length === 0 || listEl.style.display === 'none') return;
+
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          selectedIdx = Math.min(selectedIdx + 1, items.length - 1);
+          items.forEach((el, i) => el.classList.toggle('active', i === selectedIdx));
+          items[selectedIdx]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          selectedIdx = Math.max(selectedIdx - 1, 0);
+          items.forEach((el, i) => el.classList.toggle('active', i === selectedIdx));
+          items[selectedIdx]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          if (selectedIdx >= 0 && selectedIdx < items.length) {
+            e.preventDefault();
+            const nameEl = items[selectedIdx].querySelector('.ship-ac-name');
+            if (nameEl) input.value = nameEl.textContent || '';
+            listEl.style.display = 'none';
+          }
+        } else if (e.key === 'Escape') {
+          listEl.style.display = 'none';
+        }
+      });
+    });
+
+    const nameInput = dialog.querySelector('#fleet-edit-name') as HTMLInputElement;
+    nameInput.focus();
+
+    const close = () => overlay.remove();
+
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) close();
+    });
+
+    dialog.querySelector('#fleet-edit-cancel')!.addEventListener('click', close);
+
+    dialog.querySelector('#fleet-edit-save')!.addEventListener('click', () => {
+      const newName = nameInput.value.trim();
+      if (!newName) {
+        nameInput.focus();
+        return;
+      }
+      const shipInputs = dialog.querySelectorAll('.fleet-edit-ship') as NodeListOf<HTMLInputElement>;
+      const newShips: string[] = [];
+      shipInputs.forEach(inp => {
+        const v = inp.value.trim();
+        if (v) newShips.push(v);
+      });
+
+      const newPreset: FleetPresetVO = { name: newName, ships: newShips };
+      if (isNew) {
+        this.onFleetPresetChange?.('add', -1, newPreset);
+      } else {
+        this.onFleetPresetChange?.('edit', index, newPreset);
+      }
+      close();
+    });
   }
 }

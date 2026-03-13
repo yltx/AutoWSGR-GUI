@@ -138,6 +138,21 @@ export class CronScheduler {
     this.log('info', '战役任务完成，已记录运行时间');
   }
 
+  /**
+   * Controller 在战役任务结束（成功或失败）后调用。
+   *
+   * 战役次数每日 0 点刷新，同一天内不应像演习一样反复重触发。
+   * 因此无论执行成功与否，都将当天记为已处理。
+   */
+  markBattleHandled(): void {
+    this.lastBattleRun = this.dateKey(new Date());
+    this.battlePending = false;
+    try {
+      localStorage.setItem(LS_KEY_LAST_BATTLE_RUN, this.lastBattleRun);
+    } catch { /* ignore */ }
+    this.log('info', '战役任务已处理，今日不再重复触发');
+  }
+
   /** 演习任务失败 — 清除 pending 标记，下次 tick 将重新触发 */
   clearExercisePending(): void {
     this.exercisePending = false;

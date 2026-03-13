@@ -316,16 +316,43 @@
                   <option value="5">以退为进</option>
                 </select>
               </label>
-              <label class="plan-meta-item">编队：
-                <select id="plan-edit-fleet" class="input input-inline">
-                  <option value="1">第 1 舰队</option>
-                  <option value="2">第 2 舰队</option>
-                  <option value="3">第 3 舰队</option>
-                  <option value="4">第 4 舰队</option>
-                </select>
-              </label>
             </div>
             <p class="plan-comment" id="plan-comment"></p>
+          </div>
+
+          <!-- 编队预设选择器 (方案含 fleet_presets 时显示) -->
+          <div id="fleet-preset-section" class="card fleet-preset-card" style="display:none">
+            <div class="fleet-preset-header">
+              <h3 class="fleet-preset-title">编队配置</h3>
+              <div class="fleet-preset-actions">
+                <label class="fleet-select-label">编队：
+                  <select id="plan-edit-fleet" class="input input-inline">
+                    <option value="1">第 1 舰队</option>
+                    <option value="2">第 2 舰队</option>
+                    <option value="3">第 3 舰队</option>
+                    <option value="4">第 4 舰队</option>
+                  </select>
+                </label>
+                <button id="fleet-preset-add" class="btn btn-xs btn-outline" title="新增编队">＋</button>
+              </div>
+            </div>
+            <div id="fleet-preset-list" class="fleet-preset-list"></div>
+          </div>
+
+          <!-- 任务配置（次数、间隔、终止条件） -->
+          <div id="plan-task-config" class="card plan-task-config">
+            <h3 class="plan-task-config-title">任务配置</h3>
+            <div class="plan-task-config-grid">
+              <span class="plan-task-label">执行次数</span>
+              <input type="number" id="plan-edit-times" class="input input-inline input-small" value="1" min="1" max="99999">
+              <span class="plan-task-label">间隔(秒)</span>
+              <input type="number" id="plan-edit-gap" class="input input-inline input-small" value="0" min="0" max="9999">
+              <span class="plan-task-label">战利品≥</span>
+              <input type="number" id="plan-edit-loot-ge" class="input input-inline input-small" value="-1" min="-1" max="50">
+              <span class="plan-task-label">掉落舰船≥</span>
+              <input type="number" id="plan-edit-ship-ge" class="input input-inline input-small" value="-1" min="-1" max="500">
+            </div>
+            <span class="plan-task-hint">终止条件: -1为不启用</span>
           </div>
 
           <!-- 节点详细设置（可滚动区域） -->
@@ -370,9 +397,6 @@
             <button class="btn btn-primary btn-small" id="btn-execute-plan">加入队列</button>
             <button class="btn btn-small" id="btn-add-to-group">加入任务组</button>
             <button class="btn btn-small" id="btn-export-plan">导出 YAML</button>
-            <label>
-              次数：<input type="number" id="plan-times" value="1" min="1" max="99" class="input-small">
-            </label>
           </div>
         </div>
 
@@ -437,6 +461,10 @@
             <input type="text" id="cfg-emu-serial" class="input" placeholder="如 127.0.0.1:16384，留空自动检测">
             <button class="btn btn-small" id="btn-check-adb">检测 ADB</button>
           </div>
+        </div>
+        <div class="form-group">
+          <label>ADB 状态</label>
+          <span id="cfg-adb-status" class="adb-status adb-status-unknown">未检测</span>
         </div>
       </div>
 

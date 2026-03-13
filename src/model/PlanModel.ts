@@ -3,12 +3,12 @@
  * 负责从 YAML 文件解析战斗方案，并提供节点参数的查询与合并。
  */
 import * as yaml from 'js-yaml';
-import type { PlanData, NodeArgs } from './types';
+import type { PlanData, NodeArgs, FleetPreset } from './types';
 
 export class PlanModel {
   data: PlanData;
   fileName: string;
-  readonly comment: string;
+  comment: string;
 
   private constructor(data: PlanData, fileName: string, comment: string) {
     this.data = data;
@@ -39,6 +39,7 @@ export class PlanModel {
       fleet_id: parsed.fleet_id != null ? Number(parsed.fleet_id) : undefined,
       node_defaults: parsed.node_defaults as NodeArgs | undefined,
       node_args: parsed.node_args as Record<string, NodeArgs> | undefined,
+      fleet_presets: PlanModel.parseFleetPresets(parsed.fleet_presets),
       // 任务级字段
       times: parsed.times != null ? Number(parsed.times) : undefined,
       gap: parsed.gap != null ? Number(parsed.gap) : undefined,
@@ -133,6 +134,11 @@ export class PlanModel {
       if (Object.keys(cleaned).length > 0) obj.node_args = cleaned;
     }
 
+    // 编队预设
+    if (this.data.fleet_presets && this.data.fleet_presets.length > 0) {
+      obj.fleet_presets = this.data.fleet_presets;
+    }
+
     // 任务级字段 (仅导出已设置的)
     if (this.data.times != null) obj.times = this.data.times;
     if (this.data.gap != null) obj.gap = this.data.gap;
@@ -157,5 +163,21 @@ export class PlanModel {
     if (args.enemy_rules && args.enemy_rules.length > 0) out.enemy_rules = args.enemy_rules;
     if (args.proceed_stop) out.proceed_stop = args.proceed_stop;
     return out;
+  }
+
+  /** 解析 fleet_presets 字段 */
+  private static parseFleetPresets(raw: unknown): FleetPreset[] | undefined {
+    if (!Array.isArray(raw)) return undefined;
+    const presets: FleetPreset[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== 'object') continue;
+      const obj = item as Record<string, unknown>;
+      if (typeof obj.name !== 'string' || !Array.isArray(obj.ships)) continue;
+      presets.push({
+        name: obj.name,
+        ships: (obj.ships as unknown[]).map(s => String(s)),
+      });
+    }
+    return presets.length > 0 ? presets : undefined;
   }
 }

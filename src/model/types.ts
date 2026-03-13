@@ -20,6 +20,14 @@ export interface NodeArgs {
   SL_when_detour_fails?: boolean;
 }
 
+/** 编队预设: 一组预定义的舰船配置 */
+export interface FleetPreset {
+  /** 显示名称 */
+  name: string;
+  /** 舰船名列表 (按位置顺序) */
+  ships: string[];
+}
+
 /** Plan 文件解析后的完整数据 */
 export interface PlanData {
   chapter: number;
@@ -30,6 +38,8 @@ export interface PlanData {
   fleet_id?: number;               // 编队号
   node_defaults?: NodeArgs;
   node_args?: Record<string, NodeArgs>;
+  /** 预定义编队预设列表 */
+  fleet_presets?: FleetPreset[];
   // 任务级字段（可内联在 plan 中，无需单独的 preset 文件）
   times?: number;
   gap?: number;
