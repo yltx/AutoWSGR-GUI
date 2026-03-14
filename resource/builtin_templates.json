@@ -1,0 +1,53 @@
+[
+  {
+    "id": "builtin_farm_loot",
+    "name": "刷胖次",
+    "type": "normal_fight",
+    "builtin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "description": "自动刷取战利品（胖次），可选择不同地图方案",
+    "planPaths": [
+      "plans/9-2捞胖次.yaml",
+      "plans/7-4千伪.yaml",
+      "plans/8-5AI.yaml",
+      "plans/2-1捞胖次挂机.yaml"
+    ],
+    "defaultTimes": 99,
+    "defaultStopCondition": {
+      "loot_count_ge": 50
+    }
+  },
+  {
+    "id": "builtin_exercise",
+    "name": "自动演习",
+    "type": "exercise",
+    "builtin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "description": "每日自动完成演习",
+    "fleet_id": 1,
+    "defaultTimes": 1
+  },
+  {
+    "id": "builtin_campaign",
+    "name": "战役",
+    "type": "campaign",
+    "builtin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "description": "自动完成战役，使用时选择具体战役类型",
+    "campaign_name": "困难潜艇",
+    "defaultTimes": 1
+  },
+  {
+    "id": "builtin_decisive_6",
+    "name": "决战第6章",
+    "type": "decisive",
+    "builtin": true,
+    "createdAt": "2026-01-01T00:00:00.000Z",
+    "description": "自动完成决战第6章",
+    "chapter": 6,
+    "level1": [],
+    "level2": [],
+    "flagship_priority": [],
+    "defaultTimes": 1
+  }
+]

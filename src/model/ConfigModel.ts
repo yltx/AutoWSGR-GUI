@@ -23,6 +23,8 @@ const DEFAULT_SETTINGS: UserSettings = {
     exercise_fleet_id: 1,
     auto_normal_fight: false,
     auto_decisive: false,
+    decisive_ticket_reserve: 0,
+    decisive_template_id: '',
   },
 };
 

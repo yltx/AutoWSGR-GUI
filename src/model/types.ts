@@ -74,6 +74,8 @@ export interface DailyAutomation {
   exercise_fleet_id: number;
   auto_normal_fight: boolean;
   auto_decisive: boolean;
+  decisive_ticket_reserve: number;
+  decisive_template_id: string;
 }
 
 export interface UserSettings {
@@ -158,8 +160,14 @@ export interface TaskTemplate {
   type: TemplateType;
   createdAt: string;
 
+  /** 是否为内置模板（只读，不可删除/编辑） */
+  builtin?: boolean;
+  /** 内置模板的描述说明 */
+  description?: string;
+
   // normal_fight / event_fight
-  planPath?: string;               // 引用的方案文件路径
+  planPath?: string;               // 引用的方案文件路径（单方案，向后兼容）
+  planPaths?: string[];            // 可选方案列表（多方案模板）
   fleet_id?: number;
   fleet?: string[];                // 编队舰船名称 (6 个位置)
 
@@ -179,4 +187,26 @@ export interface TaskTemplate {
   defaultTimes?: number;
   defaultGap?: number;
   defaultStopCondition?: StopCondition;
+}
+
+// ════════════════════════════════════════
+// 泡澡修理配置 (Bath Repair)
+// ════════════════════════════════════════
+
+/** 单船修理阈值: 血量低于阈值时送入泡澡 */
+export interface RepairThreshold {
+  /** 阈值类型: percent=百分比 (如0.25=25%), absolute=绝对值 (如13点HP) */
+  type: 'percent' | 'absolute';
+  /** 阈值数值 */
+  value: number;
+}
+
+/** 任务级泡澡修理配置 */
+export interface BathRepairConfig {
+  /** 是否启用泡澡修理（启用后不使用快修，等待泡澡完成） */
+  enabled: boolean;
+  /** 默认修理阈值（适用于所有舰船） */
+  defaultThreshold: RepairThreshold;
+  /** 按舰船名覆盖修理阈值 (显示名 → 阈值) */
+  shipThresholds?: Record<string, RepairThreshold>;
 }

@@ -1,33 +1,9 @@
 {
-  "activeGroup": "8-5AI",
+  "activeGroup": "干了xdm",
   "groups": [
     {
-      "name": "9-2捞胖次",
-      "items": [
-        {
-          "path": "E:\\wsgrgui\\plans\\9-2捞胖次.yaml",
-          "kind": "plan",
-          "times": 9999,
-          "label": "9-2捞胖次"
-        }
-      ]
-    },
-    {
-      "name": "8-5AI",
-      "items": [
-        {
-          "path": "E:\\wsgrgui\\plans\\9-2捞胖次.yaml",
-          "kind": "plan",
-          "times": 9999,
-          "label": "9-2捞胖次"
-        },
-        {
-          "path": "E:\\wsgrgui\\plans\\8-5AI.yaml",
-          "kind": "plan",
-          "times": 1,
-          "label": "8-5AI"
-        }
-      ]
+      "name": "干了xdm",
+      "items": []
     }
   ]
 }

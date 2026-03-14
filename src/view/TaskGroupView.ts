@@ -114,18 +114,19 @@ export class TaskGroupView {
     const label = document.createElement('span');
     label.className = 'tg-label';
     label.textContent = item.label;
-    label.title = item.path;
+    label.title = item.path ?? item.templateId ?? '';
     row.appendChild(label);
 
     // 类型标签
     const kind = document.createElement('span');
     kind.className = 'tg-kind';
-    kind.textContent = item.kind === 'plan' ? '方案' : '预设';
+    kind.textContent = item.kind === 'plan' ? '方案' : item.kind === 'template' ? '模板' : '预设';
     row.appendChild(kind);
 
     // 详情：显示任务元数据（与名称同行）
     const detail = document.createElement('span');
     detail.className = 'tg-detail';
+    const fallback = item.path ?? item.label;
     if (meta) {
       const parts: string[] = [];
       if (meta.typeLabel) parts.push(meta.typeLabel);
@@ -135,11 +136,11 @@ export class TaskGroupView {
       if (meta.fleet && meta.fleet.length > 0) {
         parts.push(meta.fleet.filter(Boolean).join(' / '));
       }
-      detail.textContent = parts.join(' · ') || item.path;
+      detail.textContent = parts.join(' · ') || fallback;
     } else {
-      detail.textContent = item.path;
+      detail.textContent = fallback;
     }
-    detail.title = item.path;
+    detail.title = item.path ?? '';
     row.appendChild(detail);
 
     // 次数标签 + 输入

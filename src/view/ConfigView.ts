@@ -18,6 +18,8 @@ export class ConfigView {
   private battleTimes: HTMLInputElement;
   private autoNormalFight: HTMLInputElement;
   private autoDecisive: HTMLInputElement;
+  private decisiveTicketReserve: HTMLInputElement;
+  private decisiveTemplate: HTMLSelectElement;
   private themeMode: HTMLSelectElement;
   private accentColor: HTMLInputElement;
   private accentLabel: HTMLElement;
@@ -37,6 +39,8 @@ export class ConfigView {
     this.battleTimes = document.getElementById('cfg-battle-times') as HTMLInputElement;
     this.autoNormalFight = document.getElementById('cfg-auto-normal-fight') as HTMLInputElement;
     this.autoDecisive = document.getElementById('cfg-auto-decisive') as HTMLInputElement;
+    this.decisiveTicketReserve = document.getElementById('cfg-decisive-ticket-reserve') as HTMLInputElement;
+    this.decisiveTemplate = document.getElementById('cfg-decisive-template') as HTMLSelectElement;
     this.themeMode = document.getElementById('cfg-theme-mode') as HTMLSelectElement;
     this.accentColor = document.getElementById('cfg-accent-color') as HTMLInputElement;
     this.accentLabel = document.getElementById('cfg-accent-label')!;
@@ -63,6 +67,9 @@ export class ConfigView {
     this.battleTimes.value = String(vo.battleTimes);
     this.autoNormalFight.checked = vo.autoNormalFight;
     this.autoDecisive.checked = vo.autoDecisive;
+    this.decisiveTicketReserve.value = String(vo.decisiveTicketReserve);
+    // 决战模板下拉列表由 Controller 填充 options
+    this.decisiveTemplate.value = vo.decisiveTemplateId;
     this.themeMode.value = vo.themeMode;
     this.accentColor.value = vo.accentColor;
     this.accentLabel.textContent = vo.accentColor;
@@ -85,6 +92,8 @@ export class ConfigView {
       battleTimes: Number(this.battleTimes.value) || 3,
       autoNormalFight: this.autoNormalFight.checked,
       autoDecisive: this.autoDecisive.checked,
+      decisiveTicketReserve: Math.max(0, Number(this.decisiveTicketReserve.value) || 0),
+      decisiveTemplateId: this.decisiveTemplate.value,
       themeMode: this.themeMode.value as 'dark' | 'light' | 'system',
       accentColor: this.accentColor.value,
       debugMode: this.debugMode.checked,

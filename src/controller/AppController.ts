@@ -69,6 +69,7 @@ interface ElectronBridge {
   getAppRoot: () => Promise<string>;
   getPlansDir: () => Promise<string>;
   getConfigDir: () => Promise<string>;
+  listPlanFiles: () => Promise<{ name: string; file: string }[]>;
   openFolder: (folderPath: string) => Promise<void>;
   checkEnvironment: () => Promise<{
     pythonCmd: string | null;
@@ -94,6 +95,7 @@ interface ElectronBridge {
   onUpdateStatus: (callback: (status: any) => void) => void;
   onBackendLog: (callback: (line: string) => void) => void;
   onSetupLog: (callback: (text: string) => void) => void;
+  getAppVersion: () => string;
 }
 
 declare global {
@@ -147,6 +149,10 @@ export class AppController {
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private editingNodeId: string | null = null;
   private wizardStep = 1;
+  /** 向导中多方案路径列表 */
+  private wizardPlanPaths: string[] = [];
+  /** 正在编辑的模板 ID（非空时向导为编辑模式） */
+  private editingTemplateId: string | null = null;
   private currentPreset: TaskPreset | null = null;
   private currentPresetFilePath = '';
 
@@ -169,6 +175,7 @@ export class AppController {
       autoBattle: cfg.auto_battle,
       battleType: cfg.battle_type,
       battleTimes: cfg.battle_times,
+      autoNormalFight: cfg.auto_normal_fight,
     });
   }
 
@@ -184,6 +191,14 @@ export class AppController {
     this.bindOpsActions();
     this.renderMain();
     this.planView.render(null);
+
+    // 显示版本号
+    const versionEl = document.getElementById('app-version');
+    const bridge = window.electronBridge;
+    if (versionEl && bridge) {
+      const v = bridge.getAppVersion();
+      if (v) versionEl.textContent = `v${v}`;
+    }
 
     // 监听系统主题变化
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -226,7 +241,7 @@ export class AppController {
         const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
         this.mainView.appendLog({ time, level, channel, message });
       },
-      logDir: this.configDir,
+      logDir: `${this.configDir}/log`,
     });
 
     // 显示关键路径，帮助用户找到配置和方案目录
@@ -243,14 +258,15 @@ export class AppController {
       autoBattle: da.auto_battle,
       battleType: da.battle_type,
       battleTimes: da.battle_times,
+      autoNormalFight: da.auto_normal_fight,
     });
     await this.detectAndApplyEmulator();
     Logger.debug('模拟器检测完成');
+
+    // 加载模板（需在 renderConfig 之前，以便决战模板下拉列表能检索到已有模板）
+    await this.templateModel.init(bridge);
     this.renderConfig();
     this.mainView.setDebugMode(localStorage.getItem('debugMode') === 'true');
-
-    // 加载模板
-    await this.templateModel.init(bridge);
     this.renderTemplateLibrary();
 
     // 加载任务组
@@ -1019,7 +1035,24 @@ export class AppController {
 
     return Promise.all(items.map(async (item): Promise<TaskGroupItemMeta | null> => {
       try {
-        const content = await bridge.readFile(item.path);
+        // 模板引用 — 从模板库读取元数据
+        if (item.kind === 'template') {
+          const tpl = this.templateModel.get(item.templateId ?? '');
+          if (!tpl) return { typeLabel: '模板已删除' };
+          const meta: TaskGroupItemMeta = {
+            typeLabel: TYPE_LABELS[tpl.type] ?? tpl.type,
+          };
+          if (tpl.fleet_id) meta.fleetId = tpl.fleet_id;
+          if (item.fleet_id) meta.fleetId = item.fleet_id;
+          if (tpl.fleet?.length) meta.fleet = tpl.fleet.filter(Boolean);
+          if (item.campaignName) meta.mapName = item.campaignName;
+          else if (tpl.campaign_name) meta.mapName = tpl.campaign_name;
+          if (item.chapter) meta.mapName = `决战第${item.chapter}章`;
+          else if (tpl.chapter) meta.mapName = `决战第${tpl.chapter}章`;
+          return meta;
+        }
+
+        const content = await bridge.readFile(item.path!);
         const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') return null;
 
@@ -1206,15 +1239,21 @@ export class AppController {
     let loadedCount = 0;
     for (const item of group.items) {
       try {
-        const content = await bridge.readFile(item.path);
+        if (item.kind === 'template') {
+          // 模板引用 — 直接从模板库构建任务请求
+          loadedCount += this.loadTemplateToQueue(item) ? 1 : 0;
+          continue;
+        }
+
+        const content = await bridge.readFile(item.path!);
         const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
         if (!parsed || typeof parsed !== 'object') continue;
 
         if (item.kind === 'preset' || ('task_type' in parsed && !('chapter' in parsed))) {
-          this.importTaskPreset(parsed as unknown as TaskPreset, item.path);
+          this.importTaskPreset(parsed as unknown as TaskPreset, item.path!);
         } else {
           // 战斗方案
-          const plan = PlanModel.fromYaml(content, item.path);
+          const plan = PlanModel.fromYaml(content, item.path!);
           const times = item.times;
           const req: NormalFightReq = {
             type: 'normal_fight',
@@ -1238,6 +1277,44 @@ export class AppController {
     }
   }
 
+  /** 从模板 ID 构建任务请求并加入调度队列 */
+  private loadTemplateToQueue(item: import('../model/TaskGroupModel').TaskGroupItem): boolean {
+    const tpl = this.templateModel.get(item.templateId ?? '');
+    if (!tpl) {
+      Logger.error(`模板「${item.label}」不存在，可能已被删除`);
+      return false;
+    }
+
+    let req: TaskRequest;
+    const times = item.times;
+
+    switch (tpl.type) {
+      case 'exercise':
+        req = { type: 'exercise', fleet_id: item.fleet_id ?? tpl.fleet_id ?? 1 };
+        this.scheduler.addTask(item.label || tpl.name, 'exercise', req, TaskPriority.USER_TASK, 1);
+        break;
+      case 'campaign': {
+        const cName = item.campaignName ?? tpl.campaign_name ?? '困难潜艇';
+        req = { type: 'campaign', campaign_name: cName, times: 1 };
+        this.scheduler.addTask(item.label || tpl.name, 'campaign', req, TaskPriority.USER_TASK, times);
+        break;
+      }
+      case 'decisive':
+        req = {
+          type: 'decisive',
+          chapter: item.chapter ?? tpl.chapter ?? 6,
+          level1: tpl.level1 ?? [],
+          level2: tpl.level2 ?? [],
+          flagship_priority: tpl.flagship_priority ?? [],
+        };
+        this.scheduler.addTask(item.label || tpl.name, 'decisive', req, TaskPriority.USER_TASK, 1);
+        break;
+      default:
+        return false;
+    }
+    return true;
+  }
+
   /** 从任务列表拖拽单个条目加入队列 */
   private async loadSingleItemToQueue(index: number): Promise<void> {
     const group = this.taskGroupModel.getActiveGroup();
@@ -1245,18 +1322,25 @@ export class AppController {
     const item = group.items[index];
     if (!item) return;
 
+    if (item.kind === 'template') {
+      this.loadTemplateToQueue(item);
+      Logger.info(`已将「${item.label}」加入队列`);
+      this.renderMain();
+      return;
+    }
+
     const bridge = window.electronBridge;
     if (!bridge) return;
 
     try {
-      const content = await bridge.readFile(item.path);
+      const content = await bridge.readFile(item.path!);
       const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
       if (!parsed || typeof parsed !== 'object') return;
 
       if (item.kind === 'preset' || ('task_type' in parsed && !('chapter' in parsed))) {
-        this.importTaskPreset(parsed as unknown as TaskPreset, item.path);
+        this.importTaskPreset(parsed as unknown as TaskPreset, item.path!);
       } else {
-        const plan = PlanModel.fromYaml(content, item.path);
+        const plan = PlanModel.fromYaml(content, item.path!);
         const req: NormalFightReq = {
           type: 'normal_fight',
           plan_id: plan.fileName,
@@ -1304,7 +1388,11 @@ export class AppController {
       if (!group) return;
       const item = group.items[target.id as number];
       if (!item) return;
-      await this.openItemForEdit(item.path, item.kind);
+      if (item.kind === 'template') {
+        Logger.info(`模板「${item.label}」请在模板库中查看和编辑`);
+        return;
+      }
+      await this.openItemForEdit(item.path!, item.kind);
     } else {
       // 从队列中查找任务
       const taskId = target.id as string;
@@ -1768,11 +1856,9 @@ export class AppController {
     const times = plan.data.times ?? 1;
     const stopCondition = plan.data.stop_condition;
 
-    // 检查是否选中了编队预设
-    const presetIdx = this.planView.selectedFleetPresetIndex;
-    const selectedFleet = (presetIdx >= 0 && plan.data.fleet_presets)
-      ? plan.data.fleet_presets[presetIdx]?.ships
-      : undefined;
+    // 检查选中的编队预设（多选）
+    const selectedPresets = this.planView.getSelectedPresets();
+    const firstPreset = selectedPresets.length > 0 ? selectedPresets[0] : undefined;
 
     const req: NormalFightReq = {
       type: 'normal_fight',
@@ -1781,13 +1867,20 @@ export class AppController {
       gap: plan.data.gap ?? 0,
     };
 
-    // 如果选中了编队预设，将舰船列表附加到请求中（转换为后端名称）
-    if (selectedFleet && selectedFleet.length > 0) {
+    // 如果选中了编队预设，使用第一个预设的舰船列表
+    if (firstPreset && firstPreset.ships.length > 0) {
       req.plan = {
-        fleet: selectedFleet.map(toBackendName),
+        fleet: firstPreset.ships.map(toBackendName),
         fleet_id: plan.data.fleet_id,
       };
     }
+
+    // 读取泡澡修理配置
+    const bathRepairConfig = this.planView.getBathRepairConfig();
+    const fleetId = plan.data.fleet_id ?? 1;
+    // 编队预设轮换: 选中多个预设时传递所有选中的预设
+    const fleetPresets = selectedPresets.length > 1 ? selectedPresets : undefined;
+    const currentPresetIndex = fleetPresets ? 0 : undefined;
 
     this.scheduler.addTask(
       plan.mapName,
@@ -1796,11 +1889,15 @@ export class AppController {
       TaskPriority.USER_TASK,
       times,
       stopCondition,
+      bathRepairConfig,
+      fleetId,
+      fleetPresets,
+      currentPresetIndex,
     );
-    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${plan.fileName} times=${times} gap=${req.gap}${selectedFleet ? ' fleet=' + selectedFleet.join(',') : ''}`);
+    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${plan.fileName} times=${times} gap=${req.gap}${firstPreset ? ' fleet=' + firstPreset.ships.join(',') : ''}${fleetPresets ? ' rotation=' + fleetPresets.length + '套' : ''}`);
 
     // 重置编队选择
-    this.planView.selectedFleetPresetIndex = -1;
+    this.planView.selectedFleetPresetIndices.clear();
 
     this.switchPage('main');
     this.renderMain();
@@ -2251,11 +2348,16 @@ export class AppController {
       battleTimes: cfg.daily_automation.battle_times,
       autoNormalFight: cfg.daily_automation.auto_normal_fight,
       autoDecisive: cfg.daily_automation.auto_decisive,
+      decisiveTicketReserve: cfg.daily_automation.decisive_ticket_reserve,
+      decisiveTemplateId: cfg.daily_automation.decisive_template_id,
       themeMode: this.getThemeMode(),
       accentColor: this.getAccentColor(),
       debugMode: localStorage.getItem('debugMode') === 'true',
     };
     this.configView.render(vo);
+
+    // 填充决战模板下拉列表（传入配置值，因为 render 时 option 尚不存在，浏览器会静默丢弃）
+    this.populateDecisiveTemplateSelect(cfg.daily_automation.decisive_template_id);
   }
 
   private async saveConfig(): Promise<void> {
@@ -2285,6 +2387,8 @@ export class AppController {
         battle_times: collected.battleTimes,
         auto_normal_fight: collected.autoNormalFight,
         auto_decisive: collected.autoDecisive,
+        decisive_ticket_reserve: collected.decisiveTicketReserve,
+        decisive_template_id: collected.decisiveTemplateId,
       },
     });
 
@@ -2296,6 +2400,7 @@ export class AppController {
       autoBattle: da.auto_battle,
       battleType: da.battle_type,
       battleTimes: da.battle_times,
+      autoNormalFight: da.auto_normal_fight,
     });
 
     // 同步远征检查间隔
@@ -2310,6 +2415,17 @@ export class AppController {
     }
   }
 
+  /** 填充配置页的决战模板下拉列表 */
+  private populateDecisiveTemplateSelect(selectedId?: string): void {
+    const sel = document.getElementById('cfg-decisive-template') as HTMLSelectElement | null;
+    if (!sel) return;
+    const desiredVal = selectedId ?? sel.value;
+    const decisiveTemplates = this.templateModel.getAll().filter(t => t.type === 'decisive');
+    sel.innerHTML = '<option value="">未选择</option>' +
+      decisiveTemplates.map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+    sel.value = desiredVal;
+  }
+
   // ════════════════════════════════════════
   // 模板系统
   // ════════════════════════════════════════
@@ -2320,6 +2436,11 @@ export class AppController {
     campaign: '战役',
     decisive: '决战',
   };
+
+  private static readonly CAMPAIGN_OPTIONS: string[] = [
+    '困难潜艇', '困难航母', '困难驱逐', '困难巡洋', '困难战列',
+    '简单航母', '简单潜艇', '简单驱逐', '简单巡洋', '简单战列',
+  ];
 
   private bindTemplateActions(): void {
     // 创建模板按钮
@@ -2338,7 +2459,7 @@ export class AppController {
       radio.addEventListener('change', () => this.updateWizardConfigPanel());
     });
 
-    // 步骤2：浏览方案文件
+    // 步骤2：浏览添加方案文件
     document.getElementById('btn-tpl-browse-plan')?.addEventListener('click', async () => {
       const bridge = window.electronBridge;
       if (!bridge) return;
@@ -2346,8 +2467,69 @@ export class AppController {
         [{ name: 'YAML 方案', extensions: ['yaml', 'yml'] }],
         this.plansDir || undefined,
       );
-      if (result) {
-        (document.getElementById('tpl-plan-path') as HTMLInputElement).value = result.path;
+      if (!result) return;
+      const filePath = result.path;
+      if (!this.wizardPlanPaths.includes(filePath)) {
+        this.wizardPlanPaths.push(filePath);
+        this.renderWizardPlanList();
+      }
+      (document.getElementById('tpl-plan-path') as HTMLInputElement).value = filePath;
+      if (this.wizardPlanPaths.length === 1) {
+        try {
+          const parsed = (await import('js-yaml')).load(result.content) as Record<string, any>;
+          if (!parsed || typeof parsed !== 'object') return;
+          if (parsed.fleet_id) {
+            (document.getElementById('tpl-fleet') as HTMLSelectElement).value = String(parsed.fleet_id);
+          }
+          const presets = parsed.fleet_presets as any[] | undefined;
+          if (presets?.length && presets[0].ships?.length) {
+            this.fillFleetGrid('nf', presets[0].ships);
+          }
+          const sc = parsed.stop_condition as any;
+          if (sc) {
+            if (sc.loot_count_ge != null && sc.loot_count_ge >= 0) {
+              (document.getElementById('tpl-stop-loot') as HTMLInputElement).value = String(sc.loot_count_ge);
+            }
+            if (sc.ship_count_ge != null && sc.ship_count_ge >= 0) {
+              (document.getElementById('tpl-stop-ship') as HTMLInputElement).value = String(sc.ship_count_ge);
+            }
+          }
+          const fileName = filePath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? '';
+          if (fileName) {
+            (document.getElementById('tpl-name') as HTMLInputElement).value = fileName;
+          }
+          if (parsed.times) {
+            (document.getElementById('tpl-default-times') as HTMLInputElement).value = String(parsed.times);
+          }
+        } catch { /* YAML 解析失败不影响流程 */ }
+      }
+    });
+
+    // 步骤2：从方案目录扫描添加
+    document.getElementById('btn-tpl-scan-plans')?.addEventListener('click', async () => {
+      const bridge = window.electronBridge;
+      if (!bridge?.listPlanFiles) return;
+      const files = await bridge.listPlanFiles();
+      let added = 0;
+      for (const f of files) {
+        const fullPath = `${this.plansDir}\\${f.file}`;
+        if (!this.wizardPlanPaths.includes(fullPath)) {
+          this.wizardPlanPaths.push(fullPath);
+          added++;
+        }
+      }
+      if (added > 0) this.renderWizardPlanList();
+      Logger.info(`扫描到 ${files.length} 个方案文件，新增 ${added} 个`);
+    });
+
+    // 步骤2：方案列表删除按钮
+    document.getElementById('tpl-plan-list')?.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest('.btn-remove-plan') as HTMLElement | null;
+      if (!btn) return;
+      const idx = parseInt(btn.dataset.idx ?? '-1');
+      if (idx >= 0 && idx < this.wizardPlanPaths.length) {
+        this.wizardPlanPaths.splice(idx, 1);
+        this.renderWizardPlanList();
       }
     });
 
@@ -2373,6 +2555,7 @@ export class AppController {
       if (action === 'use') this.useTemplate(id);
       else if (action === 'delete') this.deleteTemplate(id);
       else if (action === 'rename') this.renameTemplate(id);
+      else if (action === 'edit') this.editTemplate(id);
     });
 
     // 初始渲染模板库
@@ -2383,6 +2566,8 @@ export class AppController {
 
   private showWizard(): void {
     this.wizardStep = 1;
+    this.wizardPlanPaths = [];
+    this.editingTemplateId = null;
     // 重置表单
     (document.querySelector('input[name="tpl-type"][value="normal_fight"]') as HTMLInputElement).checked = true;
     (document.getElementById('tpl-plan-path') as HTMLInputElement).value = '';
@@ -2390,6 +2575,7 @@ export class AppController {
     (document.getElementById('tpl-default-times') as HTMLInputElement).value = '1';
     (document.getElementById('tpl-stop-loot') as HTMLInputElement).value = '-1';
     (document.getElementById('tpl-stop-ship') as HTMLInputElement).value = '-1';
+    this.renderWizardPlanList();
     // 重置编队设置
     for (const suffix of ['nf', 'ex', 'cp']) {
       const cb = document.getElementById(`tpl-fleet-enable-${suffix}`) as HTMLInputElement | null;
@@ -2421,7 +2607,12 @@ export class AppController {
     // 预填类型专属字段
     switch (type) {
       case 'normal_fight': {
-        if (tpl.planPath) (document.getElementById('tpl-plan-path') as HTMLInputElement).value = tpl.planPath;
+        if (tpl.planPaths?.length) {
+          this.wizardPlanPaths = [...tpl.planPaths];
+        } else if (tpl.planPath) {
+          this.wizardPlanPaths = [tpl.planPath];
+        }
+        this.renderWizardPlanList();
         if (tpl.fleet_id) (document.getElementById('tpl-fleet') as HTMLSelectElement).value = String(tpl.fleet_id);
         if (tpl.fleet?.length) this.fillFleetGrid('nf', tpl.fleet);
         break;
@@ -2476,6 +2667,23 @@ export class AppController {
 
   private hideWizard(): void {
     document.getElementById('template-wizard')!.style.display = 'none';
+  }
+
+  /** 渲染向导中的多方案列表 */
+  private renderWizardPlanList(): void {
+    const container = document.getElementById('tpl-plan-list');
+    if (!container) return;
+    if (this.wizardPlanPaths.length === 0) {
+      container.innerHTML = '<p style="color:var(--text-muted);font-size:12px;margin:0">尚未添加方案文件</p>';
+      return;
+    }
+    container.innerHTML = this.wizardPlanPaths.map((p, i) => {
+      const name = p.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? p;
+      return `<div class="tpl-plan-entry">
+        <span class="plan-name" title="${p}">${name}</span>
+        <span class="btn-remove-plan" data-idx="${i}" title="移除">✕</span>
+      </div>`;
+    }).join('');
   }
 
   // ── 向导导航 ──
@@ -2651,13 +2859,16 @@ export class AppController {
     }
 
     const times = parseInt((document.getElementById('tpl-default-times') as HTMLInputElement).value) || 1;
-    const loot = parseInt((document.getElementById('tpl-stop-loot') as HTMLInputElement).value) || 0;
-    const ship = parseInt((document.getElementById('tpl-stop-ship') as HTMLInputElement).value) || 0;
 
-    const stopCondition = (loot > 0 || ship > 0) ? {
-      ...(loot > 0 ? { loot_count_ge: loot } : {}),
-      ...(ship > 0 ? { ship_count_ge: ship } : {}),
-    } : undefined;
+    let stopCondition: TaskTemplate['defaultStopCondition'];
+    if (type !== 'decisive') {
+      const loot = parseInt((document.getElementById('tpl-stop-loot') as HTMLInputElement).value) || 0;
+      const ship = parseInt((document.getElementById('tpl-stop-ship') as HTMLInputElement).value) || 0;
+      stopCondition = (loot > 0 || ship > 0) ? {
+        ...(loot > 0 ? { loot_count_ge: loot } : {}),
+        ...(ship > 0 ? { ship_count_ge: ship } : {}),
+      } : undefined;
+    }
 
     const partial: Omit<TaskTemplate, 'id' | 'createdAt'> = {
       name,
@@ -2669,14 +2880,17 @@ export class AppController {
     // 类型专属字段
     switch (type) {
       case 'normal_fight': {
-        const planPath = (document.getElementById('tpl-plan-path') as HTMLInputElement).value;
-        if (!planPath) {
-          this.wizardStep = 2;
-          this.updateWizardUI();
-          (document.getElementById('tpl-plan-path') as HTMLInputElement).focus();
-          return;
+        if (this.wizardPlanPaths.length === 0) {
+          const planPath = (document.getElementById('tpl-plan-path') as HTMLInputElement).value;
+          if (!planPath) {
+            this.wizardStep = 2;
+            this.updateWizardUI();
+            return;
+          }
+          this.wizardPlanPaths = [planPath];
         }
-        partial.planPath = planPath;
+        partial.planPaths = [...this.wizardPlanPaths];
+        partial.planPath = this.wizardPlanPaths[0];
         partial.fleet_id = parseInt((document.getElementById('tpl-fleet') as HTMLSelectElement).value);
         partial.fleet = this.readFleetGrid('nf');
         break;
@@ -2700,78 +2914,280 @@ export class AppController {
       }
     }
 
-    await this.templateModel.add(partial);
+    if (this.editingTemplateId) {
+      await this.templateModel.update(this.editingTemplateId, partial);
+      Logger.info(`模板「${name}」已更新`);
+      this.editingTemplateId = null;
+    } else {
+      await this.templateModel.add(partial);
+      Logger.info(`模板「${name}」已创建`);
+    }
     this.hideWizard();
     this.renderTemplateLibrary();
-    Logger.info(`模板「${name}」已创建`);
   }
 
-  // ── 使用模板 → 加入任务队列 ──
+  // ── 使用模板 → 加入任务列表 ──
 
   private async useTemplate(id: string): Promise<void> {
     const tpl = this.templateModel.get(id);
     if (!tpl) return;
 
-    const times = tpl.defaultTimes ?? 1;
-
-    let req: TaskRequest;
-    switch (tpl.type) {
-      case 'exercise':
-        req = { type: 'exercise', fleet_id: tpl.fleet_id ?? 1 };
-        break;
-      case 'campaign':
-        req = { type: 'campaign', campaign_name: tpl.campaign_name ?? '困难潜艇', times: 1 };
-        break;
-      case 'decisive':
-        req = {
-          type: 'decisive',
-          chapter: tpl.chapter ?? 6,
-          level1: tpl.level1 ?? [],
-          level2: tpl.level2 ?? [],
-          flagship_priority: tpl.flagship_priority ?? [],
-        };
-        break;
-      case 'normal_fight':
-      default:
-        if (tpl.fleet?.length) {
-          req = {
-            type: 'normal_fight',
-            plan: {
-              fleet_id: tpl.fleet_id ?? 1,
-              fleet: tpl.fleet,
-            },
-            plan_id: tpl.planPath ?? null,
-            times: 1,
-            gap: tpl.defaultGap ?? 0,
-          };
-        } else {
-          req = {
-            type: 'normal_fight',
-            plan_id: tpl.planPath ?? null,
-            times: 1,
-            gap: tpl.defaultGap ?? 0,
-          };
-        }
-        break;
+    let group = this.taskGroupModel.getActiveGroup();
+    if (!group) {
+      this.taskGroupModel.upsertGroup('默认');
+      this.taskGroupModel.setActiveGroup('默认');
+      group = this.taskGroupModel.getActiveGroup()!;
     }
 
-    const effectiveTimes = (tpl.type === 'exercise' || tpl.type === 'decisive') ? 1 : times;
-    // campaign: 后端只执行单次，前端通过 follow-up 管理重复次数
+    if (tpl.type === 'normal_fight') {
+      const paths = tpl.planPaths ?? (tpl.planPath ? [tpl.planPath] : []);
+      if (paths.length === 0) {
+        Logger.warn(`模板「${tpl.name}」缺少方案文件路径`);
+        return;
+      }
+      if (paths.length === 1) {
+        this.addPlanToTaskList(tpl, paths[0], group.name);
+      } else {
+        this.showPlanSelector(tpl, paths, group.name);
+        return;
+      }
+    } else if (tpl.type === 'campaign') {
+      this.showCampaignSelector(tpl, group.name);
+      return;
+    } else if (tpl.type === 'exercise') {
+      this.showExerciseFleetSelector(tpl, group.name);
+      return;
+    } else if (tpl.type === 'decisive') {
+      this.showDecisiveChapterSelector(tpl, group.name);
+      return;
+    } else {
+      this.taskGroupModel.addItem(group.name, {
+        templateId: tpl.id,
+        kind: 'template',
+        times: tpl.defaultTimes ?? 1,
+        label: tpl.name,
+      });
+    }
 
-    this.scheduler.addTask(
-      tpl.name,
-      tpl.type,
-      req,
-      TaskPriority.USER_TASK,
-      effectiveTimes,
-      tpl.defaultStopCondition,
-    );
+    this.taskGroupModel.save();
+    this.renderTaskGroup();
+    Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${group.name}」`);
+  }
 
-    this.renderMain();
-    Logger.info(`模板「${tpl.name}」→ 任务已加入队列 (×${effectiveTimes})`);
+  /** 将指定方案添加到任务列表 */
+  private addPlanToTaskList(tpl: TaskTemplate, planPath: string, groupName: string): void {
+    const planName = planPath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? tpl.name;
+    this.taskGroupModel.addItem(groupName, {
+      path: planPath,
+      kind: 'plan',
+      times: tpl.defaultTimes ?? 1,
+      label: `${tpl.name} (${planName})`,
+    });
+  }
+
+  /** 显示方案选择弹窗 */
+  private showPlanSelector(tpl: TaskTemplate, paths: string[], groupName: string): void {
+    const overlay = document.getElementById('plan-selector-dialog')!;
+    const title = document.getElementById('plan-selector-title')!;
+    const list = document.getElementById('plan-selector-list')!;
+    const timesRow = document.getElementById('plan-selector-times-row')!;
+    timesRow.style.display = 'none';
+
+    title.textContent = `「${tpl.name}」— 选择执行方案`;
+    list.innerHTML = paths.map((p, i) => {
+      const name = p.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? p;
+      return `<div class="plan-selector-item" data-plan-idx="${i}">
+        <span class="plan-icon">📄</span>
+        <span>${name}</span>
+      </div>`;
+    }).join('');
+
+    const onSelect = (e: Event) => {
+      const item = (e.target as HTMLElement).closest('.plan-selector-item') as HTMLElement | null;
+      if (!item) return;
+      const idx = parseInt(item.dataset.planIdx ?? '-1');
+      if (idx < 0 || idx >= paths.length) return;
+      this.addPlanToTaskList(tpl, paths[idx], groupName);
+      this.taskGroupModel.save();
+      this.renderTaskGroup();
+      Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${paths[idx].split(/[\\/]/).pop()}）`);
+      cleanup();
+    };
+    const onCancel = () => cleanup();
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      list.removeEventListener('click', onSelect);
+      document.getElementById('btn-plan-selector-cancel')?.removeEventListener('click', onCancel);
+    };
+
+    list.addEventListener('click', onSelect);
+    document.getElementById('btn-plan-selector-cancel')?.addEventListener('click', onCancel);
+    overlay.style.display = 'flex';
+  }
+
+  private showCampaignSelector(tpl: TaskTemplate, groupName: string): void {
+    const overlay = document.getElementById('plan-selector-dialog')!;
+    const title = document.getElementById('plan-selector-title')!;
+    const list = document.getElementById('plan-selector-list')!;
+    const timesRow = document.getElementById('plan-selector-times-row')!;
+    const timesInput = document.getElementById('plan-selector-times') as HTMLInputElement;
+    timesRow.style.display = '';
+    timesInput.value = String(tpl.defaultTimes ?? 1);
+
+    title.textContent = `「${tpl.name}」— 选择战役类型`;
+    list.innerHTML = AppController.CAMPAIGN_OPTIONS.map((name, i) => {
+      return `<div class="plan-selector-item" data-plan-idx="${i}">
+        <span class="plan-icon">⚔</span>
+        <span>${name}</span>
+      </div>`;
+    }).join('');
+
+    const onSelect = (e: Event) => {
+      const item = (e.target as HTMLElement).closest('.plan-selector-item') as HTMLElement | null;
+      if (!item) return;
+      const idx = parseInt(item.dataset.planIdx ?? '-1');
+      const chosen = AppController.CAMPAIGN_OPTIONS[idx];
+      if (!chosen) return;
+      const times = parseInt(timesInput.value) || 1;
+      this.taskGroupModel.addItem(groupName, {
+        templateId: tpl.id,
+        kind: 'template',
+        times,
+        label: `${tpl.name} (${chosen})`,
+        campaignName: chosen,
+      });
+      this.taskGroupModel.save();
+      this.renderTaskGroup();
+      Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（${chosen}）`);
+      cleanup();
+    };
+    const onCancel = () => cleanup();
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      list.removeEventListener('click', onSelect);
+      document.getElementById('btn-plan-selector-cancel')?.removeEventListener('click', onCancel);
+    };
+
+    list.addEventListener('click', onSelect);
+    document.getElementById('btn-plan-selector-cancel')?.addEventListener('click', onCancel);
+    overlay.style.display = 'flex';
+  }
+
+  private showExerciseFleetSelector(tpl: TaskTemplate, groupName: string): void {
+    const overlay = document.getElementById('plan-selector-dialog')!;
+    const title = document.getElementById('plan-selector-title')!;
+    const list = document.getElementById('plan-selector-list')!;
+    const timesRow = document.getElementById('plan-selector-times-row')!;
+    timesRow.style.display = 'none';
+
+    title.textContent = `「${tpl.name}」— 选择舰队`;
+    const fleetOptions = ['第 1 舰队', '第 2 舰队', '第 3 舰队', '第 4 舰队'];
+    list.innerHTML = fleetOptions.map((name, i) => {
+      return `<div class="plan-selector-item" data-plan-idx="${i}">
+        <span class="plan-icon">⚓</span>
+        <span>${name}</span>
+      </div>`;
+    }).join('');
+
+    const onSelect = (e: Event) => {
+      const item = (e.target as HTMLElement).closest('.plan-selector-item') as HTMLElement | null;
+      if (!item) return;
+      const idx = parseInt(item.dataset.planIdx ?? '-1');
+      if (idx < 0 || idx >= fleetOptions.length) return;
+      const fleetId = idx + 1;
+      this.taskGroupModel.addItem(groupName, {
+        templateId: tpl.id,
+        kind: 'template',
+        times: tpl.defaultTimes ?? 1,
+        label: `${tpl.name} (${fleetOptions[idx]})`,
+        fleet_id: fleetId,
+      });
+      this.taskGroupModel.save();
+      this.renderTaskGroup();
+      Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（${fleetOptions[idx]}）`);
+      cleanup();
+    };
+    const onCancel = () => cleanup();
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      list.removeEventListener('click', onSelect);
+      document.getElementById('btn-plan-selector-cancel')?.removeEventListener('click', onCancel);
+    };
+
+    list.addEventListener('click', onSelect);
+    document.getElementById('btn-plan-selector-cancel')?.addEventListener('click', onCancel);
+    overlay.style.display = 'flex';
+  }
+
+  private static readonly DECISIVE_CHAPTERS = [
+    { value: 1, label: '第 1 章' },
+    { value: 2, label: '第 2 章' },
+    { value: 3, label: '第 3 章' },
+    { value: 4, label: '第 4 章' },
+    { value: 5, label: '第 5 章' },
+    { value: 6, label: '第 6 章' },
+  ];
+
+  private showDecisiveChapterSelector(tpl: TaskTemplate, groupName: string): void {
+    const overlay = document.getElementById('plan-selector-dialog')!;
+    const title = document.getElementById('plan-selector-title')!;
+    const list = document.getElementById('plan-selector-list')!;
+    const timesRow = document.getElementById('plan-selector-times-row')!;
+    const timesInput = document.getElementById('plan-selector-times') as HTMLInputElement;
+    timesRow.style.display = '';
+    timesInput.value = String(tpl.defaultTimes ?? 1);
+
+    title.textContent = `「${tpl.name}」— 选择章节`;
+    list.innerHTML = AppController.DECISIVE_CHAPTERS.map((ch, i) => {
+      return `<div class="plan-selector-item" data-plan-idx="${i}">
+        <span class="plan-icon">🏆</span>
+        <span>${ch.label}</span>
+      </div>`;
+    }).join('');
+
+    const onSelect = (e: Event) => {
+      const item = (e.target as HTMLElement).closest('.plan-selector-item') as HTMLElement | null;
+      if (!item) return;
+      const idx = parseInt(item.dataset.planIdx ?? '-1');
+      const chosen = AppController.DECISIVE_CHAPTERS[idx];
+      if (!chosen) return;
+      const times = parseInt(timesInput.value) || 1;
+      this.taskGroupModel.addItem(groupName, {
+        templateId: tpl.id,
+        kind: 'template',
+        times,
+        label: `${tpl.name} (${chosen.label})`,
+        chapter: chosen.value,
+      });
+      this.taskGroupModel.save();
+      this.renderTaskGroup();
+      Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（${chosen.label}）`);
+      cleanup();
+    };
+    const onCancel = () => cleanup();
+    const cleanup = () => {
+      overlay.style.display = 'none';
+      list.removeEventListener('click', onSelect);
+      document.getElementById('btn-plan-selector-cancel')?.removeEventListener('click', onCancel);
+    };
+
+    list.addEventListener('click', onSelect);
+    document.getElementById('btn-plan-selector-cancel')?.addEventListener('click', onCancel);
+    overlay.style.display = 'flex';
+  }
+
+  /** 编辑已有模板：打开向导预填数据，保存时更新而非新建 */
+  private editTemplate(id: string): void {
+    if (this.templateModel.isBuiltin(id)) return;
+    const tpl = this.templateModel.get(id);
+    if (!tpl) return;
+    this.editingTemplateId = id;
+    this.showWizardWithTemplate(tpl as any);
+    document.getElementById('wizard-title')!.textContent = '编辑模板';
   }
 
   private async deleteTemplate(id: string): Promise<void> {
+    if (this.templateModel.isBuiltin(id)) return;
     const tpl = this.templateModel.get(id);
     if (!tpl) return;
     const ok = await this.showConfirm('确认删除', `确定删除模板「${tpl.name}」？`);
@@ -2782,6 +3198,7 @@ export class AppController {
   }
 
   private async renameTemplate(id: string): Promise<void> {
+    if (this.templateModel.isBuiltin(id)) return;
     const tpl = this.templateModel.get(id);
     if (!tpl) return;
     const newName = await this.showPrompt('重命名模板', '请输入新名称：', tpl.name);
@@ -2836,19 +3253,27 @@ export class AppController {
       return;
     }
 
-    container.innerHTML = templates.map(tpl => `
-      <div class="tpl-item" data-tpl-id="${tpl.id}">
-        <div class="tpl-item-info">
-          <div class="tpl-item-name" title="${tpl.name}">${tpl.name}</div>
-          <div class="tpl-item-type">${AppController.TEMPLATE_TYPE_LABELS[tpl.type] ?? tpl.type}${tpl.defaultTimes ? ` · ×${tpl.defaultTimes}` : ''}</div>
+    container.innerHTML = templates.map(tpl => {
+      const isBuiltin = !!tpl.builtin;
+      const builtinBadge = isBuiltin ? '<span class="tpl-builtin-badge">内置</span>' : '';
+      const planCount = tpl.planPaths?.length ?? (tpl.planPath ? 1 : 0);
+      const planInfo = tpl.type === 'normal_fight' && planCount > 1 ? ` · ${planCount}个方案` : '';
+      const descTitle = tpl.description ? ` title="${tpl.description}"` : ` title="${tpl.name}"`;
+      const editBtns = isBuiltin ? '' : `<button class="btn btn-small" data-tpl-action="edit" data-tpl-id="${tpl.id}" title="编辑">✎</button>
+         <button class="btn btn-small btn-danger" data-tpl-action="delete" data-tpl-id="${tpl.id}" title="删除">✕</button>`;
+      return `<div class="tpl-item" data-tpl-id="${tpl.id}">
+        <div class="tpl-item-info"${descTitle}>
+          <div class="tpl-item-name">${tpl.name}${builtinBadge}</div>
+          <div class="tpl-item-type">${AppController.TEMPLATE_TYPE_LABELS[tpl.type] ?? tpl.type}${planInfo}${tpl.defaultTimes ? ` · ×${tpl.defaultTimes}` : ''}</div>
         </div>
         <div class="tpl-item-actions">
-          <button class="btn btn-small btn-primary" data-tpl-action="use" data-tpl-id="${tpl.id}" title="加入队列">使用</button>
-          <button class="btn btn-small" data-tpl-action="rename" data-tpl-id="${tpl.id}" title="重命名">✎</button>
-          <button class="btn btn-small btn-danger" data-tpl-action="delete" data-tpl-id="${tpl.id}" title="删除">✕</button>
+          <button class="btn btn-small btn-primary" data-tpl-action="use" data-tpl-id="${tpl.id}" title="加入任务列表">加入列表</button>
+          ${editBtns}
         </div>
-      </div>
-    `).join('');
+      </div>`;
+    }).join('');
+
+    this.populateDecisiveTemplateSelect();
   }
 
   // ════════════════════════════════════════

@@ -1,6 +1,7 @@
 import type { TaskTemplate } from './types';
 
 const FILE_PATH = 'templates/templates.json';
+const BUILTIN_PATH = 'resource/builtin_templates.json';
 
 let idCounter = 0;
 function generateId(): string {
@@ -14,23 +15,31 @@ interface FileIO {
 }
 
 export class TemplateModel {
-  private templates: TaskTemplate[] = [];
+  private builtinTemplates: TaskTemplate[] = [];
+  private userTemplates: TaskTemplate[] = [];
   private io: FileIO | null = null;
 
   /** 初始化：传入 IPC bridge 并从本地文件加载 */
   async init(io: FileIO): Promise<void> {
     this.io = io;
+    await this.loadBuiltin();
     await this.load();
   }
 
-  /** 所有模板 */
+  /** 所有模板（内置 + 用户） */
   getAll(): readonly TaskTemplate[] {
-    return this.templates;
+    return [...this.builtinTemplates, ...this.userTemplates];
   }
 
   /** 查找模板 */
   get(id: string): TaskTemplate | undefined {
-    return this.templates.find(t => t.id === id);
+    return this.builtinTemplates.find(t => t.id === id)
+      ?? this.userTemplates.find(t => t.id === id);
+  }
+
+  /** 是否为内置模板 */
+  isBuiltin(id: string): boolean {
+    return this.builtinTemplates.some(t => t.id === id);
   }
 
   /** 添加模板 */
@@ -40,25 +49,37 @@ export class TemplateModel {
       id: generateId(),
       createdAt: new Date().toISOString(),
     };
-    this.templates.push(full);
+    this.userTemplates.push(full);
     await this.save();
     return full;
   }
 
-  /** 删除模板 */
+  /** 删除模板（内置模板不可删除） */
   async remove(id: string): Promise<boolean> {
-    const idx = this.templates.findIndex(t => t.id === id);
+    if (this.isBuiltin(id)) return false;
+    const idx = this.userTemplates.findIndex(t => t.id === id);
     if (idx < 0) return false;
-    this.templates.splice(idx, 1);
+    this.userTemplates.splice(idx, 1);
     await this.save();
     return true;
   }
 
-  /** 重命名模板 */
+  /** 重命名模板（内置模板不可重命名） */
   async rename(id: string, newName: string): Promise<void> {
-    const tpl = this.get(id);
+    if (this.isBuiltin(id)) return;
+    const tpl = this.userTemplates.find(t => t.id === id);
     if (tpl) {
-      (tpl as TaskTemplate).name = newName;
+      tpl.name = newName;
+      await this.save();
+    }
+  }
+
+  /** 更新模板字段（内置模板不可更新） */
+  async update(id: string, fields: Partial<Omit<TaskTemplate, 'id' | 'createdAt' | 'builtin'>>): Promise<void> {
+    if (this.isBuiltin(id)) return;
+    const tpl = this.userTemplates.find(t => t.id === id);
+    if (tpl) {
+      Object.assign(tpl, fields);
       await this.save();
     }
   }
@@ -75,26 +96,28 @@ export class TemplateModel {
         id: generateId(),
         createdAt: new Date().toISOString(),
       };
-      this.templates.push(tpl);
+      // 导入的模板始终为用户模板
+      delete (tpl as any).builtin;
+      this.userTemplates.push(tpl);
       count++;
     }
     if (count > 0) await this.save();
     return count;
   }
 
-  /** 持久化到本地文件 templates.json */
+  /** 持久化用户模板到本地文件 */
   private async save(): Promise<void> {
     if (!this.io) return;
-    await this.io.saveFile(FILE_PATH, JSON.stringify(this.templates, null, 2));
+    await this.io.saveFile(FILE_PATH, JSON.stringify(this.userTemplates, null, 2));
   }
 
-  /** 从本地文件加载 */
+  /** 从本地文件加载用户模板 */
   private async load(): Promise<void> {
     if (!this.io) return;
     try {
       const raw = await this.io.readFile(FILE_PATH);
       if (raw) {
-        this.templates = JSON.parse(raw);
+        this.userTemplates = JSON.parse(raw);
         return;
       }
     } catch { /* 文件不存在 */ }
@@ -102,9 +125,22 @@ export class TemplateModel {
     try {
       const raw = await this.io.readFile('templates.json');
       if (raw) {
-        this.templates = JSON.parse(raw);
+        this.userTemplates = JSON.parse(raw);
         await this.save(); // 保存到新路径
       }
     } catch { /* 旧文件也不存在，使用空列表 */ }
+  }
+
+  /** 从只读资源加载内置模板 */
+  private async loadBuiltin(): Promise<void> {
+    if (!this.io) return;
+    try {
+      const raw = await this.io.readFile(BUILTIN_PATH);
+      if (raw) {
+        const arr = JSON.parse(raw) as TaskTemplate[];
+        // 确保内置标记
+        this.builtinTemplates = arr.map(t => ({ ...t, builtin: true }));
+      }
+    } catch { /* 内置模板文件不存在 */ }
   }
 }

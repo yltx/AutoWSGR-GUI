@@ -364,6 +364,11 @@ export class ApiClient {
     return this.request('POST', '/api/repair/bath');
   }
 
+  /** 单船泡澡修理（后端接受舰船名称，自动导航到浴室并修理） */
+  async repairShip(shipName: string): Promise<ApiResponse> {
+    return this.request('POST', '/api/repair/ship', { ship_name: shipName });
+  }
+
   async destroy(shipTypes?: string[], removeEquipment = true): Promise<ApiResponse> {
     return this.request('POST', '/api/destroy', { ship_types: shipTypes ?? null, remove_equipment: removeEquipment });
   }

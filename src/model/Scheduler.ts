@@ -20,8 +20,9 @@ import {
   type WsTaskCompleted,
   type TaskResult,
 } from './ApiClient';
-import type { StopCondition } from './types';
+import type { StopCondition, BathRepairConfig, FleetPreset } from './types';
 import { Logger } from '../utils/Logger';
+import { RepairManager } from './RepairManager';
 
 // ════════════════════════════════════════
 // 任务队列项
@@ -60,6 +61,14 @@ export interface SchedulerTask {
   maxRetries: number;
   /** 当前已重试次数 */
   retryCount: number;
+  /** 泡澡修理配置 (可选) */
+  bathRepairConfig?: BathRepairConfig;
+  /** 任务使用的编队号 (用于泡澡修理前检查编队状态) */
+  fleetId?: number;
+  /** 可用的编队预设列表 (用于泡澡修理时轮换舰船) */
+  fleetPresets?: FleetPreset[];
+  /** 当前使用的编队预设索引 (-1 = 未使用预设) */
+  currentPresetIndex?: number;
 }
 
 // ════════════════════════════════════════
@@ -131,8 +140,16 @@ export class Scheduler {
   private lastExpeditionCheck = 0; // timestamp ms
   private expeditionIntervalMs = DEFAULT_EXPEDITION_INTERVAL_MS;
 
+  // ── 泡澡修理 ──
+  private repairManager: RepairManager;
+  /** 因舰船修理被延迟的任务列表 */
+  private deferredTasks: SchedulerTask[] = [];
+  /** 延迟任务重试定时器 */
+  private deferredRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
   constructor(api: ApiClient) {
     this.api = api;
+    this.repairManager = new RepairManager(api);
     this.setupApiCallbacks();
   }
 
@@ -228,6 +245,10 @@ export class Scheduler {
     priority: TaskPriority = TaskPriority.USER_TASK,
     times: number = 1,
     stopCondition?: StopCondition,
+    bathRepairConfig?: BathRepairConfig,
+    fleetId?: number,
+    fleetPresets?: FleetPreset[],
+    currentPresetIndex?: number,
   ): string {
     const id = generateTaskId();
     const task: SchedulerTask = {
@@ -241,6 +262,10 @@ export class Scheduler {
       stopCondition,
       maxRetries: 2,
       retryCount: 0,
+      bathRepairConfig,
+      fleetId,
+      fleetPresets,
+      currentPresetIndex: currentPresetIndex ?? -1,
     };
 
     // 按优先级插入队列
@@ -283,6 +308,11 @@ export class Scheduler {
       try { await this.api.taskStop(); } catch { /* ignore */ }
       this.currentTask = null;
     }
+    // 清理延迟任务
+    if (this.deferredRetryTimer) {
+      clearTimeout(this.deferredRetryTimer);
+      this.deferredRetryTimer = null;
+    }
     this.setStatus('idle');
     this.notifyQueueChange();
   }
@@ -309,6 +339,12 @@ export class Scheduler {
   /** 清空队列 (不影响当前正在运行的) */
   clearQueue(): void {
     this.queue = [];
+    this.deferredTasks = [];
+    if (this.deferredRetryTimer) {
+      clearTimeout(this.deferredRetryTimer);
+      this.deferredRetryTimer = null;
+    }
+    this.repairManager.clearAll();
     this.notifyQueueChange();
   }
 
@@ -327,7 +363,12 @@ export class Scheduler {
   private async consumeNext(): Promise<void> {
     if (this.currentTask) return; // 还有任务在跑
     if (this.queue.length === 0) {
-      this.setStatus('idle');
+      // 如果有延迟任务，定时重试
+      if (this.deferredTasks.length > 0) {
+        this.scheduleDeferredRetry();
+      } else {
+        this.setStatus('idle');
+      }
       return;
     }
 
@@ -362,6 +403,44 @@ export class Scheduler {
         this.currentTask = null;
         this.consumeNext();
         return;
+      }
+    }
+
+    // 泡澡修理检查: 如果舰船需要修理，尝试编队预设轮换或延迟任务
+    if (task.bathRepairConfig?.enabled && task.fleetId) {
+      const checkResult = await this.repairManager.checkFleetHealth(task.fleetId, task.bathRepairConfig);
+      if (!checkResult.ready) {
+        // 当前编队有舰船需要修理 → 送入泡澡
+        if (checkResult.shipsNeedRepair.length > 0) {
+          this.emitLog('info', `任务「${task.name}」: ${checkResult.shipsNeedRepair.join('、')} 需要修理，送入泡澡`);
+          await this.repairManager.sendToBath(checkResult.shipsNeedRepair);
+        }
+
+        // 尝试编队预设轮换: 切换到一套没有舰船在泡澡的预设
+        const presets = task.fleetPresets;
+        if (presets && presets.length > 1) {
+          const healthyIdx = this.repairManager.findHealthyPreset(presets, task.currentPresetIndex ?? -1);
+          if (healthyIdx >= 0) {
+            const preset = presets[healthyIdx];
+            this.emitLog('info', `任务「${task.name}」: 轮换至编队预设「${preset.name}」`);
+            this.switchTaskPreset(task, healthyIdx);
+            // 继续往下执行 taskStart
+          } else {
+            // 所有预设都有舰船在泡澡 → 延迟
+            this.emitLog('info', `任务「${task.name}」: 所有编队预设的舰船都在修理中，任务延迟`);
+            this.deferTask(task);
+            return;
+          }
+        } else {
+          // 未配置预设轮换 → 延迟
+          if (checkResult.shipsInBath.length > 0) {
+            this.emitLog('info', `任务「${task.name}」: ${checkResult.shipsInBath.join('、')} 正在泡澡中，任务延迟`);
+          } else {
+            this.emitLog('info', `任务「${task.name}」: 舰船正在修理，任务延迟`);
+          }
+          this.deferTask(task);
+          return;
+        }
       }
     }
 
@@ -464,6 +543,10 @@ export class Scheduler {
         stopCondition: finished.stopCondition,
         maxRetries: finished.maxRetries,
         retryCount: 0,
+        bathRepairConfig: finished.bathRepairConfig,
+        fleetId: finished.fleetId,
+        fleetPresets: finished.fleetPresets,
+        currentPresetIndex: finished.currentPresetIndex,
       };
       Logger.debug(`followUp: 「${finished.name}」 remaining=${followUp.remainingTimes}/${followUp.totalTimes}`, 'scheduler');
       this.insertByPriority(followUp);
@@ -572,6 +655,67 @@ export class Scheduler {
     } else {
       this.queue.splice(idx, 0, task);
     }
+  }
+
+  // ── 泡澡修理: 延迟任务管理 ──
+
+  /** 将任务放入延迟列表，不消耗 remainingTimes */
+  private deferTask(task: SchedulerTask): void {
+    this.currentTask = null;
+    this.deferredTasks.push(task);
+    this.notifyQueueChange();
+    // 尝试执行队列中其他任务
+    if (this.queue.length > 0) {
+      this.consumeNext();
+    } else {
+      this.scheduleDeferredRetry();
+    }
+  }
+
+  /** 切换任务使用的编队预设（修改 request 中的 fleet 舰船列表） */
+  private switchTaskPreset(task: SchedulerTask, presetIndex: number): void {
+    const preset = task.fleetPresets?.[presetIndex];
+    if (!preset) return;
+    task.currentPresetIndex = presetIndex;
+
+    const req = task.request;
+    if (req.type === 'normal_fight' || req.type === 'event_fight') {
+      const fleet = preset.ships.map(n => n.endsWith('·改') ? n.slice(0, -2) : n);
+      if (req.plan) {
+        req.plan.fleet = fleet;
+      } else {
+        (req as any).plan = { fleet, fleet_id: task.fleetId };
+      }
+    }
+  }
+
+  /** 30 秒后重新尝试延迟任务 */
+  private scheduleDeferredRetry(): void {
+    if (this.deferredRetryTimer) return;
+    this.emitLog('info', '所有任务因修理被阻塞，30 秒后重试...');
+    this.setStatus('idle');
+    this.deferredRetryTimer = setTimeout(() => {
+      this.deferredRetryTimer = null;
+      this.retryDeferredTasks();
+    }, 30_000);
+  }
+
+  /** 重新尝试延迟的任务 */
+  private retryDeferredTasks(): void {
+    if (this.deferredTasks.length === 0) return;
+    // 将所有延迟任务按优先级插回队列
+    for (const task of this.deferredTasks) {
+      this.insertByPriority(task);
+    }
+    this.deferredTasks = [];
+    this.notifyQueueChange();
+    this.emitLog('info', '延迟任务已重新加入队列，尝试执行');
+    this.consumeNext();
+  }
+
+  /** 获取延迟任务列表（只读） */
+  get deferredTaskList(): ReadonlyArray<SchedulerTask> {
+    return this.deferredTasks;
   }
 
   // ── 内部: 远征定时器 ──

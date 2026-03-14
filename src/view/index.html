@@ -10,7 +10,7 @@
 <body>
   <!-- ═══ 顶部导航栏 ═══ -->
   <nav class="nav-bar">
-    <div class="nav-title">WSGR GUI</div>
+    <div class="nav-title">WSGR GUI <span class="nav-version" id="app-version"></span></div>
     <div class="nav-tabs">
       <button class="nav-tab active" data-page="main">主页</button>
       <button class="nav-tab" data-page="plan">方案预览</button>
@@ -84,10 +84,10 @@
               </div>
             </div>
             <div class="task-group-items" id="task-group-items">
-              <p class="tg-empty">暂无任务条目，导入方案后点击「加入任务组」添加</p>
+              <p class="tg-empty">暂无任务。可从方案预览页的模板库「加入列表」，或点击下方「从文件添加」。</p>
             </div>
             <div class="task-group-actions">
-              <button class="btn btn-primary btn-small" id="btn-tg-load-all">全部加入队列</button>
+              <button class="btn btn-primary btn-small" id="btn-tg-load-all">全部开始执行</button>
               <button class="btn btn-small" id="btn-tg-add-file">从文件添加</button>
               <button class="btn btn-small" id="btn-tg-export" title="导出任务列表为文件">导出列表</button>
               <button class="btn btn-small" id="btn-tg-import" title="从文件导入任务列表">导入列表</button>
@@ -179,6 +179,21 @@
           <div class="modal-actions">
             <button class="btn btn-primary" id="btn-new-plan-confirm">确定</button>
             <button class="btn" id="btn-new-plan-cancel">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 方案选择器弹窗（多方案模板选择具体方案） ═══ -->
+      <div id="plan-selector-dialog" class="modal-overlay" style="display:none">
+        <div class="modal card" style="max-width:420px">
+          <h3 id="plan-selector-title">选择执行方案</h3>
+          <div id="plan-selector-list" class="plan-selector-list"></div>
+          <div id="plan-selector-times-row" class="form-group" style="display:none;margin-top:8px">
+            <label style="font-size:12px">执行次数</label>
+            <input type="number" id="plan-selector-times" class="input" min="1" max="99" value="1" style="width:80px">
+          </div>
+          <div class="modal-actions">
+            <button class="btn" id="btn-plan-selector-cancel">取消</button>
           </div>
         </div>
       </div>
@@ -353,6 +368,31 @@
               <input type="number" id="plan-edit-ship-ge" class="input input-inline input-small" value="-1" min="-1" max="500">
             </div>
             <span class="plan-task-hint">终止条件: -1为不启用</span>
+
+            <!-- 泡澡修理设置 -->
+            <div class="bath-repair-section">
+              <label class="bath-repair-toggle">
+                <input type="checkbox" id="plan-bath-repair-enable">
+                泡澡修理（不使用快修）
+              </label>
+              <div id="bath-repair-config" class="bath-repair-config" style="display:none">
+                <p class="plan-task-hint" style="margin:4px 0 6px">舰船血量低于阈值时自动送入泡澡，等待修理完成后再执行。选中多个编队预设时自动轮换。</p>
+
+                <!-- 默认修理阈值 -->
+                <div class="bath-default-threshold">
+                  <span class="bath-rotation-label">默认阈值:</span>
+                  <select class="input input-inline bath-default-th-type" id="bath-default-th-type">
+                    <option value="percent">百分比</option>
+                    <option value="absolute">绝对值</option>
+                  </select>
+                  <input type="number" class="input input-inline input-small" id="bath-default-th-value" value="50" min="0" max="999">
+                </div>
+
+                <!-- 按舰船名设定阈值（根据选中预设动态生成） -->
+                <div id="bath-ship-thresholds" class="bath-ship-thresholds" style="display:none"></div>
+                <p class="plan-task-hint" style="margin:4px 0 0">点击上方编队预设（可多选）后，此处显示具体舰船阈值设置。</p>
+              </div>
+            </div>
           </div>
 
           <!-- 节点详细设置（可滚动区域） -->
@@ -417,6 +457,7 @@
               <button class="btn btn-small btn-primary" id="btn-create-template">创建模板</button>
             </div>
           </div>
+          <p class="config-hint" style="margin:0 0 8px;font-size:11px">保存可复用的任务参数预设。点击「加入列表」将模板添加到主页任务列表。</p>
           <div class="template-library-items" id="template-library-items">
             <p class="tpl-empty">暂无模板，点击「创建模板」添加</p>
           </div>
@@ -460,11 +501,8 @@
           <div class="input-row">
             <input type="text" id="cfg-emu-serial" class="input" placeholder="如 127.0.0.1:16384，留空自动检测">
             <button class="btn btn-small" id="btn-check-adb">检测 ADB</button>
+            <span id="cfg-adb-status" class="adb-status adb-status-unknown">未检测</span>
           </div>
-        </div>
-        <div class="form-group">
-          <label>ADB 状态</label>
-          <span id="cfg-adb-status" class="adb-status adb-status-unknown">未检测</span>
         </div>
       </div>
 
@@ -513,7 +551,7 @@
 
       <div class="card">
         <h3>自动化设置</h3>
-        <p class="config-hint">勾选启用的自动化任务。后端启动后将按照配置自动执行对应任务。具体任务参数可在模板中进一步自定义。</p>
+        <p class="config-hint">每日自动调度的任务开关。启用后，后端启动时自动执行对应任务。</p>
 
         <div class="auto-grid">
 
@@ -524,7 +562,7 @@
           </div>
           <div class="auto-section-body">
             <div class="form-group">
-              <label>远征检查间隔（分钟）</label>
+              <label>检查间隔（分钟）</label>
               <input type="number" id="cfg-expedition-interval" class="input" min="1" max="120" value="15">
             </div>
           </div>
@@ -552,7 +590,7 @@
               </select>
             </div>
             <div class="form-group">
-              <label>战役次数</label>
+              <label>次数</label>
               <input type="number" id="cfg-battle-times" class="input" min="1" max="10" value="3">
             </div>
           </div>
@@ -582,7 +620,7 @@
             <label class="auto-toggle"><input type="checkbox" id="cfg-auto-normal-fight"> 自动常规出击</label>
           </div>
           <div class="auto-section-body">
-            <p class="config-hint">按模板库中的出击方案自动执行。</p>
+            <p class="config-hint">每日自动执行任务列表中的所有任务。</p>
           </div>
         </div>
 
@@ -592,7 +630,20 @@
             <label class="auto-toggle"><input type="checkbox" id="cfg-auto-decisive"> 自动决战</label>
           </div>
           <div class="auto-section-body">
-            <p class="config-hint">按模板库中的决战配置自动执行。</p>
+            <div class="form-group" style="margin-bottom:6px">
+              <div class="input-row" style="align-items:center;gap:8px">
+                <label style="font-size:12px;white-space:nowrap">保留票数</label>
+                <input type="number" id="cfg-decisive-ticket-reserve" class="input" min="0" value="0" style="width:60px">
+              </div>
+            </div>
+            <div class="form-group">
+              <div class="input-row" style="align-items:center;gap:8px">
+                <label style="font-size:12px;white-space:nowrap">模板</label>
+                <select id="cfg-decisive-template" class="input" style="flex:1;min-width:100px">
+                  <option value="">未选择</option>
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -672,11 +723,14 @@
         <!-- 普通出击 -->
         <div class="wizard-config" id="wizard-cfg-normal_fight">
           <div class="form-group">
-            <label>战斗方案文件</label>
-            <div class="input-row">
-              <input type="text" id="tpl-plan-path" class="input" readonly placeholder="点击选择 .yaml 方案文件">
-              <button class="btn btn-small" id="btn-tpl-browse-plan">选择</button>
+            <label>可选方案文件 <small style="color:var(--text-muted)">(可添加多个，使用时选择)</small></label>
+            <div id="tpl-plan-list" class="tpl-plan-list"></div>
+            <div class="input-row" style="margin-top:4px">
+              <button class="btn btn-small" id="btn-tpl-browse-plan">+ 浏览添加</button>
+              <button class="btn btn-small" id="btn-tpl-scan-plans">从方案目录扫描</button>
             </div>
+            <!-- 向后兼容：隐藏的单路径输入 -->
+            <input type="hidden" id="tpl-plan-path">
           </div>
           <div class="form-group">
             <label>编队</label>
@@ -789,7 +843,7 @@
           <label>默认执行次数</label>
           <input type="number" id="tpl-default-times" class="input" value="1" min="1" max="999">
         </div>
-        <div class="form-group">
+        <div class="form-group" id="tpl-stop-condition-group">
           <label>停止条件 (可选)</label>
           <div class="input-row">
             <label style="font-size:12px;white-space:nowrap">战利品 ≥</label>

@@ -308,12 +308,24 @@ ipcMain.handle('check-adb-devices', async () => {
   }
 });
 
+ipcMain.on('get-app-version-sync', (event) => {
+  event.returnValue = app.getVersion();
+});
+
 ipcMain.handle('get-app-root', () => {
   return appRoot();
 });
 
 ipcMain.handle('get-plans-dir', () => {
   return resolveAppPath('plans');
+});
+
+ipcMain.handle('list-plan-files', () => {
+  const dir = resolveAppPath('plans');
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir)
+    .filter(f => /\.ya?ml$/i.test(f))
+    .map(f => ({ name: f.replace(/\.ya?ml$/i, ''), file: f }));
 });
 
 ipcMain.handle('get-config-dir', () => {

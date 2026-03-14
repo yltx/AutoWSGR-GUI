@@ -130,6 +130,8 @@ export interface ConfigViewObject {
   battleTimes: number;
   autoNormalFight: boolean;
   autoDecisive: boolean;
+  decisiveTicketReserve: number;
+  decisiveTemplateId: string;
   themeMode: 'dark' | 'light' | 'system';
   accentColor: string;
   debugMode: boolean;

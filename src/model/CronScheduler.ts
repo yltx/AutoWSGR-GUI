@@ -28,6 +28,8 @@ export interface CronConfig {
   battleType: string;
   /** 战役次数 */
   battleTimes: number;
+  /** 启用自动常规出击（每日执行任务列表） */
+  autoNormalFight: boolean;
 }
 
 /** 定时任务触发时的回调 */
@@ -36,6 +38,8 @@ export interface CronCallbacks {
   onExerciseDue?: (fleetId: number) => void;
   /** 请求添加战役任务 */
   onCampaignDue?: (campaignName: string, times: number) => void;
+  /** 请求执行任务列表中所有任务 */
+  onNormalFightDue?: () => void;
   /** 请求添加定时方案任务 */
   onScheduledTaskDue?: (taskKey: string) => void;
   /** 日志 */
@@ -58,6 +62,7 @@ const EXERCISE_REFRESH_HOURS = [0, 12, 18];
 /** localStorage key — 记录任务实际完成时间 */
 const LS_KEY_LAST_EXERCISE_RUN = 'cron_lastExerciseRun';   // ISO 时间戳
 const LS_KEY_LAST_BATTLE_RUN   = 'cron_lastBattleRun';     // YYYY-MM-DD
+const LS_KEY_LAST_NORMAL_FIGHT_RUN = 'cron_lastNormalFightRun'; // YYYY-MM-DD
 
 // ════════════════════════════════════════
 // CronScheduler 实现
@@ -72,9 +77,12 @@ export class CronScheduler {
   private lastExerciseRun: Date | null = null;
   /** 上一次战役任务实际完成的日期 (YYYY-MM-DD) */
   private lastBattleRun = '';
-  /** 是否有演习/战役任务正在排队或执行中 (避免同一会话重复入队) */
+  /** 是否有演习/战役/常规出击任务正在排队或执行中 (避免同一会话重复入队) */
   private exercisePending = false;
   private battlePending = false;
+  /** 上一次常规出击实际完成的日期 (YYYY-MM-DD) */
+  private lastNormalFightRun = '';
+  private normalFightPending = false;
   /** 注册的定时方案任务 */
   private scheduledTasks: ScheduledTask[] = [];
 
@@ -95,7 +103,7 @@ export class CronScheduler {
   start(): void {
     this.stop();
     this.loadTimestamps();
-    this.log('info', `定时调度配置: 演习=${this.config.autoExercise}, 战役=${this.config.autoBattle}`);
+    this.log('info', `定时调度配置: 演习=${this.config.autoExercise}, 战役=${this.config.autoBattle}, 常规出击=${this.config.autoNormalFight}`);
     if (this.lastExerciseRun) {
       this.log('info', `上次演习完成: ${this.lastExerciseRun.toLocaleString()}`);
     }
@@ -163,6 +171,30 @@ export class CronScheduler {
     this.battlePending = false;
   }
 
+  /** Controller 在常规出击任务全部完成后调用 */
+  markNormalFightCompleted(): void {
+    this.lastNormalFightRun = this.dateKey(new Date());
+    this.normalFightPending = false;
+    try {
+      localStorage.setItem(LS_KEY_LAST_NORMAL_FIGHT_RUN, this.lastNormalFightRun);
+    } catch { /* ignore */ }
+    this.log('info', '自动常规出击完成，已记录运行时间');
+  }
+
+  /** 常规出击任务已处理（成功或失败），今日不再重复 */
+  markNormalFightHandled(): void {
+    this.lastNormalFightRun = this.dateKey(new Date());
+    this.normalFightPending = false;
+    try {
+      localStorage.setItem(LS_KEY_LAST_NORMAL_FIGHT_RUN, this.lastNormalFightRun);
+    } catch { /* ignore */ }
+  }
+
+  /** 常规出击失败 — 清除 pending，下次 tick 重试 */
+  clearNormalFightPending(): void {
+    this.normalFightPending = false;
+  }
+
   // ── 持久化 ──
 
   /** 从 localStorage 加载上次运行时间戳 */
@@ -174,6 +206,7 @@ export class CronScheduler {
         if (!isNaN(d.getTime())) this.lastExerciseRun = d;
       }
       this.lastBattleRun = localStorage.getItem(LS_KEY_LAST_BATTLE_RUN) || '';
+      this.lastNormalFightRun = localStorage.getItem(LS_KEY_LAST_NORMAL_FIGHT_RUN) || '';
     } catch { /* ignore */ }
   }
 
@@ -209,6 +242,7 @@ export class CronScheduler {
     const now = new Date();
     this.checkExercise(now);
     this.checkCampaign(now);
+    this.checkNormalFight(now);
     this.checkScheduledTasks(now);
     this.resetDailyFlags(now);
   }
@@ -258,6 +292,22 @@ export class CronScheduler {
     this.battlePending = true;
     this.log('info', `自动战役触发 (${this.config.battleType} ×${this.config.battleTimes})`);
     this.callbacks.onCampaignDue?.(this.config.battleType, this.config.battleTimes);
+  }
+
+  /**
+   * 检查常规出击:
+   * 每日 0 点刷新。若 lastNormalFightRun 不是今天则触发，将任务列表全部加入队列。
+   */
+  private checkNormalFight(now: Date): void {
+    if (!this.config.autoNormalFight) return;
+    if (this.normalFightPending) return;
+
+    const todayStr = this.dateKey(now);
+    if (this.lastNormalFightRun >= todayStr) return;
+
+    this.normalFightPending = true;
+    this.log('info', '自动常规出击触发 (执行任务列表中所有任务)');
+    this.callbacks.onNormalFightDue?.();
   }
 
   /** 检查定时方案任务 */

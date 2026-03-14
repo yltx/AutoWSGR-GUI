@@ -4,6 +4,7 @@
  */
 import type { PlanPreviewViewObject, NodeViewObject, MapNodeType, MapEdgeVO, FleetPresetVO } from './viewObjects';
 import { ALL_SHIPS, shipTypeLabel } from '../data/shipData';
+import type { BathRepairConfig, RepairThreshold } from '../model/types';
 
 const FORMATION_SHORT: Record<string, string> = {
   '单纵阵': '单纵',
@@ -66,8 +67,11 @@ export class PlanPreviewView {
   private shipGeInput: HTMLInputElement;
   private taskConfigEl: HTMLElement;
 
-  /** 当前选中的编队预设索引 (-1 = 未选择) */
-  selectedFleetPresetIndex = -1;
+  /** 当前选中的编队预设索引集合 (多选) */
+  selectedFleetPresetIndices: Set<number> = new Set();
+
+  /** 当前方案的编队预设列表（用于动态渲染泡澡舰船阈值） */
+  private currentPresets: FleetPresetVO[] = [];
 
   /** 外部回调：用户点击某个节点 chip 时触发 */
   onNodeClick?: (nodeId: string) => void;
@@ -135,10 +139,124 @@ export class PlanPreviewView {
       this.onPlanFieldChange?.('ship_count_ge', v >= 0 ? v : undefined);
     });
 
+    // 泡澡修理开关
+    const bathToggle = document.getElementById('plan-bath-repair-enable') as HTMLInputElement;
+    const bathConfigDiv = document.getElementById('bath-repair-config');
+    if (bathToggle && bathConfigDiv) {
+      bathToggle.addEventListener('change', () => {
+        bathConfigDiv.style.display = bathToggle.checked ? '' : 'none';
+      });
+    }
+
     // 点击注释区域进入编辑模式
     this.commentEl.addEventListener('click', () => {
       this.startCommentEdit();
     });
+  }
+
+  /** 读取泡澡修理配置（未启用时返回 undefined） */
+  getBathRepairConfig(): BathRepairConfig | undefined {
+    const toggle = document.getElementById('plan-bath-repair-enable') as HTMLInputElement;
+    if (!toggle || !toggle.checked) return undefined;
+
+    // 默认阈值
+    const typeEl = document.getElementById('bath-default-th-type') as HTMLSelectElement;
+    const valueEl = document.getElementById('bath-default-th-value') as HTMLInputElement;
+    const type = typeEl?.value === 'absolute' ? 'absolute' as const : 'percent' as const;
+    const value = valueEl ? parseInt(valueEl.value, 10) : 50;
+
+    // 按舰船名读取覆盖阈值
+    const shipThresholds: Record<string, RepairThreshold> = {};
+    document.querySelectorAll<HTMLElement>('.bath-ship-th-row').forEach(row => {
+      const shipName = row.dataset.ship;
+      if (!shipName) return;
+      const sType = (row.querySelector('.bath-ship-th-type') as HTMLSelectElement)?.value;
+      const sValue = parseInt((row.querySelector('.bath-ship-th-value') as HTMLInputElement)?.value ?? '', 10);
+      if (!isNaN(sValue)) {
+        shipThresholds[shipName] = {
+          type: sType === 'absolute' ? 'absolute' : 'percent',
+          value: sValue,
+        };
+      }
+    });
+
+    return {
+      enabled: true,
+      defaultThreshold: { type, value: isNaN(value) ? 50 : value },
+      shipThresholds: Object.keys(shipThresholds).length > 0 ? shipThresholds : undefined,
+    };
+  }
+
+  /** 获取选中的编队预设列表 */
+  getSelectedPresets(): FleetPresetVO[] {
+    const result: FleetPresetVO[] = [];
+    const sorted = Array.from(this.selectedFleetPresetIndices).sort((a, b) => a - b);
+    for (const idx of sorted) {
+      if (idx < this.currentPresets.length) result.push(this.currentPresets[idx]);
+    }
+    return result;
+  }
+
+  /** 根据选中的编队预设，动态渲染泡澡修理的舰船阈值列表 */
+  private renderBathShipThresholds(): void {
+    const container = document.getElementById('bath-ship-thresholds');
+    if (!container) return;
+
+    // 收集选中预设的所有不重复舰船名（保持出现顺序）
+    const shipNames: string[] = [];
+    const seen = new Set<string>();
+    const sorted = Array.from(this.selectedFleetPresetIndices).sort((a, b) => a - b);
+    for (const idx of sorted) {
+      const preset = this.currentPresets[idx];
+      if (!preset) continue;
+      for (const name of preset.ships) {
+        if (!seen.has(name)) {
+          seen.add(name);
+          shipNames.push(name);
+        }
+      }
+    }
+
+    container.innerHTML = '';
+    if (shipNames.length === 0) {
+      container.style.display = 'none';
+      return;
+    }
+
+    container.style.display = '';
+
+    // 表头（用 display:contents 让子元素直接参与父 grid）
+    const header = document.createElement('div');
+    header.className = 'bath-ship-th-header-row';
+    header.innerHTML = '<span class="bath-ship-th-label-h">舰船</span><span class="bath-ship-th-h">类型</span><span class="bath-ship-th-h">阈值</span>';
+    container.appendChild(header);
+
+    for (const name of shipNames) {
+      const row = document.createElement('div');
+      row.className = 'bath-ship-th-row';
+      row.dataset.ship = name;
+
+      const label = document.createElement('span');
+      label.className = 'bath-ship-th-label';
+      label.textContent = name;
+      label.title = name;
+      row.appendChild(label);
+
+      const sel = document.createElement('select');
+      sel.className = 'input input-inline bath-ship-th-type';
+      sel.innerHTML = '<option value="percent">百分比</option><option value="absolute">绝对值</option>';
+      row.appendChild(sel);
+
+      const inp = document.createElement('input');
+      inp.type = 'number';
+      inp.className = 'input input-inline input-small bath-ship-th-value';
+      inp.value = '50';
+      inp.min = '0';
+      inp.max = '999';
+      row.appendChild(inp);
+
+      container.appendChild(row);
+    }
   }
 
   /** 进入注释编辑模式 */
@@ -428,16 +546,17 @@ export class PlanPreviewView {
   renderFleetPresets(presets?: FleetPresetVO[]): void {
     this.fleetPresetSection.style.display = '';
     this.fleetPresetListEl.innerHTML = '';
+    this.currentPresets = presets ?? [];
 
     if (!presets || presets.length === 0) {
-      this.selectedFleetPresetIndex = -1;
+      this.selectedFleetPresetIndices.clear();
+      this.renderBathShipThresholds();
       return;
     }
-    this.fleetPresetListEl.innerHTML = '';
 
     presets.forEach((preset, index) => {
       const item = document.createElement('div');
-      item.className = 'fleet-preset-item' + (index === this.selectedFleetPresetIndex ? ' selected' : '');
+      item.className = 'fleet-preset-item' + (this.selectedFleetPresetIndices.has(index) ? ' selected' : '');
 
       // 第一行：名称 + 操作按钮
       const row = document.createElement('div');
@@ -466,11 +585,14 @@ export class PlanPreviewView {
       deleteBtn.title = '删除编队';
       deleteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (this.selectedFleetPresetIndex === index) {
-          this.selectedFleetPresetIndex = -1;
-        } else if (this.selectedFleetPresetIndex > index) {
-          this.selectedFleetPresetIndex--;
+        // 重新计算选中集合
+        const newSet = new Set<number>();
+        for (const idx of this.selectedFleetPresetIndices) {
+          if (idx < index) newSet.add(idx);
+          else if (idx > index) newSet.add(idx - 1);
+          // idx === index: 不加入（已删除）
         }
+        this.selectedFleetPresetIndices = newSet;
         this.onFleetPresetChange?.('delete', index);
       });
       actionsEl.appendChild(deleteBtn);
@@ -490,14 +612,15 @@ export class PlanPreviewView {
       item.appendChild(shipsEl);
 
       item.addEventListener('click', () => {
-        if (this.selectedFleetPresetIndex === index) {
-          this.selectedFleetPresetIndex = -1;
+        if (this.selectedFleetPresetIndices.has(index)) {
+          this.selectedFleetPresetIndices.delete(index);
         } else {
-          this.selectedFleetPresetIndex = index;
+          this.selectedFleetPresetIndices.add(index);
         }
         this.fleetPresetListEl.querySelectorAll('.fleet-preset-item').forEach((el, i) => {
-          el.classList.toggle('selected', i === this.selectedFleetPresetIndex);
+          el.classList.toggle('selected', this.selectedFleetPresetIndices.has(i));
         });
+        this.renderBathShipThresholds();
       });
 
       this.fleetPresetListEl.appendChild(item);

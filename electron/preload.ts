@@ -4,6 +4,10 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
 contextBridge.exposeInMainWorld('electronBridge', {
+  getAppVersion: () => {
+    return ipcRenderer.sendSync('get-app-version-sync') as string;
+  },
+
   openDirectoryDialog: (title?: string) => {
     return ipcRenderer.invoke('open-directory-dialog', title);
   },
@@ -42,6 +46,10 @@ contextBridge.exposeInMainWorld('electronBridge', {
 
   getPlansDir: () => {
     return ipcRenderer.invoke('get-plans-dir');
+  },
+
+  listPlanFiles: () => {
+    return ipcRenderer.invoke('list-plan-files');
   },
 
   getConfigDir: () => {
