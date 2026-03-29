@@ -283,12 +283,13 @@ function detectEmulator(): EmulatorDetectResult | null {
       { encoding: 'utf-8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 },
     );
     // 输出格式: 键路径行 + 空行 + "    UninstallString    REG_SZ    value" + 空行 ...
-    let currentKey = '';
     for (const line of output.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('HKEY')) {
-        currentKey = trimmed;
-      } else if (/UninstallString/i.test(trimmed) && /MuMu/i.test(trimmed)) {
+        // 键路径行: 当前实现不需要使用具体键名, 仅保留以便未来扩展或调试
+        continue;
+      }
+      if (/UninstallString/i.test(trimmed) && /MuMu/i.test(trimmed)) {
         const valMatch = trimmed.match(/UninstallString\s+REG_\w+\s+(.+)/i);
         if (valMatch) {
           const uninstall = valMatch[1].trim();
