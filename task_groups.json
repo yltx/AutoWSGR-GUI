@@ -17,6 +17,20 @@
           "times": 1,
           "label": "自动演习 (第 4 舰队)",
           "fleet_id": 4
+        },
+        {
+          "templateId": "tpl_1774794378287_1",
+          "kind": "template",
+          "times": 1,
+          "label": "My-E6 (第 6 章)",
+          "chapter": 6
+        },
+        {
+          "templateId": "tpl_1774794378287_1",
+          "kind": "template",
+          "times": 1,
+          "label": "My-E6 (第 6 章)",
+          "chapter": 6
         }
       ]
     },

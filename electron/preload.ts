@@ -96,6 +96,19 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('install-portable-python');
   },
 
+  // ── Python 路径配置 ──
+  getPythonPath: () => {
+    return ipcRenderer.sendSync('get-python-path-sync') as string | null;
+  },
+
+  setPythonPath: (pythonPath: string | null) => {
+    return ipcRenderer.invoke('set-python-path', pythonPath);
+  },
+
+  validatePython: (pythonPath: string) => {
+    return ipcRenderer.invoke('validate-python', pythonPath);
+  },
+
   // ── GUI 自动更新 ──
   checkGuiUpdates: () => {
     return ipcRenderer.invoke('check-gui-updates');

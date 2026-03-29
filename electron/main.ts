@@ -48,6 +48,15 @@ function getBackendPort(): number {
 
 const BACKEND_PORT = getBackendPort();
 
+/** 用户配置的 Python 路径：gui_settings.json > null (自动检测) */
+function getConfiguredPythonPath(): string | null {
+  const settings = readGuiSettings();
+  if (typeof settings.python_path === 'string' && settings.python_path.length > 0) {
+    return settings.python_path;
+  }
+  return null;
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 /** 是否处于打包后的生产模式 */
@@ -265,34 +274,40 @@ function detectEmulator(): EmulatorDetectResult | null {
   if (process.platform !== 'win32') return null;
 
   // ── MuMu 12 ──
-  const mumuKeys = [
-    'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\MuMuPlayer-12.0',
-  ];
-  // 也搜索 HKLM Uninstall 下所有含 MuMu 的键 (MuMu 定制版用不同键名)
+  // 用单次 reg query /s 递归搜索 Uninstall 下的 UninstallString，
+  // 再从输出中筛选含 MuMu 的条目，避免逐键启动子进程。
   const uninstallBase = 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall';
-  for (const subKey of readRegistrySubKeys(uninstallBase)) {
-    const dispName = readRegistryValue(subKey, 'DisplayName');
-    if (dispName && /MuMu/i.test(dispName) && !mumuKeys.includes(subKey)) {
-      mumuKeys.push(subKey);
-    }
-  }
-  for (const regKey of mumuKeys) {
-    const uninstall = readRegistryValue(regKey, 'UninstallString');
-    if (uninstall) {
-      const root = path.dirname(uninstall.replace(/"/g, ''));
-      const shellDir = path.join(root, 'shell');
-      const playerExe = path.join(shellDir, 'MuMuPlayer.exe');
-      const adbExe = path.join(shellDir, 'adb.exe');
-      if (fs.existsSync(playerExe)) {
-        return {
-          type: 'MuMu',
-          path: playerExe,
-          serial: '127.0.0.1:16384',
-          adbPath: fs.existsSync(adbExe) ? adbExe : '',
-        };
+  try {
+    const output = execSync(
+      `reg query "${uninstallBase}" /s /v UninstallString`,
+      { encoding: 'utf-8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 },
+    );
+    // 输出格式: 键路径行 + 空行 + "    UninstallString    REG_SZ    value" + 空行 ...
+    let currentKey = '';
+    for (const line of output.split('\n')) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('HKEY')) {
+        currentKey = trimmed;
+      } else if (/UninstallString/i.test(trimmed) && /MuMu/i.test(trimmed)) {
+        const valMatch = trimmed.match(/UninstallString\s+REG_\w+\s+(.+)/i);
+        if (valMatch) {
+          const uninstall = valMatch[1].trim();
+          const root = path.dirname(uninstall.replace(/"/g, ''));
+          const shellDir = path.join(root, 'shell');
+          const playerExe = path.join(shellDir, 'MuMuPlayer.exe');
+          const adbExe = path.join(shellDir, 'adb.exe');
+          if (fs.existsSync(playerExe)) {
+            return {
+              type: 'MuMu',
+              path: playerExe,
+              serial: '127.0.0.1:16384',
+              adbPath: fs.existsSync(adbExe) ? adbExe : '',
+            };
+          }
+        }
       }
     }
-  }
+  } catch { /* Uninstall 注册表扫描失败, 继续检测其他模拟器 */ }
 
   // ── 雷电模拟器 ──
   try {
@@ -367,6 +382,30 @@ ipcMain.on('get-backend-port-sync', (event) => {
 
 ipcMain.handle('set-backend-port', (_event, port: number) => {
   writeGuiSettings({ backend_port: port });
+});
+
+ipcMain.on('get-python-path-sync', (event) => {
+  event.returnValue = getConfiguredPythonPath();
+});
+
+ipcMain.handle('set-python-path', (_event, pythonPath: string | null) => {
+  writeGuiSettings({ python_path: pythonPath ?? '' });
+  cachedPythonCmd = undefined; // 清除缓存，下次查找时使用新路径
+});
+
+ipcMain.handle('validate-python', async (_event, pythonPath: string) => {
+  if (!pythonPath) return { valid: false, version: null, error: '路径为空' };
+  if (!fs.existsSync(pythonPath)) return { valid: false, version: null, error: '文件不存在' };
+  try {
+    const { stdout } = await execAsync(`"${pythonPath}" --version`, { windowsHide: true, timeout: 10000 });
+    const version = stdout.trim();
+    if (!isAllowedPythonVersion(version)) {
+      return { valid: false, version, error: `版本不兼容: ${version}（需要 3.12 或 3.13）` };
+    }
+    return { valid: true, version };
+  } catch (e) {
+    return { valid: false, version: null, error: `执行失败: ${e instanceof Error ? e.message : String(e)}` };
+  }
 });
 
 ipcMain.handle('get-app-root', () => {
@@ -519,11 +558,26 @@ function isAllowedPythonVersion(versionOutput: string): boolean {
   return major === 3 && (minor === 12 || minor === 13);
 }
 
-/** 查找可用的 Python 可执行文件 (优先本地便携版, 仅接受 3.12/3.13, 结果会缓存) */
+/** 查找可用的 Python 可执行文件 (用户配置 > 本地便携版 > 系统, 仅接受 3.12/3.13, 结果会缓存) */
 async function findPython(): Promise<string | null> {
   if (cachedPythonCmd !== undefined) return cachedPythonCmd;
 
   let found: string | null = null;
+
+  // 最高优先级：用户在配置页指定的 Python 路径
+  const configured = getConfiguredPythonPath();
+  if (configured && fs.existsSync(configured)) {
+    try {
+      const { stdout } = await execAsync(`"${configured}" --version`, { windowsHide: true });
+      if (isAllowedPythonVersion(stdout)) found = configured;
+      else sendProgress(`WARNING 用户配置的 Python 版本不兼容: ${stdout.trim()}（需要 3.12 或 3.13），回退自动检测`);
+    } catch {
+      sendProgress('WARNING 用户配置的 Python 路径无法执行，回退自动检测');
+    }
+  } else if (configured) {
+    sendProgress('WARNING 用户配置的 Python 路径不存在，回退自动检测');
+  }
+
   // 优先使用本地便携版 Python
   const localPython = path.join(appRoot(), 'python', 'python.exe');
   if (fs.existsSync(localPython)) {
@@ -534,7 +588,7 @@ async function findPython(): Promise<string | null> {
     } catch { /* local Python broken */ }
   }
 
-  if (!found) {
+  if (!found && !configured) {  // 仅在本地 Python 不可用且无用户配置时回退系统 Python
     // 回退到系统全局 Python
     // 注意: 必须解析出真实的 .exe 绝对路径，因为 pyenv 等工具使用 .bat shim，
     // 而 Node.js spawn() 不经过 shell，无法执行 .bat 文件。
@@ -729,7 +783,11 @@ function readEnvMarker(): { pythonCmd: string; pythonVersion: string; autowsgrVe
     const data = JSON.parse(fs.readFileSync(ENV_READY_MARKER(), 'utf-8'));
     if (data && data.pythonCmd && data.autowsgrVersion && isVersionOk(data.autowsgrVersion)) {
       // 确保记录的 python 路径仍然存在
-      if (fs.existsSync(data.pythonCmd)) return data;
+      if (!fs.existsSync(data.pythonCmd)) return null;
+      // 若用户切换了 Python 路径，旧标记自动失效
+      const configured = getConfiguredPythonPath();
+      if (configured && configured !== data.pythonCmd) return null;
+      return data;
     }
   } catch { /* ignore */ }
   return null;
@@ -811,7 +869,9 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
       const proc = spawn(pythonCmd, [
         '-m', 'pip', 'install',
         '--target', targetDir,
-        'setuptools',
+        '--upgrade',
+        '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
+        '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
         'autowsgr',
       ], {
         cwd: appRoot(),
@@ -830,36 +890,42 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
       return localVer;
     }
 
-    // 升级后验证关键传递依赖是否完整
-    const verifyScript = path.join(app.getPath('temp'), 'autowsgr_verify_deps.py');
-    fs.writeFileSync(verifyScript, [
+    // 升级后：单次 Python 调用验证版本 + 关键依赖
+    const postScript = path.join(app.getPath('temp'), 'autowsgr_post_upgrade.py');
+    fs.writeFileSync(postScript, [
       'import json, sys, site',
       `sys.path.insert(0, r'${spFwd}')`,
       `site.addsitedir(r'${spFwd}')`,
-      'missing = []',
+      'r = {"version": "unknown", "missing": []}',
+      'try:',
+      '    import autowsgr; r["version"] = autowsgr.__version__',
+      'except: pass',
       "for m in ['fastapi', 'uvicorn']:",
       '    try: __import__(m)',
-      '    except Exception: missing.append(m)',
-      'print(json.dumps(missing))',
+      '    except Exception: r["missing"].append(m)',
+      'print(json.dumps(r))',
     ].join('\n'), 'utf-8');
 
     try {
-      const { stdout: verifyOut } = await execAsync(
-        `"${pythonCmd}" "${verifyScript}"`,
+      const { stdout: postOut } = await execAsync(
+        `"${pythonCmd}" "${postScript}"`,
         { windowsHide: true, timeout: 15000, env: pipEnv() },
       );
-      try { fs.unlinkSync(verifyScript); } catch { /* ignore */ }
-      const missing: string[] = JSON.parse(verifyOut.trim());
+      try { fs.unlinkSync(postScript); } catch { /* ignore */ }
+      const postResult = JSON.parse(postOut.trim());
+      const actualVer: string = postResult.version;
+      const missing: string[] = postResult.missing;
 
       if (missing.length > 0) {
-        const pkgs = [...missing];
         sendProgress(`升级后缺少依赖: ${missing.join(', ')}，正在补装…`);
         const fixCode = await new Promise<number>((resolve) => {
           const proc = spawn(pythonCmd, [
             '-m', 'pip', 'install',
             '--target', targetDir,
             '--force-reinstall', '--no-deps',
-            ...pkgs,
+            '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
+            '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
+            ...missing,
           ], {
             cwd: appRoot(),
             windowsHide: true,
@@ -873,12 +939,13 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
         });
 
         if (fixCode !== 0) {
-          // --no-deps 失败则完整安装
           await new Promise<void>((resolve) => {
             const proc = spawn(pythonCmd, [
               '-m', 'pip', 'install',
               '--target', targetDir,
-              ...pkgs,
+              '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
+              '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
+              ...missing,
             ], {
               cwd: appRoot(),
               windowsHide: true,
@@ -893,34 +960,16 @@ async function autoUpdateAutowsgr(pythonCmd: string): Promise<string | null> {
         }
         sendProgress(`依赖补装完成 ✓`);
       }
-    } catch {
-      try { fs.unlinkSync(verifyScript); } catch { /* ignore */ }
-    }
 
-    // 升级后验证实际版本
-    const verCheckScript = path.join(app.getPath('temp'), 'autowsgr_ver_check.py');
-    fs.writeFileSync(verCheckScript, [
-      'import sys',
-      `sys.path.insert(0, r'${spFwd}')`,
-      'try:',
-      '    import autowsgr; print(autowsgr.__version__)',
-      'except: print("unknown")',
-    ].join('\n'), 'utf-8');
-    try {
-      const { stdout: verOut } = await execAsync(
-        `"${pythonCmd}" "${verCheckScript}"`,
-        { windowsHide: true, timeout: 15000, env: pipEnv() },
-      );
-      try { fs.unlinkSync(verCheckScript); } catch { /* ignore */ }
-      const actualVer = verOut.trim();
-      if (actualVer === latestVer) {
-        sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
-        return latestVer;
+      if (actualVer !== 'unknown') {
+        const msg = actualVer === latestVer
+          ? `autowsgr 已升级至 ${latestVer} ✓`
+          : `autowsgr 已升级至 ${actualVer}（期望 ${latestVer}）`;
+        sendProgress(msg);
+        return actualVer;
       }
-      sendProgress(`autowsgr 已升级至 ${actualVer}（期望 ${latestVer}）`);
-      return actualVer;
     } catch {
-      try { fs.unlinkSync(verCheckScript); } catch { /* ignore */ }
+      try { fs.unlinkSync(postScript); } catch { /* ignore */ }
     }
 
     sendProgress(`autowsgr 已升级至 ${latestVer} ✓`);
@@ -1131,6 +1180,9 @@ function localSitePackages(): string {
 /** 同步查找 Python (用于非 async 上下文) */
 function findPythonSync(): string | null {
   if (cachedPythonCmd !== undefined) return cachedPythonCmd;
+  // 最高优先级：用户配置的 Python 路径
+  const configured = getConfiguredPythonPath();
+  if (configured && fs.existsSync(configured)) return configured;
   const localPython = path.join(appRoot(), 'python', 'python.exe');
   if (fs.existsSync(localPython)) return localPython;
   for (const cmd of ['python', 'python3']) {

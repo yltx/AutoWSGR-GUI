@@ -98,6 +98,9 @@ interface ElectronBridge {
   getAppVersion: () => string;
   getBackendPort: () => number;
   setBackendPort: (port: number) => Promise<void>;
+  getPythonPath: () => string | null;
+  setPythonPath: (pythonPath: string | null) => Promise<void>;
+  validatePython: (pythonPath: string) => Promise<{ valid: boolean; version: string | null; error?: string }>;
 }
 
 declare global {
@@ -684,6 +687,50 @@ export class AppController {
       const dir = await bridge.openDirectoryDialog('选择模拟器安装目录');
       if (dir) {
         (document.getElementById('cfg-emu-path') as HTMLInputElement).value = dir;
+      }
+    });
+
+    // Python 路径浏览按钮
+    document.getElementById('btn-browse-python')?.addEventListener('click', async () => {
+      const bridge = window.electronBridge;
+      if (!bridge) return;
+      const result = await bridge.openFileDialog(
+        [{ name: 'Python', extensions: ['exe'] }],
+      );
+      if (result) {
+        (document.getElementById('cfg-python-path') as HTMLInputElement).value = result.path;
+      }
+    });
+
+    // Python 检测按钮
+    document.getElementById('btn-validate-python')?.addEventListener('click', async () => {
+      const bridge = window.electronBridge;
+      if (!bridge?.validatePython) return;
+      const btn = document.getElementById('btn-validate-python') as HTMLButtonElement;
+      const status = document.getElementById('cfg-python-status')!;
+      const pythonPath = (document.getElementById('cfg-python-path') as HTMLInputElement).value.trim();
+      if (!pythonPath) {
+        status.textContent = '“留空”将自动检测';
+        status.className = 'adb-status adb-status-unknown';
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = '检测中…';
+      try {
+        const result = await bridge.validatePython(pythonPath);
+        if (result.valid) {
+          status.textContent = `✓ ${result.version}`;
+          status.className = 'adb-status adb-status-online';
+        } else {
+          status.textContent = result.error ?? '不兼容';
+          status.className = 'adb-status adb-status-offline';
+        }
+      } catch {
+        status.textContent = '检测失败';
+        status.className = 'adb-status adb-status-offline';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = '检测';
       }
     });
 
@@ -2456,6 +2503,7 @@ export class AppController {
       accentColor: this.getAccentColor(),
       debugMode: localStorage.getItem('debugMode') === 'true',
       backendPort: window.electronBridge?.getBackendPort?.() ?? 8438,
+      pythonPath: window.electronBridge?.getPythonPath?.() ?? '',
     };
     this.configView.render(vo);
 
@@ -2476,6 +2524,11 @@ export class AppController {
     // 保存后端端口（修改后需重启生效）
     if (window.electronBridge?.setBackendPort) {
       await window.electronBridge.setBackendPort(collected.backendPort);
+    }
+
+    // 保存 Python 路径（修改后需重启生效）
+    if (window.electronBridge?.setPythonPath) {
+      await window.electronBridge.setPythonPath(collected.pythonPath || null);
     }
 
     this.configModel.update({

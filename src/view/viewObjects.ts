@@ -139,4 +139,5 @@ export interface ConfigViewObject {
   accentColor: string;
   debugMode: boolean;
   backendPort: number;
+  pythonPath: string;
 }

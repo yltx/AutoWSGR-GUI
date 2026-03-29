@@ -507,6 +507,20 @@
         </div>
       </div>
 
+      <div class="card">
+        <h3>Python 环境</h3>
+        <div class="form-group">
+          <label>Python 解释器路径</label>
+          <div class="input-row">
+            <input type="text" id="cfg-python-path" class="input" placeholder="留空自动检测">
+            <button class="btn btn-small" id="btn-browse-python">浏览</button>
+            <button class="btn btn-small" id="btn-validate-python">检测</button>
+            <span id="cfg-python-status" class="adb-status adb-status-unknown"></span>
+          </div>
+          <span class="config-hint">需要 Python 3.12 或 3.13。留空将依次尝试内置 Python → 系统 Python。修改后需重启生效。</span>
+        </div>
+      </div>
+
       <div class="card" style="display:none">
         <h3>游戏账号</h3>
         <div class="form-group">
