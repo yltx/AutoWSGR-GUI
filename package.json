@@ -1,6 +1,6 @@
 {
   "name": "wsgrgui",
-  "version": "1.2.2",
+  "version": "1.2.4",
   "description": "AutoWSGR 图形界面 — MVP",
   "main": "dist/electron/main.js",
   "scripts": {
