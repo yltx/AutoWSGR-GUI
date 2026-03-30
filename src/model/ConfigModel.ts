@@ -3,7 +3,7 @@
  * 负责从 YAML 加载、导出配置，以及局部更新。
  */
 import * as yaml from 'js-yaml';
-import type { UserSettings } from './types';
+import type { UserSettings } from '../types/model';
 import { Logger } from '../utils/Logger';
 
 const DEFAULT_SETTINGS: UserSettings = {

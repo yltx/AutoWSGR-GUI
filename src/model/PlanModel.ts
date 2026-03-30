@@ -3,7 +3,7 @@
  * 负责从 YAML 文件解析战斗方案，并提供节点参数的查询与合并。
  */
 import * as yaml from 'js-yaml';
-import type { PlanData, NodeArgs, FleetPreset, ShipSlot, ShipFilter } from './types';
+import type { PlanData, NodeArgs, FleetPreset, ShipSlot, ShipFilter } from '../types/model';
 
 export class PlanModel {
   data: PlanData;

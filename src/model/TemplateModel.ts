@@ -1,4 +1,4 @@
-import type { TaskTemplate } from './types';
+import type { TaskTemplate } from '../types/model';
 
 const FILE_PATH = 'templates/templates.json';
 const BUILTIN_PATH = 'resource/builtin_templates.json';
