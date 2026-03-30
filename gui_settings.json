@@ -1,3 +1,4 @@
 {
-  "backend_port": 8438
+  "backend_port": 8438,
+  "python_path": ""
 }

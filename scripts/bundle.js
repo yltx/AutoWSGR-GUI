@@ -2,7 +2,7 @@ const esbuild = require('esbuild');
 const path = require('path');
 
 esbuild.buildSync({
-  entryPoints: [path.join(__dirname, '..', 'dist', 'src', 'controller', 'AppController.js')],
+  entryPoints: [path.join(__dirname, '..', 'dist', 'src', 'controller', 'app', 'AppController.js')],
   bundle: true,
   outfile: path.join(__dirname, '..', 'dist', 'renderer.bundle.js'),
   platform: 'browser',

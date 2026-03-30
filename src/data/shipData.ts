@@ -54,7 +54,7 @@ export function toBackendName(displayName: string): string {
 // 模糊匹配 (ShipFilter)
 // ════════════════════════════════════════
 
-import type { ShipFilter, ShipSlot } from '../model/types';
+import type { ShipFilter, ShipSlot } from '../types/model';
 
 /** 将 ShipFilter 转为显示标签, 如 "德国 驱逐" */
 export function shipFilterLabel(filter: ShipFilter): string {

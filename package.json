@@ -4,9 +4,11 @@
   "description": "AutoWSGR 图形界面 — MVP",
   "main": "dist/electron/main.js",
   "scripts": {
-    "build": "tsc && node scripts/bundle.js",
+    "build:css": "sass src/view/styles/main.scss src/view/styles/styles.css --no-source-map --style=expanded",
+    "clean": "node -e \"fs.rmSync('dist/src',{recursive:true,force:true});fs.rmSync('dist/electron',{recursive:true,force:true});console.log('dist cleaned')\" ",
+    "build": "npm run clean && npm run build:css && tsc && node scripts/bundle.js",
     "start": "chcp 65001 >nul && npm run build && electron .",
-    "dev": "chcp 65001 >nul && tsc && node scripts/bundle.js && electron .",
+    "dev": "chcp 65001 >nul && npm run clean && npm run build:css && tsc && node scripts/bundle.js && electron .",
     "prepare-python": "node scripts/prepare-python.js",
     "prepare-adb": "node scripts/prepare-adb.js",
     "pack": "npm run build && electron-builder --dir",
@@ -18,6 +20,7 @@
     "electron": "^33.0.0",
     "electron-builder": "^26.8.1",
     "esbuild": "^0.27.3",
+    "sass": "^1.98.0",
     "typescript": "^5.6.0"
   },
   "dependencies": {

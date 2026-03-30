@@ -31,6 +31,13 @@
           "times": 1,
           "label": "My-E6 (第 6 章)",
           "chapter": 6
+        },
+        {
+          "templateId": "builtin_campaign",
+          "kind": "template",
+          "times": 12,
+          "label": "战役 (困难驱逐)",
+          "campaignName": "困难驱逐"
         }
       ]
     },
