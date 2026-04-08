@@ -182,14 +182,37 @@ export class Scheduler {
     return resp.success;
   }
 
-  /** 立即停止当前任务并清除运行状态（不删除队列，不自动消费下一个） */
+  /**
+   * 立即停止当前任务，并将其恢复为“未开始执行”状态重新放回队列。
+   * 用于用户手动点击“停止”后的可恢复场景。
+   */
   async stopRunning(): Promise<void> {
     Logger.debug(`stopRunning: currentTask=${this.currentTask?.name ?? 'null'} queueLen=${this._taskQueue.length}`, 'scheduler');
-    this._stopped = true;
-    if (this.currentTask) {
-      try { await this.api.taskStop(); } catch { /* ignore */ }
-      this.currentTask = null;
+
+    const runningTask = this.currentTask;
+    if (!runningTask) {
+      this._taskQueue.clearDeferredTimer();
+      this.setStatus('idle');
+      this.notifyQueueChange();
+      return;
     }
+
+    this._stopped = true;
+    this.setStatus('stopping');
+    try {
+      await this.api.taskStop();
+    } catch {
+      /* ignore */
+    }
+
+    // 用户手动停止后，恢复为“未开始执行”状态放回队列。
+    runningTask.remainingTimes = runningTask.totalTimes;
+    runningTask.retryCount = 0;
+    runningTask.backendTaskId = undefined;
+    this.currentTask = null;
+    this._taskQueue.insertByPriority(runningTask);
+    this._stopped = false;
+
     this._taskQueue.clearDeferredTimer();
     this.setStatus('idle');
     this.notifyQueueChange();

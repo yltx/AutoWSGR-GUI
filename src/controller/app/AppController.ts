@@ -341,7 +341,12 @@ export class AppController {
     });
 
     document.getElementById('btn-stop-task')?.addEventListener('click', async () => {
-      await this.scheduler.stopRunning(); this.renderMain(); Logger.info('已停止当前任务');
+      await this.scheduler.stopRunning();
+      this.schedulerBinder.currentProgress = '';
+      this.schedulerBinder.trackedLoot = '';
+      this.schedulerBinder.trackedShip = '';
+      this.renderMain();
+      Logger.info('已停止当前任务（任务已保留在队列中）');
     });
     document.getElementById('btn-clear-queue')?.addEventListener('click', () => {
       this.scheduler.clearQueue(); this.renderMain();
