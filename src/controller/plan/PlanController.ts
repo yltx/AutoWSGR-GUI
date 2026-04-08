@@ -4,10 +4,10 @@
  */
 import { PlanPreviewView } from '../../view/plan/PlanPreviewView';
 import type { PlanModel } from '../../model/PlanModel';
-import type { NormalFightReq } from '../../types/api';
+import type { CombatPlanReq, NodeDecisionReq, NormalFightReq } from '../../types/api';
 import type { Scheduler } from '../../model/scheduler';
 import { TaskPriority } from '../../model/scheduler';
-import type { TaskPreset } from '../../types/model';
+import type { NodeArgs, TaskPreset } from '../../types/model';
 import { getNodeType, isNightNode } from '../../model/MapDataLoader';
 import type { MapData } from '../../model/MapDataLoader';
 import { toBackendName, resolveFleetPreset, shipSlotLabel } from '../../data/shipData';
@@ -206,6 +206,49 @@ export class PlanController {
 
   // ── 执行方案 ──
 
+  private toNodeDecisionReq(args?: NodeArgs): NodeDecisionReq | undefined {
+    if (!args) return undefined;
+    const mapped: NodeDecisionReq = {};
+    if (args.formation != null) mapped.formation = args.formation;
+    if (args.night != null) mapped.night = args.night;
+    if (args.proceed != null) mapped.proceed = args.proceed;
+    if (args.proceed_stop != null) mapped.proceed_stop = args.proceed_stop;
+    if (args.enemy_rules && args.enemy_rules.length > 0) {
+      mapped.enemy_rules = args.enemy_rules.map(([cond, action]) => [String(cond), String(action)]);
+    }
+    return Object.keys(mapped).length > 0 ? mapped : undefined;
+  }
+
+  private buildInlinePlan(plan: PlanModel): CombatPlanReq {
+    const inlinePlan: CombatPlanReq = {
+      chapter: plan.data.chapter,
+      map: plan.data.map,
+      selected_nodes: [...plan.data.selected_nodes],
+    };
+
+    if (plan.data.fleet_id != null) inlinePlan.fleet_id = plan.data.fleet_id;
+    if (plan.data.repair_mode != null) {
+      inlinePlan.repair_mode = Array.isArray(plan.data.repair_mode)
+        ? [...plan.data.repair_mode]
+        : [plan.data.repair_mode];
+    }
+    if (plan.data.fight_condition != null) inlinePlan.fight_condition = plan.data.fight_condition;
+
+    const nodeDefaults = this.toNodeDecisionReq(plan.data.node_defaults);
+    if (nodeDefaults) inlinePlan.node_defaults = nodeDefaults;
+
+    if (plan.data.node_args) {
+      const nodeArgs: Record<string, NodeDecisionReq> = {};
+      for (const [nodeId, nodeArg] of Object.entries(plan.data.node_args)) {
+        const mapped = this.toNodeDecisionReq(nodeArg);
+        if (mapped) nodeArgs[nodeId] = mapped;
+      }
+      if (Object.keys(nodeArgs).length > 0) inlinePlan.node_args = nodeArgs;
+    }
+
+    return inlinePlan;
+  }
+
   private executePlan(): void {
     if (!this.currentPlan) return;
     const plan = this.currentPlan;
@@ -214,16 +257,22 @@ export class PlanController {
     const selectedPresets = this.planView.getSelectedPresets();
     const firstPreset = selectedPresets.length > 0 ? selectedPresets[0] : undefined;
 
-    const req: NormalFightReq = {
-      type: 'normal_fight',
-      plan_id: plan.fileName,
-      times: 1,
-      gap: plan.data.gap ?? 0,
-    };
+    const req: NormalFightReq = { type: 'normal_fight', times: 1, gap: plan.data.gap ?? 0 };
+
+    if (plan.fileName?.trim()) {
+      req.plan_id = plan.fileName;
+    } else {
+      req.plan = this.buildInlinePlan(plan);
+      Logger.warn('当前方案尚未导出 YAML，将以内存方案直接执行');
+    }
 
     if (firstPreset && firstPreset.ships.length > 0) {
       const resolved = resolveFleetPreset(firstPreset.ships);
-      req.plan = { fleet: resolved.map(toBackendName), fleet_id: plan.data.fleet_id };
+      if (resolved.length > 0) {
+        if (!req.plan) req.plan = {};
+        req.plan.fleet = resolved.map(toBackendName);
+        req.plan.fleet_id = plan.data.fleet_id;
+      }
     }
 
     const bathRepairConfig = this.planView.getBathRepairConfig();
@@ -235,7 +284,8 @@ export class PlanController {
       plan.mapName, 'normal_fight', req, TaskPriority.USER_TASK, times,
       stopCondition, bathRepairConfig, fleetId, fleetPresets, currentPresetIndex,
     );
-    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${plan.fileName} times=${times} gap=${req.gap}${firstPreset ? ' fleet=' + firstPreset.ships.map(s => shipSlotLabel(s)).join(',') : ''}${fleetPresets ? ' rotation=' + fleetPresets.length + '套' : ''}`);
+    const planRef = req.plan_id ?? '(inline-unsaved)';
+    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${planRef} times=${times} gap=${req.gap}${firstPreset ? ' fleet=' + firstPreset.ships.map(s => shipSlotLabel(s)).join(',') : ''}${fleetPresets ? ' rotation=' + fleetPresets.length + '套' : ''}`);
 
     this.planView.selectedFleetPresetIndices.clear();
     this.host.switchPage('main');
