@@ -130,7 +130,7 @@ export function loadTemplateToQueue(
         flagship_priority: tpl.flagship_priority ?? [],
         use_quick_repair: tpl.use_quick_repair,
       };
-      host.scheduler.addTask(item.label || tpl.name, 'decisive', req, TaskPriority.USER_TASK, 1, undefined, undefined, undefined, undefined, undefined, undefined, allowPolling);
+      host.scheduler.addTask(item.label || tpl.name, 'decisive', req, TaskPriority.USER_TASK, times, undefined, undefined, undefined, undefined, undefined, undefined, allowPolling);
       break;
     default:
       return false;
