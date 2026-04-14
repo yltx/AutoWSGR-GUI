@@ -2,14 +2,33 @@
 
 [AutoWSGR](https://github.com/OpenWSGR/AutoWSGR) 的桌面图形界面，基于 Electron + TypeScript 构建。
 
-## 功能
+## 当前 GUI 已实现功能
 
-- **主页** — 实时状态面板、任务队列管理（拖拽排序）、后端 WebSocket 日志、远征自动检查
-- **方案预览** — 导入 / 新建 YAML 战斗方案，SVG 地图可视化，节点级编辑（阵型 / 夜战 / 追击 / 索敌）
-- **模板库** — 预设常用流程模板（出击 / 演习 / 战役 / 决战），一键加入队列
-- **任务组** — 多方案有序集合，整组入队、拖拽排序、持久化
-- **配置** — 模拟器自动检测（MuMu / 雷电 / 蓝叠）、账号设置、自动化调度（远征 / 演习 / 战役 / 战利品）、主题切换
-- **调度器** — 任务顺序执行、优先级、失败自动重试、定时调度（CronScheduler）
+- **主页**
+  - 连接状态与远征倒计时展示
+  - 手动运维操作（收远征 / 收奖励 / 收建造 / 食堂烹饪 / 浴室修理）
+  - 任务队列开始、停止、清空
+  - 任务组管理（新建、重命名、删除、导入导出、整组入队）
+  - 后端日志实时查看与等级过滤
+- **方案预览**
+  - 导入 YAML 或从地图新建方案
+  - 节点路线可视化与节点级参数编辑
+  - 方案级参数配置（修理策略、战况、编队、次数、间隔、终止条件）
+  - 编队预设与泡澡修理阈值配置
+  - 一键加入队列 / 加入任务组 / 保存 YAML / 另存为
+- **模板库**
+  - 支持普通出击、演习、战役、决战四类模板
+  - 模板导入、创建、详情配置、加入任务列表
+- **配置页**
+  - 模拟器类型、路径、ADB 串号检测
+  - Python 解释器路径检测与后端端口设置
+  - 自动更新模式与手动检查更新
+  - 每日自动任务（远征、战役、演习、常规出击、决战、战利品）
+  - 主题模式、主色调、调试模式
+- **调度与运行**
+  - 任务优先级调度
+  - 条件停止与失败重试
+  - 启动流程检查与运行期日志可观测
 
 ## 安装
 
@@ -34,28 +53,10 @@ setup.bat              # 安装便携 Python + autowsgr 依赖
 npm run dev            # 编译 + 启动 Electron
 ```
 
-### 使用本地后端源码联调
+## 用户文档
 
-如需让 GUI 直接加载本地克隆的后端源码（而非 `python/site-packages` 中的 PyPI 包），可在启动前设置环境变量：
-
-```powershell
-$env:AUTOWSGR_LOCAL_BACKEND = 'E:\AutoWSGR-backend'
-npm run dev
-```
-
-也可在 `gui_settings.json` 中设置：
-
-```json
-{
-  "local_backend_repo": "E:\\AutoWSGR-backend"
-}
-```
-
-说明：
-
-- 启动时会校验 `<local_backend_repo>/autowsgr/__init__.py` 是否存在。
-- `AUTOWSGR_LOCAL_BACKEND` 优先级高于 `gui_settings.json`。
-- 执行“安装依赖”时，若设置了 `AUTOWSGR_LOCAL_BACKEND`，会优先从该本地仓库安装 `autowsgr`。
+- GUI 操作指南（含“从方案预览页开始的新建任务配置流程”）：[docs/user-guide.md](docs/user-guide.md)
+- YAML 关键字说明（战斗方案编写）：[docs/plan-guide.md](docs/plan-guide.md)
 
 ## 编写战斗方案
 
@@ -113,7 +114,7 @@ npm run dev
 ## 开发命令
 
 | 命令 | 说明 |
-|------|------|
+| ------ | ------ |
 | `npm run dev` | 编译 TypeScript + 打包 + 启动 Electron |
 | `npm run build` | 仅编译 + 打包（不启动） |
 | `npm run build:css` | 编译 SCSS → CSS |
