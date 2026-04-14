@@ -170,6 +170,10 @@ export class ApiClient {
     return this.request('POST', '/api/expedition/check');
   }
 
+  async expeditionAutoCheck(allowRepair = true): Promise<ApiResponse> {
+    return this.request('POST', '/api/expedition/auto_check', { allow_repair: allowRepair });
+  }
+
   // ── 游戏状态查询 ──
 
   async gameContext(): Promise<ApiResponse<GameContextData>> {
