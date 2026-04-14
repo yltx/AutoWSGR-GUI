@@ -290,6 +290,7 @@ export class Scheduler {
     Logger.debug(`consumeNext: 「${task.name}」 type=${task.type} remaining=${task.remainingTimes}/${task.totalTimes} req=${JSON.stringify(task.request)}`, 'scheduler');
 
     // 远征任务: 直接调用远征 API，不走 taskStart 流程
+    // 挂机模式下顺带领取奖励并执行智能浴室维修
     if (task.type === 'expedition') {
       try {
         this.emitLog('info', '正在检查远征...');
@@ -298,6 +299,28 @@ export class Scheduler {
       } catch {
         this.emitLog('debug', '远征检查跳过');
       }
+
+      try {
+        this.emitLog('info', '正在领取任务奖励...');
+        await this.api.rewardCollect();
+        this.emitLog('info', '任务奖励领取完成');
+      } catch {
+        this.emitLog('debug', '任务奖励领取跳过');
+      }
+
+      try {
+        const taskStatus = await this.api.taskStatus();
+        if (taskStatus.success && taskStatus.data?.status === 'running') {
+          this.emitLog('info', '检测到战斗任务进行中，跳过浴室维修');
+        } else {
+          this.emitLog('info', '正在检查浴室维修...');
+          await this.api.repairBath();
+          this.emitLog('info', '浴室维修检查完成');
+        }
+      } catch {
+        this.emitLog('debug', '浴室维修检查跳过');
+      }
+
       this.currentTask = null;
       this.consumeNext();
       return;
