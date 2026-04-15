@@ -42,7 +42,7 @@ export class TemplateLibraryView {
          <button class="btn btn-small btn-danger" data-tpl-action="delete" data-tpl-id="${item.id}" title="删除">✕</button>`;
       return `<div class="tpl-item" data-tpl-id="${item.id}">
         <div class="tpl-item-info"${descTitle}>
-          <div class="tpl-item-name">${this.esc(item.name)}${builtinBadge}</div>
+          <div class="tpl-item-name">${builtinBadge}${this.esc(item.name)}</div>
           <div class="tpl-item-type">${this.esc(item.typeLabel)}${planInfo}${item.defaultTimes ? ` · ×${item.defaultTimes}` : ''}</div>
         </div>
         <div class="tpl-item-actions">

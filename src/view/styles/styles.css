@@ -3309,7 +3309,7 @@ input[type=checkbox]:focus-visible {
   border-radius: 3px;
   background: var(--accent);
   color: #fff;
-  margin-left: 6px;
+  margin-right: 6px;
   vertical-align: middle;
   font-weight: 500;
 }

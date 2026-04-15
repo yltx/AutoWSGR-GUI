@@ -1,0 +1,45 @@
+# 周常第10章 — 地图 10-1
+# 编队: 空想(改型) + 351 + 4条改型潜艇（不限国籍模糊匹配）
+# 目标等级: 全员 >= 110
+# 路线: B-D-F-G-H-L-M-O (L 迂回)
+
+chapter: 10
+map: 1
+selected_nodes: [B, D, F, G, H, L, M, O]
+fleet_id: 2
+fight_condition: 1
+repair_mode: 1
+
+node_defaults:
+  formation: 2
+  night: false
+  proceed: true
+
+node_args:
+  L:
+    formation: 2
+    night: false
+    proceed: true
+    detour: true
+  M:
+    formation: 2
+    night: false
+    proceed: true
+    long_missile_support: true
+  O:
+    formation: 4
+    night: false
+    proceed: true
+    long_missile_support: true
+
+fleet_presets:
+  - name: 空想351潜艇队
+    ships:
+      - { name: 空想·改, min_level: 110 }
+      - { name: 351, min_level: 110 }
+      - { ship_type: ss_or_ssg, min_level: 110 }
+      - { ship_type: ss_or_ssg, min_level: 110 }
+      - { ship_type: ss_or_ssg, min_level: 110 }
+      - { ship_type: ss_or_ssg, min_level: 110 }
+
+times: 3

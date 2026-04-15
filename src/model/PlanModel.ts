@@ -189,7 +189,10 @@ export class PlanModel {
     if (raw && typeof raw === 'object') {
       const obj = raw as Record<string, unknown>;
       const filter: ShipFilter = {};
-      if (typeof obj.name === 'string') filter.name = obj.name;
+      if (typeof obj.name === 'string' || typeof obj.name === 'number') {
+        const normalizedName = String(obj.name).trim();
+        if (normalizedName) filter.name = normalizedName;
+      }
       if (typeof obj.nation === 'string') filter.nation = obj.nation;
       if (typeof obj.ship_type === 'string') filter.ship_type = obj.ship_type;
       if (Array.isArray(obj.priority)) {

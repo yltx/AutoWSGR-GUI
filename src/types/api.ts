@@ -161,6 +161,8 @@ export interface FleetRuleReq {
   candidates: string[];
   /** 搜索关键词（用于同名舰船精确筛选） */
   search_name?: string;
+  /** 舰种约束（如 cl/cav/ss），用于同名舰船二次筛选 */
+  ship_type?: string;
   /** 等级下限（仅选择 >= 该等级） */
   min_level?: number;
   /** 等级上限（仅选择 <= 该等级） */

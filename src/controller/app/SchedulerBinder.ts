@@ -334,6 +334,10 @@ export class SchedulerBinder {
       if (plan.data.selected_nodes.length > 0) {
         req.plan = req.plan ?? {};
         req.plan.selected_nodes = [...plan.data.selected_nodes];
+        // 与普通出击一致：避免后端把 plan.fleet_id 默认成 1 覆盖 YAML 内舰队。
+        if (plan.data.fleet_id != null) {
+          req.plan.fleet_id = plan.data.fleet_id;
+        }
       }
       const stopCondition = { loot_count_ge: stopCount };
       const id = this.host.scheduler.addTask(

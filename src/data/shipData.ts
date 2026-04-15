@@ -204,8 +204,12 @@ export function resolveFleetPresetRules(ships: ShipSlot[]): Array<string | Fleet
 
     const rule: FleetRuleReq = { candidates };
     if (slot.name) {
-      const searchName = toBackendName(String(slot.name));
+      // 保留原始舰名作为搜索关键词，避免同名异型（如大淀）被归一化后无法区分。
+      const searchName = String(slot.name).trim();
       if (searchName) rule.search_name = searchName;
+    }
+    if (slot.ship_type) {
+      rule.ship_type = String(slot.ship_type).trim();
     }
     if (slot.min_level != null && Number.isFinite(slot.min_level)) {
       rule.min_level = Math.max(1, Math.floor(slot.min_level));

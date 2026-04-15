@@ -275,6 +275,9 @@ export class PlanController {
     if (plan.data.selected_nodes.length > 0) {
       req.plan = req.plan ?? {};
       req.plan.selected_nodes = [...plan.data.selected_nodes];
+      // 后端 schema 会为 plan.fleet_id 注入默认值 1；
+      // 这里显式传入当前舰队，避免 selected_nodes 覆盖请求意外把舰队重置为 1。
+      req.plan.fleet_id = effectiveFleetId;
     }
 
     if (firstPreset && firstPreset.ships.length > 0) {
