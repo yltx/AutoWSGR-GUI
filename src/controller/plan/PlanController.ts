@@ -123,17 +123,40 @@ export class PlanController {
     document.getElementById('btn-save-plan')?.addEventListener('click', () =>
       savePlanFlow(this.currentPlan, this.host, () => this.renderPlanPreview()));
 
-    document.getElementById('btn-new-plan')?.addEventListener('click', () => this.planView.showNewPlanDialog());
+    const updateNewPlanMapOptions = (chapterVal: string): void => {
+      const mapSelect = document.getElementById('new-plan-map') as HTMLSelectElement | null;
+      if (!mapSelect) return;
+
+      const mapCountByChapter: Record<string, number> = {
+        '1': 5,
+        '2': 6,
+        '3': 4,
+        '4': 4,
+        '5': 5,
+        '6': 4,
+        '7': 5,
+        '8': 5,
+        '9': 5,
+        '10': 1,
+        Ex: 12,
+      };
+
+      const count = mapCountByChapter[chapterVal] ?? 6;
+      mapSelect.innerHTML = Array.from({ length: count }, (_, i) =>
+        `<option value="${i + 1}">${i + 1}</option>`).join('');
+    };
+
+    document.getElementById('btn-new-plan')?.addEventListener('click', () => {
+      const chapterSelect = document.getElementById('new-plan-chapter') as HTMLSelectElement | null;
+      if (chapterSelect) updateNewPlanMapOptions(chapterSelect.value);
+      this.planView.showNewPlanDialog();
+    });
     document.getElementById('btn-new-plan-confirm')?.addEventListener('click', () =>
       confirmNewPlanFlow(this.planView, this.host, this.planSetters));
     document.getElementById('btn-new-plan-cancel')?.addEventListener('click', () => this.planView.hideNewPlanDialog());
 
     document.getElementById('new-plan-chapter')?.addEventListener('change', (e) => {
-      const val = (e.target as HTMLSelectElement).value;
-      const mapSelect = document.getElementById('new-plan-map') as HTMLSelectElement;
-      const count = val === 'Ex' ? 12 : 6;
-      mapSelect.innerHTML = Array.from({ length: count }, (_, i) =>
-        `<option value="${i + 1}">${i + 1}</option>`).join('');
+      updateNewPlanMapOptions((e.target as HTMLSelectElement).value);
     });
 
     this.planView.onPlanFieldChange = (field, value) => {

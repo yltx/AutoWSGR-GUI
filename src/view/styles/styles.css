@@ -2539,12 +2539,32 @@ input[type=checkbox]:focus-visible {
   overflow: hidden;
 }
 
-.plan-right > h3 {
+.plan-right-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
   flex-shrink: 0;
-  margin: 0 0 6px;
+}
+
+.plan-right-header > h3 {
+  flex-shrink: 0;
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
   color: var(--text-secondary);
+}
+
+.plan-actions-top {
+  margin-left: auto;
+  padding-top: 0;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.plan-actions-top .btn {
+  white-space: nowrap;
 }
 
 /* ═══ 节点编辑面板 ═══ */

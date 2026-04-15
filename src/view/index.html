@@ -161,6 +161,7 @@
               <option value="7">第 7 章</option>
               <option value="8">第 8 章</option>
               <option value="9">第 9 章</option>
+              <option value="10">第 10 章</option>
               <option value="Ex">Ex 系列</option>
             </select>
           </div>
@@ -172,7 +173,6 @@
               <option value="3">3</option>
               <option value="4">4</option>
               <option value="5">5</option>
-              <option value="6">6</option>
             </select>
           </div>
           <div class="modal-actions">
@@ -447,17 +447,19 @@
             </div>
           </div>
 
-          <div class="plan-actions">
-            <button class="btn btn-primary btn-small" id="btn-execute-plan">加入队列</button>
-            <button class="btn btn-small" id="btn-add-to-group">加入任务组</button>
-            <button class="btn btn-small" id="btn-save-plan">保存 YAML</button>
-            <button class="btn btn-small" id="btn-export-plan">另存为</button>
-          </div>
         </div>
 
         <!-- 右列：节点路线地图 -->
         <div class="plan-right">
-          <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
+          <div class="plan-right-header">
+            <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
+            <div class="plan-actions plan-actions-top">
+              <button class="btn btn-primary btn-small" id="btn-execute-plan">加入队列</button>
+              <button class="btn btn-small" id="btn-add-to-group">加入任务组</button>
+              <button class="btn btn-small" id="btn-save-plan">保存 YAML</button>
+              <button class="btn btn-small" id="btn-export-plan">另存为</button>
+            </div>
+          </div>
           <div class="node-list" id="node-list"></div>
         </div>
       </div>

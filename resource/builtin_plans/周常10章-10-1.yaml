@@ -28,7 +28,7 @@ node_args:
     long_missile_support: true
   O:
     formation: 4
-    night: false
+    night: true
     proceed: true
     long_missile_support: true
 
