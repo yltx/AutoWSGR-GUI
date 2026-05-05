@@ -6,6 +6,7 @@
 chapter: 10
 map: 1
 selected_nodes: [B, D, F, G, H, L, M, O]
+endpoint_nodes: [O]
 fleet_id: 2
 fight_condition: 1
 repair_mode: 1

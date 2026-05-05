@@ -16,6 +16,7 @@ import { importPlanFlow, exportPlanFlow, savePlanFlow, confirmNewPlanFlow, type 
 import { importTaskPresetFlow, showPresetDetailFlow, closePresetDetailFlow, executePresetFlow, type PresetState } from './presetFlow';
 import { saveNodeEditorValues } from './nodeEditor';
 import { buildPlanPreviewVO } from './rendering';
+import { normalizeSelectedNodesForBackend } from './selectedNodes';
 
 export interface PlanHost {
   readonly scheduler: Scheduler;
@@ -81,7 +82,12 @@ export class PlanController {
     document.getElementById('btn-import-plan')?.addEventListener('click', () => this.importPlan());
     document.getElementById('btn-import-plan-2')?.addEventListener('click', () => this.importPlan());
     document.getElementById('btn-close-plan')?.addEventListener('click', () => this.closePlan());
-    document.getElementById('btn-execute-plan')?.addEventListener('click', () => this.executePlan());
+    document.getElementById('btn-execute-plan')?.addEventListener('click', () => {
+      this.executePlan().catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        Logger.error(`执行方案失败: ${msg}`);
+      });
+    });
 
     // 节点编辑
     this.planView.onNodeClick = (nodeId) => {
@@ -94,6 +100,7 @@ export class PlanController {
       const mapNight = this.currentMapData ? isNightNode(this.currentMapData, nodeId) : false;
       const isEnabled = this.currentPlan.data.selected_nodes.includes(nodeId);
       const canDetour = this.currentMapData ? isDetourNode(this.currentMapData, nodeId) : false;
+      const isEndpoint = (this.currentPlan.data.endpoint_nodes ?? []).includes(nodeId);
       this.planView.showNodeEditor(nodeId, nodeType as any, {
         enabled: isEnabled,
         formation: args.formation ?? 2,
@@ -102,6 +109,8 @@ export class PlanController {
         proceed: args.proceed ?? true,
         detour: args.detour ?? false,
         canDetour,
+        slWhenDetourFails: args.SL_when_detour_fails ?? false,
+        isEndpoint,
         enemyRules: rulesText,
       }, mapNight);
     };
@@ -240,6 +249,7 @@ export class PlanController {
     if (args.proceed != null) mapped.proceed = args.proceed;
     if (args.detour != null) mapped.detour = args.detour;
     if (args.proceed_stop != null) mapped.proceed_stop = args.proceed_stop;
+    if (args.SL_when_detour_fails != null) mapped.SL_when_detour_fails = args.SL_when_detour_fails;
     if (args.enemy_rules && args.enemy_rules.length > 0) {
       mapped.enemy_rules = args.enemy_rules.map(([cond, action]) => [String(cond), String(action)]);
     }
@@ -247,10 +257,11 @@ export class PlanController {
   }
 
   private buildInlinePlan(plan: PlanModel): CombatPlanReq {
+    const selectedNodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
     const inlinePlan: CombatPlanReq = {
       chapter: plan.data.chapter,
       map: plan.data.map,
-      selected_nodes: [...plan.data.selected_nodes],
+      selected_nodes: selectedNodes,
     };
 
     if (plan.data.fleet_id != null) inlinePlan.fleet_id = plan.data.fleet_id;
@@ -276,7 +287,30 @@ export class PlanController {
     return inlinePlan;
   }
 
-  private executePlan(): void {
+  private buildInlinePlanFilePath(plan: PlanModel): string {
+    const safeMap = plan.mapName.replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const ts = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+    const fileName = `_ui_inline_${safeMap}_${ts}.yaml`;
+    return this.host.plansDir ? `${this.host.plansDir}\\${fileName}` : fileName;
+  }
+
+  private async ensurePlanFileForExecution(plan: PlanModel): Promise<string | null> {
+    const bridge = window.electronBridge;
+    if (!bridge) return null;
+
+    let planPath = plan.fileName?.trim();
+    if (!planPath) {
+      planPath = this.buildInlinePlanFilePath(plan);
+      plan.fileName = planPath;
+      Logger.warn(`当前方案尚未保存，已自动保存为临时文件: ${planPath}`);
+      this.renderPlanPreview();
+    }
+
+    await bridge.saveFile(planPath, plan.toYaml());
+    return bridge.resolveAppPath(planPath);
+  }
+
+  private async executePlan(): Promise<void> {
     if (!this.currentPlan) return;
     const plan = this.currentPlan;
     const times = plan.data.times ?? 1;
@@ -287,17 +321,18 @@ export class PlanController {
     let effectiveFleetId = configuredFleetId;
 
     const req: NormalFightReq = { type: 'normal_fight', times: 1, gap: plan.data.gap ?? 0 };
+    const ensuredPlanPath = await this.ensurePlanFileForExecution(plan);
 
-    if (plan.fileName?.trim()) {
-      req.plan_id = plan.fileName;
+    if (ensuredPlanPath) {
+      req.plan_id = ensuredPlanPath;
     } else {
       req.plan = this.buildInlinePlan(plan);
-      Logger.warn('当前方案尚未保存 YAML，将以内存方案直接执行');
+      Logger.warn('无法保存方案文件，回退为内存方案执行（部分高级规则可能不生效）');
     }
 
     if (plan.data.selected_nodes.length > 0) {
       req.plan = req.plan ?? {};
-      req.plan.selected_nodes = [...plan.data.selected_nodes];
+      req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
       // 后端 schema 会为 plan.fleet_id 注入默认值 1；
       // 这里显式传入当前舰队，避免 selected_nodes 覆盖请求意外把舰队重置为 1。
       req.plan.fleet_id = effectiveFleetId;
@@ -326,6 +361,7 @@ export class PlanController {
     this.host.scheduler.addTask(
       plan.mapName, 'normal_fight', req, TaskPriority.USER_TASK, times,
       stopCondition, bathRepairConfig, fleetId, fleetPresets, currentPresetIndex,
+      undefined, undefined, plan.data.endpoint_nodes,
     );
     const planRef = req.plan_id ?? '(inline-unsaved)';
     Logger.debug(`executePlan: map=${plan.mapName} plan_id=${planRef} times=${times} gap=${req.gap}${firstPreset ? ' fleet=' + firstPreset.ships.map(s => shipSlotLabel(s)).join(',') : ''}${fleetPresets ? ' rotation=' + fleetPresets.length + '套' : ''}`);

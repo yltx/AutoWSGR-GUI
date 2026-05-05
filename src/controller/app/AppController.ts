@@ -306,6 +306,13 @@ export class AppController {
       if (result) this.configView.setPythonPath(result.path);
     });
 
+    document.getElementById('btn-browse-backend-repo')?.addEventListener('click', async () => {
+      const bridge = window.electronBridge;
+      if (!bridge) return;
+      const dir = await bridge.openDirectoryDialog('选择本地后端仓库目录');
+      if (dir) this.configView.setBackendRepoPath(dir);
+    });
+
     document.getElementById('btn-validate-python')?.addEventListener('click', async () => {
       const bridge = window.electronBridge;
       if (!bridge?.validatePython) return;

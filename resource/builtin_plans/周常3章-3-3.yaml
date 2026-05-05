@@ -4,6 +4,7 @@
 
 chapter: 3
 map: 3
+endpoint_nodes: [K]
 fleet_id: 1
 fight_condition: 1
 repair_mode: 1

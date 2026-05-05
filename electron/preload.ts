@@ -12,8 +12,40 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.sendSync('get-backend-port-sync') as number;
   },
 
+  getBackendStartupMode: () => {
+    return ipcRenderer.sendSync('get-backend-startup-mode-sync') as 'managed' | 'external';
+  },
+
+  getBackendRepoPath: () => {
+    return ipcRenderer.sendSync('get-backend-repo-path-sync') as string;
+  },
+
+  getOcrGpuMode: () => {
+    return ipcRenderer.sendSync('get-ocr-gpu-mode-sync') as 'auto' | 'cpu' | 'cuda';
+  },
+
+  getSaveBackendScreenshots: () => {
+    return ipcRenderer.sendSync('get-save-backend-screenshots-sync') as boolean;
+  },
+
   setBackendPort: (port: number) => {
     return ipcRenderer.invoke('set-backend-port', port);
+  },
+
+  setBackendStartupMode: (mode: 'managed' | 'external') => {
+    return ipcRenderer.invoke('set-backend-startup-mode', mode);
+  },
+
+  setBackendRepoPath: (repoPath: string | null) => {
+    return ipcRenderer.invoke('set-backend-repo-path', repoPath);
+  },
+
+  setOcrGpuMode: (mode: 'auto' | 'cpu' | 'cuda') => {
+    return ipcRenderer.invoke('set-ocr-gpu-mode', mode);
+  },
+
+  setSaveBackendScreenshots: (enabled: boolean) => {
+    return ipcRenderer.invoke('set-save-backend-screenshots', enabled);
   },
 
   getUpdateMode: () => {
@@ -58,6 +90,10 @@ contextBridge.exposeInMainWorld('electronBridge', {
 
   getAppRoot: () => {
     return ipcRenderer.invoke('get-app-root');
+  },
+
+  resolveAppPath: (filePath: string) => {
+    return ipcRenderer.invoke('resolve-app-path', filePath);
   },
 
   getPlansDir: () => {

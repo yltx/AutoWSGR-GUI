@@ -133,7 +133,7 @@ export class PlanPreviewView {
 
   /* ── 节点编辑（委托 + 跨视图协调） ── */
 
-  showNodeEditor(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; enemyRules: string }, mapNight = false): void {
+  showNodeEditor(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; slWhenDetourFails: boolean; isEndpoint: boolean; enemyRules: string }, mapNight = false): void {
     this.nodeEditor.show(nodeId, nodeType, args, mapNight);
     this.fleetPresetView.hideSection();
     this.taskConfigEl.style.display = 'none';
@@ -152,7 +152,7 @@ export class PlanPreviewView {
     this.mapView.clearSelection();
   }
 
-  collectNodeEditorValues(): { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; rulesText: string } {
+  collectNodeEditorValues(): { enabled: boolean; isEndpoint: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; slWhenDetourFails: boolean; rulesText: string } {
     return this.nodeEditor.collectValues();
   }
 

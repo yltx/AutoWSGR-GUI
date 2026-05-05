@@ -24,11 +24,22 @@ export class ConfigView {
   private autoLoot: HTMLInputElement;
   private lootPlan: HTMLSelectElement;
   private lootStopCount: HTMLInputElement;
+  private autoExpeditionBody: HTMLElement | null;
+  private autoBattleBody: HTMLElement | null;
+  private autoExerciseBody: HTMLElement | null;
+  private autoDecisiveBody: HTMLElement | null;
+  private autoLootBody: HTMLElement | null;
   private themeMode: HTMLSelectElement;
   private accentColor: HTMLInputElement;
   private accentLabel: HTMLElement;
   private debugMode: HTMLInputElement;
   private backendPort: HTMLInputElement;
+  private backendStartupMode: HTMLInputElement;
+  private backendRepoPath: HTMLInputElement;
+  private ocrGpuMode: HTMLSelectElement;
+  private saveBackendScreenshots: HTMLInputElement;
+  private debugAdvancedWrap: HTMLElement | null;
+  private backendRepoWrap: HTMLElement | null;
   private pythonPath: HTMLInputElement;
   private pythonStatus: HTMLElement | null;
   private adbStatus: HTMLElement | null;
@@ -54,11 +65,22 @@ export class ConfigView {
     this.autoLoot = document.getElementById('cfg-auto-loot') as HTMLInputElement;
     this.lootPlan = document.getElementById('cfg-loot-plan') as HTMLSelectElement;
     this.lootStopCount = document.getElementById('cfg-loot-stop-count') as HTMLInputElement;
+    this.autoExpeditionBody = document.getElementById('cfg-auto-expedition-body');
+    this.autoBattleBody = document.getElementById('cfg-auto-battle-body');
+    this.autoExerciseBody = document.getElementById('cfg-auto-exercise-body');
+    this.autoDecisiveBody = document.getElementById('cfg-auto-decisive-body');
+    this.autoLootBody = document.getElementById('cfg-auto-loot-body');
     this.themeMode = document.getElementById('cfg-theme-mode') as HTMLSelectElement;
     this.accentColor = document.getElementById('cfg-accent-color') as HTMLInputElement;
     this.accentLabel = document.getElementById('cfg-accent-label')!;
     this.debugMode = document.getElementById('cfg-debug-mode') as HTMLInputElement;
     this.backendPort = document.getElementById('cfg-backend-port') as HTMLInputElement;
+    this.backendStartupMode = document.getElementById('cfg-use-external-backend') as HTMLInputElement;
+    this.backendRepoPath = document.getElementById('cfg-backend-repo-path') as HTMLInputElement;
+    this.ocrGpuMode = document.getElementById('cfg-ocr-gpu-mode') as HTMLSelectElement;
+    this.saveBackendScreenshots = document.getElementById('cfg-save-backend-screenshots') as HTMLInputElement;
+    this.debugAdvancedWrap = document.getElementById('cfg-debug-advanced');
+    this.backendRepoWrap = document.getElementById('cfg-backend-repo-wrap');
     this.pythonPath = document.getElementById('cfg-python-path') as HTMLInputElement;
     this.pythonStatus = document.getElementById('cfg-python-status');
     this.adbStatus = document.getElementById('cfg-adb-status');
@@ -68,6 +90,25 @@ export class ConfigView {
     this.accentColor.addEventListener('input', () => {
       this.accentLabel.textContent = this.accentColor.value;
     });
+
+    this.debugMode.addEventListener('change', () => {
+      this.updateDebugAdvancedVisibility();
+      this.updateBackendRepoVisibility();
+    });
+
+    this.backendStartupMode.addEventListener('change', () => {
+      this.updateBackendRepoVisibility();
+    });
+
+    this.autoExpedition.addEventListener('change', () => this.updateAutoOptionVisibility());
+    this.autoBattle.addEventListener('change', () => this.updateAutoOptionVisibility());
+    this.autoExercise.addEventListener('change', () => this.updateAutoOptionVisibility());
+    this.autoDecisive.addEventListener('change', () => this.updateAutoOptionVisibility());
+    this.autoLoot.addEventListener('change', () => this.updateAutoOptionVisibility());
+
+    this.updateDebugAdvancedVisibility();
+    this.updateBackendRepoVisibility();
+    this.updateAutoOptionVisibility();
   }
 
   /** 用 ViewObject 填充表单 */
@@ -97,7 +138,49 @@ export class ConfigView {
     this.accentLabel.textContent = vo.accentColor;
     this.debugMode.checked = vo.debugMode;
     this.backendPort.value = String(vo.backendPort);
+    this.backendStartupMode.checked = vo.backendStartupMode === 'external';
+    this.backendRepoPath.value = vo.backendRepoPath;
+    this.ocrGpuMode.value = vo.ocrGpuMode;
+    this.saveBackendScreenshots.checked = vo.saveBackendScreenshots;
     this.pythonPath.value = vo.pythonPath;
+
+    this.updateDebugAdvancedVisibility();
+    this.updateBackendRepoVisibility();
+    this.updateAutoOptionVisibility();
+  }
+
+  private updateDebugAdvancedVisibility(): void {
+    if (!this.debugAdvancedWrap) return;
+    const show = this.debugMode.checked;
+    this.debugAdvancedWrap.style.display = show ? '' : 'none';
+    if (!show && this.backendRepoWrap) {
+      this.backendRepoWrap.style.display = 'none';
+    }
+  }
+
+  private updateBackendRepoVisibility(): void {
+    if (!this.backendRepoWrap) return;
+    const show = this.debugMode.checked && this.backendStartupMode.checked;
+    this.backendRepoWrap.style.display = show ? '' : 'none';
+    this.backendRepoPath.required = show;
+  }
+
+  private updateAutoOptionVisibility(): void {
+    if (this.autoExpeditionBody) {
+      this.autoExpeditionBody.style.display = this.autoExpedition.checked ? '' : 'none';
+    }
+    if (this.autoBattleBody) {
+      this.autoBattleBody.style.display = this.autoBattle.checked ? '' : 'none';
+    }
+    if (this.autoExerciseBody) {
+      this.autoExerciseBody.style.display = this.autoExercise.checked ? '' : 'none';
+    }
+    if (this.autoDecisiveBody) {
+      this.autoDecisiveBody.style.display = this.autoDecisive.checked ? '' : 'none';
+    }
+    if (this.autoLootBody) {
+      this.autoLootBody.style.display = this.autoLoot.checked ? '' : 'none';
+    }
   }
 
   /** 从表单收集当前值 (Controller 调用) */
@@ -126,6 +209,10 @@ export class ConfigView {
       accentColor: this.accentColor.value,
       debugMode: this.debugMode.checked,
       backendPort: Math.max(1, Math.min(65535, Number(this.backendPort.value) || 8438)),
+      backendStartupMode: this.backendStartupMode.checked ? 'external' : 'managed',
+      backendRepoPath: this.backendRepoPath.value.trim(),
+      ocrGpuMode: (['auto', 'cpu', 'cuda'].includes(this.ocrGpuMode.value) ? this.ocrGpuMode.value : 'auto') as 'auto' | 'cpu' | 'cuda',
+      saveBackendScreenshots: this.saveBackendScreenshots.checked,
       pythonPath: this.pythonPath.value.trim(),
     };
   }
@@ -138,6 +225,10 @@ export class ConfigView {
 
   setPythonPath(path: string): void {
     this.pythonPath.value = path;
+  }
+
+  setBackendRepoPath(path: string): void {
+    this.backendRepoPath.value = path;
   }
 
   getPythonPath(): string {

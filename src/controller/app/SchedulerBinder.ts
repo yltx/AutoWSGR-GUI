@@ -8,6 +8,7 @@ import type { TemplateModel } from '../../model/TemplateModel';
 import { PlanModel } from '../../model/PlanModel';
 import type { NormalFightReq } from '../../types/api';
 import { Logger } from '../../utils/Logger';
+import { normalizeSelectedNodesForBackend } from '../plan/selectedNodes';
 
 export interface SchedulerBinderHost {
   readonly scheduler: Scheduler;
@@ -325,15 +326,16 @@ export class SchedulerBinder {
     try {
       const content = await bridge.readFile(planPath);
       const plan = PlanModel.fromYaml(content, planPath);
+      const resolvedPlanId = await bridge.resolveAppPath(plan.fileName);
       const req: NormalFightReq = {
         type: 'normal_fight',
-        plan_id: plan.fileName,
+        plan_id: resolvedPlanId,
         times: 1,
         gap: plan.data.gap ?? 0,
       };
       if (plan.data.selected_nodes.length > 0) {
         req.plan = req.plan ?? {};
-        req.plan.selected_nodes = [...plan.data.selected_nodes];
+        req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
         // 与普通出击一致：避免后端把 plan.fleet_id 默认成 1 覆盖 YAML 内舰队。
         if (plan.data.fleet_id != null) {
           req.plan.fleet_id = plan.data.fleet_id;

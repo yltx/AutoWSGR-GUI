@@ -9,6 +9,7 @@ export interface ElectronBridge {
   detectEmulator: () => Promise<{ type: string; path: string; serial: string; adbPath: string } | null>;
   checkAdbDevices: () => Promise<{ serial: string; status: string }[]>;
   getAppRoot: () => Promise<string>;
+  resolveAppPath: (filePath: string) => Promise<string>;
   getPlansDir: () => Promise<string>;
   getConfigDir: () => Promise<string>;
   listPlanFiles: () => Promise<{ name: string; file: string }[]>;
@@ -46,6 +47,14 @@ export interface ElectronBridge {
   getAppVersion: () => string;
   getBackendPort: () => number;
   setBackendPort: (port: number) => Promise<void>;
+  getBackendStartupMode: () => 'managed' | 'external';
+  setBackendStartupMode: (mode: 'managed' | 'external') => Promise<void>;
+  getBackendRepoPath: () => string;
+  setBackendRepoPath: (repoPath: string | null) => Promise<void>;
+  getOcrGpuMode: () => 'auto' | 'cpu' | 'cuda';
+  setOcrGpuMode: (mode: 'auto' | 'cpu' | 'cuda') => Promise<void>;
+  getSaveBackendScreenshots: () => boolean;
+  setSaveBackendScreenshots: (enabled: boolean) => Promise<void>;
   getUpdateMode: () => 'auto' | 'manual';
   setUpdateMode: (mode: 'auto' | 'manual') => Promise<void>;
   getPythonPath: () => string | null;

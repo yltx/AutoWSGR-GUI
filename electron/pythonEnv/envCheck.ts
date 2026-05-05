@@ -93,6 +93,59 @@ function shouldAutoUpdate(): boolean {
   return ctx.getUpdateMode() !== 'manual';
 }
 
+type CoreDepProbeResult = {
+  uvicorn: boolean;
+  fastapi: boolean;
+  scipy: boolean;
+  autowsgr: string | null;
+};
+
+/**
+ * 检查核心依赖可导入性。
+ * 这里额外检查 scipy._lib，避免仅校验入口包导致“检查通过但运行时报错”。
+ */
+async function probeCoreDependencies(pythonCmd: string): Promise<CoreDepProbeResult | null> {
+  const ctx = getCtx();
+  const spFwd = localSitePackages().replace(/\\/g, '/');
+  const checkScript = path.join(ctx.getTempDir(), 'autowsgr_depcheck.py');
+  fs.writeFileSync(checkScript, [
+    'import json, sys, site',
+    `sp = '${spFwd}'`,
+    'sys.path.insert(0, sp)',
+    'site.addsitedir(sp)',
+    'r = {}',
+    "checks = [('uvicorn', 'uvicorn'), ('fastapi', 'fastapi'), ('scipy', 'scipy._lib')]",
+    'for key, mod in checks:',
+    '    try:',
+    '        __import__(mod); r[key] = True',
+    '    except Exception:',
+    '        r[key] = False',
+    'try:',
+    '    import autowsgr; r["autowsgr"] = autowsgr.__version__',
+    'except Exception:',
+    '    r["autowsgr"] = None',
+    'print(json.dumps(r))',
+  ].join('\n'), 'utf-8');
+
+  try {
+    const { stdout: depOut } = await execAsync(
+      `"${pythonCmd}" "${checkScript}"`,
+      { windowsHide: true, timeout: 30000 },
+    );
+    const depResult = JSON.parse(depOut.trim());
+    return {
+      uvicorn: Boolean(depResult.uvicorn),
+      fastapi: Boolean(depResult.fastapi),
+      scipy: Boolean(depResult.scipy),
+      autowsgr: depResult.autowsgr == null ? null : String(depResult.autowsgr),
+    };
+  } catch {
+    return null;
+  } finally {
+    try { fs.unlinkSync(checkScript); } catch { /* ignore */ }
+  }
+}
+
 // ════════════════════════════════════════
 // 环境检查主流程
 // ════════════════════════════════════════
@@ -110,24 +163,42 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
     const certFile = await ensureSslCertForPython(marker.pythonCmd);
     if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
     else ctx.sendProgress('WARNING 未检测到 TLS 根证书，后续联网操作可能失败');
-    // 每次启动检查并自动更新 autowsgr（可由更新模式关闭）
-    let finalVer = marker.autowsgrVersion;
-    if (shouldAutoUpdate()) {
-      const updatedVer = await autoUpdateAutowsgr(marker.pythonCmd, buildAutoUpdateDeps());
-      finalVer = updatedVer ?? marker.autowsgrVersion;
-      if (updatedVer && updatedVer !== marker.autowsgrVersion) {
-        writeEnvMarker(marker.pythonCmd, marker.pythonVersion, finalVer);
-      }
+
+    const markerProbe = await probeCoreDependencies(marker.pythonCmd);
+    const markerBrokenDeps: string[] = [];
+    if (!markerProbe) {
+      markerBrokenDeps.push('dep-check');
     } else {
-      ctx.sendProgress('手动更新模式：跳过 autowsgr 自动更新检查');
+      if (!markerProbe.uvicorn) markerBrokenDeps.push('uvicorn');
+      if (!markerProbe.fastapi) markerBrokenDeps.push('fastapi');
+      if (!markerProbe.scipy) markerBrokenDeps.push('scipy');
+      if (markerProbe.autowsgr == null) markerBrokenDeps.push('autowsgr');
     }
-    ctx.sendProgress(`环境就绪 (${marker.pythonVersion}, autowsgr ${finalVer}) ✓`);
-    return {
-      pythonCmd: marker.pythonCmd,
-      pythonVersion: marker.pythonVersion,
-      missingPackages: [],
-      allReady: true,
-    };
+
+    if (markerBrokenDeps.length === 0) {
+      // 每次启动检查并自动更新 autowsgr（可由更新模式关闭）
+      const markerAutowsgrVersion = markerProbe?.autowsgr ?? marker.autowsgrVersion;
+      let finalVer = markerAutowsgrVersion;
+      if (shouldAutoUpdate()) {
+        const updatedVer = await autoUpdateAutowsgr(marker.pythonCmd, buildAutoUpdateDeps());
+        finalVer = updatedVer ?? markerAutowsgrVersion;
+        if (updatedVer && updatedVer !== markerAutowsgrVersion) {
+          writeEnvMarker(marker.pythonCmd, marker.pythonVersion, finalVer);
+        }
+      } else {
+        ctx.sendProgress('手动更新模式：跳过 autowsgr 自动更新检查');
+      }
+      ctx.sendProgress(`环境就绪 (${marker.pythonVersion}, autowsgr ${finalVer}) ✓`);
+      return {
+        pythonCmd: marker.pythonCmd,
+        pythonVersion: marker.pythonVersion,
+        missingPackages: [],
+        allReady: true,
+      };
+    }
+
+    ctx.sendProgress(`检测到依赖异常 (${markerBrokenDeps.join(', ')})，重新执行完整检查…`);
+    try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* ignore */ }
   }
 
   // ── 完整检查路径 ──
@@ -153,37 +224,14 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
   ctx.sendProgress('正在检查依赖包…');
   const missingPackages: string[] = [];
 
-  // 批量检查所有依赖（单次 Python 调用，避免多次子进程启动开销）
-  const spFwd = localSitePackages().replace(/\\/g, '/');
-  const checkScript = path.join(ctx.getTempDir(), 'autowsgr_depcheck.py');
-  fs.writeFileSync(checkScript, [
-    'import json, sys, site',
-    `sp = '${spFwd}'`,
-    'sys.path.insert(0, sp)',
-    'site.addsitedir(sp)',   // 处理 .pth 文件，与后端启动保持一致
-    'r = {}',
-    "for p in ['uvicorn', 'fastapi']:",
-    '    try:',
-    '        __import__(p); r[p] = True',
-    '    except Exception:',
-    '        r[p] = False',
-    'try:',
-    '    import autowsgr; r["autowsgr"] = autowsgr.__version__',
-    'except Exception:',
-    '    r["autowsgr"] = None',
-    'print(json.dumps(r))',
-  ].join('\n'), 'utf-8');
-
   let autowsgrVersion = '';
   try {
-    const { stdout: depOut } = await execAsync(
-      `"${pythonCmd}" "${checkScript}"`,
-      { windowsHide: true, timeout: 30000 },
-    );
-    try { fs.unlinkSync(checkScript); } catch { /* ignore */ }
-    const depResult = JSON.parse(depOut.trim());
+    const depResult = await probeCoreDependencies(pythonCmd);
+    if (!depResult) {
+      throw new Error('依赖探测失败');
+    }
 
-    for (const pkg of ['uvicorn', 'fastapi']) {
+    for (const pkg of ['uvicorn', 'fastapi', 'scipy'] as const) {
       if (depResult[pkg]) {
         ctx.sendProgress(`  ${pkg} \u2713`);
       } else {
@@ -201,8 +249,7 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
       ctx.sendProgress(`  autowsgr \u2717`);
     }
   } catch {
-    try { fs.unlinkSync(checkScript); } catch { /* ignore */ }
-    missingPackages.push('uvicorn', 'fastapi', 'autowsgr');
+    missingPackages.push('uvicorn', 'fastapi', 'scipy', 'autowsgr');
     ctx.sendProgress('  依赖检查失败');
   }
 

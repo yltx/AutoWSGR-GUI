@@ -12,6 +12,10 @@ selected_nodes:
   - O
   - E
   - K
+endpoint_nodes:
+  - E
+  - K
+  - O
 fleet_id: 2
 fight_condition: 1
 repair_mode: 2

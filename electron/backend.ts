@@ -35,18 +35,36 @@ export function getBackendProcess(): ChildProcess | null {
   return backendProcess;
 }
 
-function readBackendRepoOverrideFromSettings(): string | null {
+type OcrGpuMode = 'auto' | 'cpu' | 'cuda';
+
+function readGuiSettings(): Record<string, unknown> {
   try {
     const settingsPath = path.join(ctx.appRoot(), 'gui_settings.json');
-    if (!fs.existsSync(settingsPath)) return null;
-    const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
-    const value = raw.backend_repo_path;
-    if (typeof value !== 'string') return null;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
+    if (!fs.existsSync(settingsPath)) return {};
+    return JSON.parse(fs.readFileSync(settingsPath, 'utf-8')) as Record<string, unknown>;
   } catch {
-    return null;
+    return {};
   }
+}
+
+function readBackendRepoOverrideFromSettings(): string | null {
+  const raw = readGuiSettings();
+  const value = raw.backend_repo_path;
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function readOcrGpuModeFromSettings(): OcrGpuMode {
+  const raw = readGuiSettings();
+  const value = raw.ocr_gpu_mode;
+  if (value === 'cpu' || value === 'cuda') return value;
+  return 'auto';
+}
+
+function readSaveBackendScreenshotsFromSettings(): boolean {
+  const raw = readGuiSettings();
+  return raw.save_backend_screenshots === true;
 }
 
 function resolveLocalBackendRepoPath(): string | null {
@@ -133,6 +151,8 @@ export async function startBackend(): Promise<void> {
   const cwd = ctx.appRoot();
   const localSite = localSitePackages();
   const localBackendRepo = resolveLocalBackendRepoPath();
+  const ocrGpuMode = readOcrGpuModeFromSettings();
+  const saveBackendScreenshots = readSaveBackendScreenshotsFromSettings();
 
   const pyLiteral = (value: string): string => value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
@@ -146,14 +166,76 @@ export async function startBackend(): Promise<void> {
     `sys.path.insert(0, sp)`,
     `site.addsitedir(sp)`,  // 处理 .pth 文件，激活 _distutils_hack
     ...(localBackendRepo ? [`repo = r'${pyLiteral(localBackendRepo)}'`, `sys.path.insert(0, repo)`] : []),
+    `GUI_OCR_GPU_MODE = '${ocrGpuMode}'`,
+    `GUI_SAVE_IMAGES = ${saveBackendScreenshots ? 'True' : 'False'}`,
     `import autowsgr`,
     `print('[Bootstrap] autowsgr=' + getattr(autowsgr, '__file__', 'unknown'))`,
     `print('[Bootstrap] repo_override=' + (r'${pyLiteral(localBackendRepo ?? '')}' or '<none>'))`,
+    `print('[Bootstrap] ocr_gpu_mode=' + GUI_OCR_GPU_MODE)`,
+    `print('[Bootstrap] save_backend_screenshots=' + ('true' if GUI_SAVE_IMAGES else 'false'))`,
+    `from pathlib import Path`,
+    `import autowsgr.infra.logger as _aw_logger`,
+    `from autowsgr.scheduler import launcher as _aw_launcher`,
+    `import autowsgr.vision.ocr as _aw_ocr`,
+    `_orig_load_config = _aw_launcher.Launcher.load_config`,
+    `_orig_save_image = _aw_logger.save_image`,
+    `_orig_create = _aw_ocr.OCREngine.create.__func__`,
+    `_cuda_cache = None`,
+    `def _detect_cuda():`,
+    `    global _cuda_cache`,
+    `    if _cuda_cache is not None:`,
+    `        return _cuda_cache`,
+    `    try:`,
+    `        import torch`,
+    `        _cuda_cache = bool(torch.cuda.is_available())`,
+    `    except Exception:`,
+    `        _cuda_cache = False`,
+    `    return _cuda_cache`,
+    `def _resolve_gpu_mode():`,
+    `    if GUI_OCR_GPU_MODE == 'cuda':`,
+    `        return True`,
+    `    if GUI_OCR_GPU_MODE == 'cpu':`,
+    `        return False`,
+    `    return _detect_cuda()`,
+    `if GUI_OCR_GPU_MODE == 'cpu':`,
+    `    print('[Bootstrap] cuda_available=skipped(cpu mode)')`,
+    `else:`,
+    `    print('[Bootstrap] cuda_available=' + ('true' if _detect_cuda() else 'false'))`,
+    `def _patched_create(cls, engine='easyocr', gpu=False):`,
+    `    use_gpu = gpu`,
+    `    if str(engine).lower() == 'easyocr':`,
+    `        use_gpu = _resolve_gpu_mode()`,
+    `    return _orig_create(cls, engine=engine, gpu=use_gpu)`,
+    `_aw_ocr.OCREngine.create = classmethod(_patched_create)`,
+    `def _patched_load_config(self):`,
+    `    cfg = _orig_load_config(self)`,
+    `    if GUI_SAVE_IMAGES:`,
+    `        try:`,
+    `            log_dir = getattr(cfg.log, 'dir', None)`,
+    `            if log_dir is not None:`,
+    `                img_dir = Path(log_dir) / 'images'`,
+    `                img_dir.mkdir(parents=True, exist_ok=True)`,
+    `                _aw_logger._image_dir = img_dir`,
+    `                _aw_logger.logger.info('[GUI] 截图保存目录: {}', img_dir)`,
+    `        except Exception as _e:`,
+    `            _aw_logger.logger.warning('[GUI] 截图目录初始化失败: {}', _e)`,
+    `    else:`,
+    `        _aw_logger._image_dir = None`,
+    `    return cfg`,
+    `_aw_launcher.Launcher.load_config = _patched_load_config`,
+    `def _patched_save_image(image, tag='screenshot', img_dir=None):`,
+    `    if not GUI_SAVE_IMAGES:`,
+    `        return None`,
+    `    target_dir = img_dir or getattr(_aw_logger, '_image_dir', None)`,
+    `    if target_dir is None:`,
+    `        return None`,
+    `    return _orig_save_image(image, tag=tag, img_dir=target_dir)`,
+    `_aw_logger.save_image = _patched_save_image`,
     `import uvicorn`,
     `uvicorn.run('autowsgr.server.main:app', host='127.0.0.1', port=${ctx.BACKEND_PORT})`,
   ];
 
-  const bootstrap = bootstrapParts.join('; ');
+  const bootstrap = bootstrapParts.join('\n');
   const mainWindow = ctx.getMainWindow();
   if (localBackendRepo) {
     console.log(`[Backend] 使用本地后端仓库: ${localBackendRepo}`);
@@ -161,6 +243,8 @@ export async function startBackend(): Promise<void> {
   } else {
     mainWindow?.webContents.send('backend-log', '[GUI] 未启用本地后端仓库覆盖，使用 site-packages 中的 autowsgr');
   }
+  mainWindow?.webContents.send('backend-log', `[GUI] OCR 加速模式: ${ocrGpuMode}`);
+  mainWindow?.webContents.send('backend-log', `[GUI] 保存识别异常截图: ${saveBackendScreenshots ? '开启' : '关闭'}`);
 
   // 将内置 ADB 目录加入 PATH，使后端 shutil.which('adb') 能找到
   const adbDir = path.join(ctx.appRoot(), 'adb');

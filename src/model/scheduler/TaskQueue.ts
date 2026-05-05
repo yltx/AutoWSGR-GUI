@@ -4,6 +4,7 @@
  */
 import type { TaskRequest } from '../../types/api';
 import type { StopCondition, BathRepairConfig, FleetPreset } from '../../types/model';
+import type { BathingShip } from './RepairManager';
 import { TaskPriority, type SchedulerTaskType, type SchedulerTask } from '../../types/scheduler';
 import { resolveFleetPreset, resolveFleetPresetRules, toBackendName } from '../../data/shipData';
 
@@ -94,6 +95,7 @@ export class TaskQueue {
     currentPresetIndex?: number,
     forceRetry?: boolean,
     allowPolling?: boolean,
+    endpointNodes?: string[],
   ): string {
     const id = generateTaskId();
     const task: SchedulerTask = {
@@ -113,6 +115,7 @@ export class TaskQueue {
       fleetId,
       fleetPresets,
       currentPresetIndex: currentPresetIndex ?? -1,
+      endpointNodes,
     };
     this.insertByPriority(task);
     return id;
@@ -158,18 +161,36 @@ export class TaskQueue {
   }
 
   /**
-   * 30 秒后重新尝试延迟任务。
+   * 动态延迟后重新尝试延迟任务。
    * @param onRetry 延迟到期后的回调，调用方负责将延迟任务重新入队并消费。
    * @param emitLog 日志回调
+   * @param bathingShips 泡澡中舰船列表（用于计算动态等待时间）
    */
-  scheduleDeferredRetry(onRetry: () => void, emitLog: (level: string, msg: string) => void): void {
+  scheduleDeferredRetry(
+    onRetry: () => void,
+    emitLog: (level: string, msg: string) => void,
+    bathingShips?: ReadonlyMap<string, BathingShip>,
+  ): void {
     if (this.deferredRetryTimer) return;
-    emitLog('info', '所有任务因修理被阻塞，30 秒后重试...');
-    this.deferredRetryTimer = setTimeout(() => {
-      this.deferredRetryTimer = null;
-      this.retryDeferredTasks(emitLog);
-      onRetry();
-    }, 30_000);
+
+    const waitMs = this.calculateDynamicWait(bathingShips);
+
+    if (waitMs <= 0) {
+      emitLog('info', '维修时间未知，30 秒后重试...');
+      this.deferredRetryTimer = setTimeout(() => {
+        this.deferredRetryTimer = null;
+        this.retryDeferredTasks(emitLog);
+        onRetry();
+      }, 30_000);
+    } else {
+      const waitSeconds = Math.ceil(waitMs / 1000);
+      emitLog('info', `预计 ${waitSeconds} 秒后维修完成，等待中...`);
+      this.deferredRetryTimer = setTimeout(() => {
+        this.deferredRetryTimer = null;
+        this.retryDeferredTasks(emitLog);
+        onRetry();
+      }, waitMs);
+    }
   }
 
   /** 重新尝试延迟的任务：将全部延迟项按优先级插回主队列 */
@@ -188,6 +209,36 @@ export class TaskQueue {
       clearTimeout(this.deferredRetryTimer);
       this.deferredRetryTimer = null;
     }
+  }
+
+  /**
+   * 根据泡澡中舰船的 repairEndTime 计算动态等待时间。
+   * @returns 等待毫秒数，或 -1（全部不可信，应使用默认 30 秒）
+   */
+  private calculateDynamicWait(bathingShips?: ReadonlyMap<string, BathingShip>): number {
+    if (!bathingShips || bathingShips.size === 0) {
+      return -1;
+    }
+
+    let minEndTime = Infinity;
+    let hasValidTime = false;
+
+    for (const ship of bathingShips.values()) {
+      if (ship.repairEndTime && ship.repairEndTime > 0) {
+        minEndTime = Math.min(minEndTime, ship.repairEndTime);
+        hasValidTime = true;
+      }
+    }
+
+    if (!hasValidTime) return -1;
+
+    const now = Date.now();
+    if (minEndTime <= now) {
+      return 5_000;
+    }
+
+    const rawWait = minEndTime - now + 5_000;
+    return Math.min(rawWait, 30_000);
   }
 
   // ── 编队预设切换 ──

@@ -140,6 +140,10 @@ export interface ConfigViewObject {
   accentColor: string;
   debugMode: boolean;
   backendPort: number;
+  backendStartupMode: 'managed' | 'external';
+  backendRepoPath: string;
+  ocrGpuMode: 'auto' | 'cpu' | 'cuda';
+  saveBackendScreenshots: boolean;
   pythonPath: string;
 }
 

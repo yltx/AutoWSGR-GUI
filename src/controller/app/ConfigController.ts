@@ -12,6 +12,7 @@ import type { StartupController } from '../startup/StartupController';
 import type { ConfigViewObject } from '../../types/view';
 import { Logger } from '../../utils/Logger';
 import { getThemeMode, getAccentColor, applyTheme } from './theme';
+import { showAlert } from '../shared/DialogHelper';
 
 export interface ConfigControllerHost {
   readonly configModel: ConfigModel;
@@ -72,6 +73,10 @@ export class ConfigController {
       accentColor: getAccentColor(),
       debugMode: localStorage.getItem('debugMode') === 'true',
       backendPort: window.electronBridge?.getBackendPort?.() ?? 8438,
+      backendStartupMode: window.electronBridge?.getBackendStartupMode?.() ?? 'managed',
+      backendRepoPath: window.electronBridge?.getBackendRepoPath?.() ?? '',
+      ocrGpuMode: window.electronBridge?.getOcrGpuMode?.() ?? 'auto',
+      saveBackendScreenshots: window.electronBridge?.getSaveBackendScreenshots?.() ?? false,
       pythonPath: window.electronBridge?.getPythonPath?.() ?? '',
     };
     this.host.configView.render(vo);
@@ -81,6 +86,12 @@ export class ConfigController {
   /** 保存配置并同步各组件 */
   async saveConfig(): Promise<void> {
     const collected = this.host.configView.collect();
+    const bridge = window.electronBridge;
+
+    if (collected.backendStartupMode === 'external' && !collected.backendRepoPath.trim()) {
+      await showAlert('请配置本地后端路径', '启用“使用本地后端”时必须选择本地后端仓库路径。');
+      return;
+    }
 
     // 界面设置 → localStorage
     localStorage.setItem('themeMode', collected.themeMode);
@@ -90,16 +101,28 @@ export class ConfigController {
     this.host.mainView.setDebugMode(collected.debugMode);
     applyTheme();
 
-    if (window.electronBridge?.setUpdateMode) {
-      await window.electronBridge.setUpdateMode(collected.updateMode);
+    if (bridge?.setUpdateMode) {
+      await bridge.setUpdateMode(collected.updateMode);
     }
 
     // 后端端口 / Python 路径（修改后需重启）
-    if (window.electronBridge?.setBackendPort) {
-      await window.electronBridge.setBackendPort(collected.backendPort);
+    if (bridge?.setBackendPort) {
+      await bridge.setBackendPort(collected.backendPort);
     }
-    if (window.electronBridge?.setPythonPath) {
-      await window.electronBridge.setPythonPath(collected.pythonPath || null);
+    if (bridge?.setBackendStartupMode) {
+      await bridge.setBackendStartupMode(collected.backendStartupMode);
+    }
+    if (bridge?.setBackendRepoPath) {
+      await bridge.setBackendRepoPath(collected.backendRepoPath || null);
+    }
+    if (bridge?.setOcrGpuMode) {
+      await bridge.setOcrGpuMode(collected.ocrGpuMode);
+    }
+    if (bridge?.setSaveBackendScreenshots) {
+      await bridge.setSaveBackendScreenshots(collected.saveBackendScreenshots);
+    }
+    if (bridge?.setPythonPath) {
+      await bridge.setPythonPath(collected.pythonPath || null);
     }
 
     this.host.configModel.update({
@@ -147,7 +170,6 @@ export class ConfigController {
     const yamlStr = this.host.configModel.toYaml();
     console.log('保存配置:\n', yamlStr);
 
-    const bridge = window.electronBridge;
     if (bridge) {
       await bridge.saveFile('usersettings.yaml', yamlStr);
     }

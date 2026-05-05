@@ -70,6 +70,32 @@ function getUpdateMode(): 'auto' | 'manual' {
   return settings.update_mode === 'manual' ? 'manual' : 'auto';
 }
 
+type BackendStartupMode = 'managed' | 'external';
+type OcrGpuMode = 'auto' | 'cpu' | 'cuda';
+
+function getBackendStartupMode(): BackendStartupMode {
+  const settings = readGuiSettings();
+  return settings.backend_startup_mode === 'external' ? 'external' : 'managed';
+}
+
+function getBackendRepoPath(): string {
+  const settings = readGuiSettings();
+  if (typeof settings.backend_repo_path !== 'string') return '';
+  return settings.backend_repo_path.trim();
+}
+
+function getOcrGpuMode(): OcrGpuMode {
+  const settings = readGuiSettings();
+  const value = typeof settings.ocr_gpu_mode === 'string' ? settings.ocr_gpu_mode : '';
+  if (value === 'cpu' || value === 'cuda') return value;
+  return 'auto';
+}
+
+function getSaveBackendScreenshots(): boolean {
+  const settings = readGuiSettings();
+  return settings.save_backend_screenshots === true;
+}
+
 let mainWindow: BrowserWindow | null = null;
 
 /** 是否处于打包后的生产模式 */
@@ -275,6 +301,22 @@ ipcMain.on('get-backend-port-sync', (event) => {
   event.returnValue = BACKEND_PORT;
 });
 
+ipcMain.on('get-backend-startup-mode-sync', (event) => {
+  event.returnValue = getBackendStartupMode();
+});
+
+ipcMain.on('get-backend-repo-path-sync', (event) => {
+  event.returnValue = getBackendRepoPath();
+});
+
+ipcMain.on('get-ocr-gpu-mode-sync', (event) => {
+  event.returnValue = getOcrGpuMode();
+});
+
+ipcMain.on('get-save-backend-screenshots-sync', (event) => {
+  event.returnValue = getSaveBackendScreenshots();
+});
+
 ipcMain.handle('set-backend-port', (_event, port: number) => {
   // 防御性校验：仅在端口为有限数值且位于合法范围时才写入设置
   if (typeof port !== 'number' || !Number.isFinite(port)) {
@@ -285,6 +327,25 @@ ipcMain.handle('set-backend-port', (_event, port: number) => {
     return;
   }
   writeGuiSettings({ backend_port: normalizedPort });
+});
+
+ipcMain.handle('set-backend-startup-mode', (_event, mode: BackendStartupMode) => {
+  const normalized = mode === 'external' ? 'external' : 'managed';
+  writeGuiSettings({ backend_startup_mode: normalized });
+});
+
+ipcMain.handle('set-backend-repo-path', (_event, repoPath: string | null) => {
+  const normalized = typeof repoPath === 'string' ? repoPath.trim() : '';
+  writeGuiSettings({ backend_repo_path: normalized });
+});
+
+ipcMain.handle('set-ocr-gpu-mode', (_event, mode: OcrGpuMode) => {
+  const normalized: OcrGpuMode = mode === 'cpu' || mode === 'cuda' ? mode : 'auto';
+  writeGuiSettings({ ocr_gpu_mode: normalized });
+});
+
+ipcMain.handle('set-save-backend-screenshots', (_event, enabled: boolean) => {
+  writeGuiSettings({ save_backend_screenshots: enabled === true });
 });
 
 ipcMain.on('get-python-path-sync', (event) => {
@@ -322,6 +383,10 @@ ipcMain.handle('validate-python', async (_event, pythonPath: string) => {
 
 ipcMain.handle('get-app-root', () => {
   return appRoot();
+});
+
+ipcMain.handle('resolve-app-path', (_event, filePath: string) => {
+  return resolveAppPath(filePath);
 });
 
 ipcMain.handle('get-plans-dir', () => {

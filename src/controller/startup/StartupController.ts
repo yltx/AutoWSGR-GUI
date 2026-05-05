@@ -81,8 +81,13 @@ export class StartupController {
     checkForUpdates(bridge, this.host);
 
     // 4. 启动后端 & 连接
-    Logger.info('正在启动后端服务…');
-    await bridge.startBackend();
+    const backendStartupMode = bridge.getBackendStartupMode?.() ?? 'managed';
+    if (backendStartupMode === 'external') {
+      Logger.info('已启用外部后端模式，跳过内置后端启动');
+    } else {
+      Logger.info('正在启动后端服务…');
+      await bridge.startBackend();
+    }
     waitForBackendAndConnect(this.host);
   }
 

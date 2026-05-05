@@ -9,6 +9,7 @@ import type { NormalFightReq, TaskRequest } from '../../types/api';
 import type { TaskPreset } from '../../types/model';
 import { resolveFleetPreset, resolveFleetPresetRules, toBackendName } from '../../data/shipData';
 import { Logger } from '../../utils/Logger';
+import { normalizeSelectedNodesForBackend } from '../plan/selectedNodes';
 import type { TaskGroupHost } from './TaskGroupController';
 
 /** 加载整个任务组到调度队列 */
@@ -38,16 +39,17 @@ export async function loadGroupToQueue(
         host.importTaskPreset(parsed as unknown as TaskPreset, item.path!);
       } else {
         const plan = PlanModel.fromYaml(content, item.path!);
+        const resolvedPlanId = await bridge.resolveAppPath(plan.fileName);
         const times = item.times;
         const req: NormalFightReq = {
           type: 'normal_fight',
-          plan_id: plan.fileName,
+          plan_id: resolvedPlanId,
           times: 1,
           gap: plan.data.gap ?? 0,
         };
         if (plan.data.selected_nodes.length > 0) {
           req.plan = req.plan ?? {};
-          req.plan.selected_nodes = [...plan.data.selected_nodes];
+          req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
         }
         let selectedFleetId = item.fleet_id ?? plan.data.fleet_id;
         if (item.autoFleetFallback && selectedFleetId === 1) {
@@ -81,6 +83,7 @@ export async function loadGroupToQueue(
           undefined,
           !!item.forceRetry,
           !!item.allowPolling,
+          plan.data.endpoint_nodes,
         );
       }
       loadedCount++;
@@ -169,15 +172,16 @@ export async function loadSingleItemToQueue(
       host.importTaskPreset(parsed as unknown as TaskPreset, item.path!);
     } else {
       const plan = PlanModel.fromYaml(content, item.path!);
+      const resolvedPlanId = await bridge.resolveAppPath(plan.fileName);
       const req: NormalFightReq = {
         type: 'normal_fight',
-        plan_id: plan.fileName,
+        plan_id: resolvedPlanId,
         times: 1,
         gap: plan.data.gap ?? 0,
       };
       if (plan.data.selected_nodes.length > 0) {
         req.plan = req.plan ?? {};
-        req.plan.selected_nodes = [...plan.data.selected_nodes];
+        req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
       }
       let selectedFleetId = item.fleet_id ?? plan.data.fleet_id;
       if (item.autoFleetFallback && selectedFleetId === 1) {
@@ -211,6 +215,7 @@ export async function loadSingleItemToQueue(
         undefined,
         !!item.forceRetry,
         !!item.allowPolling,
+        plan.data.endpoint_nodes,
       );
     }
 

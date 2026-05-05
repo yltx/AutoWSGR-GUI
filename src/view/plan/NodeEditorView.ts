@@ -14,7 +14,7 @@ export class NodeEditorView {
     this.infoEl = document.getElementById('node-info')!;
   }
 
-  show(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; enemyRules: string }, mapNight = false): void {
+  show(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; slWhenDetourFails: boolean; isEndpoint: boolean; enemyRules: string }, mapNight = false): void {
     this.infoEl.style.display = 'none';
     const isCombatNode = !NON_COMBAT_TYPES.has(nodeType);
 
@@ -34,15 +34,23 @@ export class NodeEditorView {
     }
     this.editorIdEl.textContent = nodeId;
     (document.getElementById('node-edit-enabled') as HTMLInputElement).checked = args.enabled;
+    (document.getElementById('node-edit-endpoint') as HTMLInputElement).checked = args.isEndpoint;
 
     const detourGroup = document.getElementById('node-edit-detour-group') as HTMLElement;
+    const detourHelp = document.getElementById('node-edit-detour-help') as HTMLElement;
     const detourInput = document.getElementById('node-edit-detour') as HTMLInputElement;
     if (args.canDetour) {
       detourGroup.style.display = '';
+      detourHelp.style.display = '';
+      detourHelp.textContent = '可通过勾选"迂回"直接迂回，也可在索敌规则中返回 detour 触发条件迂回。';
       detourInput.checked = args.detour;
+      (document.getElementById('node-edit-sl-when-detour-fails') as HTMLInputElement).checked = args.slWhenDetourFails;
     } else {
       detourGroup.style.display = 'none';
+      detourHelp.style.display = '';
+      detourHelp.textContent = '当前节点不是迂回点，索敌规则中的 detour 动作会被忽略。';
       detourInput.checked = false;
+      (document.getElementById('node-edit-sl-when-detour-fails') as HTMLInputElement).checked = false;
     }
 
     const combatFields = document.getElementById('node-editor-combat-fields') as HTMLElement;
@@ -62,6 +70,7 @@ export class NodeEditorView {
     (document.getElementById('node-edit-long-missile-support') as HTMLInputElement).checked = args.longMissileSupport;
     (document.getElementById('node-edit-proceed') as HTMLInputElement).checked = args.proceed;
     (document.getElementById('node-edit-rules') as HTMLTextAreaElement).value = args.enemyRules;
+
     this.placeholderEl.style.display = 'none';
     this.editorEl.style.display = '';
   }
@@ -98,16 +107,23 @@ export class NodeEditorView {
     this.editorEl.style.display = 'none';
     this.infoEl.style.display = 'none';
     this.placeholderEl.style.display = '';
+    const detourHelp = document.getElementById('node-edit-detour-help') as HTMLElement | null;
+    if (detourHelp) {
+      detourHelp.style.display = 'none';
+      detourHelp.textContent = '';
+    }
   }
 
-  collectValues(): { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; rulesText: string } {
+  collectValues(): { enabled: boolean; isEndpoint: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; slWhenDetourFails: boolean; rulesText: string } {
     return {
       enabled: (document.getElementById('node-edit-enabled') as HTMLInputElement).checked,
+      isEndpoint: (document.getElementById('node-edit-endpoint') as HTMLInputElement).checked,
       formation: parseInt((document.getElementById('node-edit-formation') as HTMLSelectElement).value, 10),
       night: (document.getElementById('node-edit-night') as HTMLInputElement).checked,
       longMissileSupport: (document.getElementById('node-edit-long-missile-support') as HTMLInputElement).checked,
       proceed: (document.getElementById('node-edit-proceed') as HTMLInputElement).checked,
       detour: (document.getElementById('node-edit-detour') as HTMLInputElement).checked,
+      slWhenDetourFails: (document.getElementById('node-edit-sl-when-detour-fails') as HTMLInputElement).checked,
       rulesText: (document.getElementById('node-edit-rules') as HTMLTextAreaElement).value,
     };
   }

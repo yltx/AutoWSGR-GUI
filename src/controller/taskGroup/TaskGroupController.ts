@@ -129,8 +129,17 @@ export class TaskGroupController {
       this.contextMenuTarget = null;
     });
 
-    document.getElementById('btn-add-to-group')?.addEventListener('click', () =>
-      addCurrentPlanToGroup(this.taskGroupModel, () => this.host.getCurrentPlan(), () => this.render()));
+    document.getElementById('btn-add-to-group')?.addEventListener('click', () => {
+      addCurrentPlanToGroup(
+        this.taskGroupModel,
+        () => this.host.getCurrentPlan(),
+        this.host.plansDir,
+        () => this.render(),
+      ).catch((e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        void showAlert('加入任务组失败', msg);
+      });
+    });
 
     document.getElementById('btn-close-preset')?.addEventListener('click', () => this.host.closePresetDetail());
     document.getElementById('btn-tp-add-queue')?.addEventListener('click', () => this.host.executePreset());

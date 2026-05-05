@@ -185,9 +185,25 @@ export async function installDependencies(pythonCmd: string): Promise<{ success:
     const cwd = ctx.appRoot();
     const targetDir = localSitePackages();
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+
+    // pip --target 在目录已存在时默认不覆盖，容易留下半安装状态。
+    // 先清理关键链路包，再配合 --upgrade 做覆盖安装。
+    try {
+      const criticalPkgs = ['autowsgr', 'easyocr', 'scipy', 'numpy', 'scikit_image'];
+      for (const entry of fs.readdirSync(targetDir)) {
+        const shouldRemove = criticalPkgs.some(
+          (pkg) => entry === pkg || entry.startsWith(`${pkg}-`),
+        ) || entry === 'numpy.libs';
+        if (shouldRemove) {
+          fs.rmSync(path.join(targetDir, entry), { recursive: true, force: true });
+        }
+      }
+    } catch { /* ignore cleanup errors */ }
+
     ctx.sendProgress('正在安装后端依赖到项目目录…');
     const proc = spawn(pythonCmd, [
       '-m', 'pip', 'install',
+      '--upgrade',
       '--target', targetDir,
       'setuptools',         // provides distutils (removed in Python 3.12)
       'autowsgr',

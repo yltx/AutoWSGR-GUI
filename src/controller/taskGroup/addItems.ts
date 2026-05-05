@@ -6,6 +6,13 @@ import type { PlanModel } from '../../model/PlanModel';
 import type { TaskPreset } from '../../types/model';
 import { Logger } from '../../utils/Logger';
 
+function buildInlinePlanPath(plan: PlanModel, plansDir: string): string {
+  const safeMap = plan.mapName.replace(/[^a-zA-Z0-9_-]+/g, '_');
+  const ts = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  const fileName = `_ui_inline_${safeMap}_${ts}.yaml`;
+  return plansDir ? `${plansDir}\\${fileName}` : fileName;
+}
+
 function ensureActiveGroup(taskGroupModel: TaskGroupModel) {
   let group = taskGroupModel.getActiveGroup();
   if (!group) {
@@ -17,16 +24,28 @@ function ensureActiveGroup(taskGroupModel: TaskGroupModel) {
 }
 
 /** 将当前已加载的 Plan 添加到任务组 */
-export function addCurrentPlanToGroup(
+export async function addCurrentPlanToGroup(
   taskGroupModel: TaskGroupModel,
   getCurrentPlan: () => PlanModel | null,
+  plansDir: string,
   render: () => void,
-): void {
+): Promise<void> {
   const plan = getCurrentPlan();
   if (!plan) { Logger.warn('没有已加载的方案'); return; }
+  const bridge = window.electronBridge;
+  if (!bridge) return;
+
+  let fileName = plan.fileName?.trim();
+  if (!fileName) {
+    fileName = buildInlinePlanPath(plan, plansDir);
+    plan.fileName = fileName;
+    Logger.warn(`当前方案未保存，已自动保存为临时方案: ${fileName}`);
+  }
+
+  await bridge.saveFile(fileName, plan.toYaml());
+
   const group = ensureActiveGroup(taskGroupModel);
   const times = plan.data.times ?? 1;
-  const fileName = plan.fileName;
   const label = fileName.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? fileName;
 
   taskGroupModel.addItem(group.name, { path: fileName, kind: 'plan', times, label });

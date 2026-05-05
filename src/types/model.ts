@@ -55,6 +55,8 @@ export interface PlanData {
   chapter: number;
   map: number;
   selected_nodes: string[];
+  /** 终点节点列表：经过其中任一节点即认定本轮完成。未设置时回退到最后一个 selected_node。 */
+  endpoint_nodes?: string[];
   fight_condition?: number;        // 1-5, 默认 1
   repair_mode?: number | number[];  // 1 或 2（或每舰位数组）, 默认 1
   fleet_id?: number;               // 编队号

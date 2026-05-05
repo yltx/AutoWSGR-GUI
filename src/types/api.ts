@@ -153,6 +153,7 @@ export interface NodeDecisionReq {
   proceed?: boolean;
   proceed_stop?: number[];
   detour?: boolean;
+  SL_when_detour_fails?: boolean;
   enemy_rules?: string[][] | null;
 }
 

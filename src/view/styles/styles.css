@@ -2764,24 +2764,65 @@ input[type=checkbox]:focus-visible {
 }
 
 /* 自动化分区 */
-.auto-grid {
+.auto-list {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px 8px;
-  flex: 1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
   align-content: start;
 }
 
-.auto-section {
-  margin-bottom: 0;
-  padding: 6px 8px;
-  border-radius: var(--radius);
-  border: 1px solid var(--border);
-  background: var(--bg-card);
+.auto-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  padding: 10px 0;
+  position: relative;
+}
+.auto-item::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-bottom: 1px solid var(--border);
+}
+.auto-item:nth-child(odd) {
+  padding-right: 16px;
+  border-right: 1px solid var(--border);
+}
+.auto-item:nth-child(odd)::after {
+  right: 8px;
+}
+.auto-item:nth-child(n+5)::after {
+  display: none;
 }
 
-.auto-section-header {
-  margin-bottom: 2px;
+.auto-item-inline {
+  /* no extra fields */
+}
+
+.auto-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-left: 20px;
+}
+
+.auto-item-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 8px;
+  align-items: center;
+}
+
+.auto-item label {
+  font-size: 12px;
+}
+
+.auto-item .input {
+  padding: 6px 10px;
+  font-size: 12px;
 }
 
 .auto-toggle {
@@ -2794,19 +2835,24 @@ input[type=checkbox]:focus-visible {
   margin-right: 6px;
 }
 
-.auto-section-body {
-  padding-left: 2px;
-  font-size: 12px;
+@media (max-width: 980px) {
+  .auto-list {
+    grid-template-columns: 1fr;
+  }
+  .auto-item:nth-child(odd) {
+    padding-right: 0;
+    border-right: none;
+  }
+  .auto-item:nth-child(odd)::after {
+    right: 0;
+  }
+  .auto-item:last-child::after {
+    display: none;
+  }
+  .auto-item-row {
+    grid-template-columns: 1fr;
+  }
 }
-
-.auto-section-body .form-group {
-  margin-bottom: 2px;
-}
-
-.auto-section-body .form-group:last-child {
-  margin-bottom: 0;
-}
-
 /* ═══ ADB 状态指示器 ═══ */
 .adb-status {
   display: inline-block;

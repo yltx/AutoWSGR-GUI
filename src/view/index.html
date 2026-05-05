@@ -414,12 +414,15 @@
               </div>
               <div class="form-group form-row">
                 <label><input type="checkbox" id="node-edit-enabled" checked> 启用节点</label>
+                <label><input type="checkbox" id="node-edit-endpoint"> 终点节点</label>
               </div>
-              <p class="plan-task-hint" style="margin:-4px 0 8px">关闭后，该节点会从路线节点中移除。</p>
+              <p class="plan-task-hint" style="margin:-4px 0 8px">关闭"启用"会从路线中移除。勾选"终点"后，经过此节点即认定本轮执行完成。</p>
               <div id="node-edit-detour-group" class="form-group form-row" style="display:none">
                 <label><input type="checkbox" id="node-edit-detour"> 迂回</label>
+                <label><input type="checkbox" id="node-edit-sl-when-detour-fails"> 迂回失败SL</label>
                 <span class="plan-task-hint">仅在可迂回节点生效</span>
               </div>
+              <p id="node-edit-detour-help" class="plan-task-hint" style="display:none;margin:-4px 0 8px"></p>
               <p id="node-editor-non-combat-note" class="plan-task-hint" style="display:none;margin:0 0 8px">该节点无战斗配置，仅支持启用/关闭。</p>
               <div id="node-editor-combat-fields">
               <div class="form-group">
@@ -441,6 +444,11 @@
                 <label>索敌规则</label>
                 <textarea id="node-edit-rules" class="input node-rules-textarea" rows="2"
                   placeholder="每行一条，如: DD >= 1, 4&#10;多条件用 and 连接: DD >= 1 and CL >= 2, 4"></textarea>
+                <p class="plan-task-hint" style="margin:4px 0 0">
+                  动作支持: <code>detour</code>（迂回）, <code>retreat</code>（撤退）, <code>1-5</code>（指定阵型）。
+                  分隔符支持英文/中文逗号或箭头: <code>,</code> <code>，</code> <code>=></code> <code>-></code>。
+                </p>
+                <p class="plan-task-hint" style="margin:2px 0 0">示例: <code>BB &gt;= 1, detour</code> 或 <code>CV &gt;= 2 => retreat</code></p>
               </div>
               </div>
               <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
@@ -523,51 +531,96 @@
         </div>
       </div>
 
-      <div class="card config-card-runtime">
-        <h3>Python 环境</h3>
-        <div class="form-group">
-          <label>Python 解释器路径</label>
-          <div class="input-row">
-            <input type="text" id="cfg-python-path" class="input" placeholder="留空自动检测">
-            <button class="btn btn-small" id="btn-browse-python">浏览</button>
-            <button class="btn btn-small" id="btn-validate-python">检测</button>
-            <span id="cfg-python-status" class="adb-status adb-status-unknown"></span>
+      <div class="card config-card-auto">
+        <h3>自动化设置 <span class="config-tip" title="每日自动调度的任务开关。启用后，后端启动时自动执行对应任务。">?</span></h3>
+
+        <div class="auto-list">
+          <div class="auto-item">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-expedition" checked> 自动远征</label>
+            <div class="auto-item-body" id="cfg-auto-expedition-body">
+              <label>检查间隔（分钟）</label>
+              <input type="number" id="cfg-expedition-interval" class="input" min="1" max="120" value="15">
+            </div>
           </div>
-          <span class="config-hint">需 Python 3.12/3.13；留空将按内置 → 系统顺序检测。修改后重启生效。</span>
-        </div>
 
-        <hr class="card-divider">
-
-        <div class="form-group">
-          <label>后端端口</label>
-          <div class="input-row config-runtime-row">
-            <input type="number" id="cfg-backend-port" class="input config-inline-number" min="1" max="65535" value="8438">
-            <span class="config-hint config-inline-note">修改后需重启生效</span>
+          <div class="auto-item">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-battle"> 自动战役</label>
+            <div class="auto-item-body" id="cfg-auto-battle-body">
+              <div class="auto-item-row">
+                <label>战役类型</label>
+                <select id="cfg-battle-type" class="input">
+                  <option value="困难潜艇">困难潜艇</option>
+                  <option value="困难航母">困难航母</option>
+                  <option value="困难驱逐">困难驱逐</option>
+                  <option value="困难巡洋">困难巡洋</option>
+                  <option value="困难战列">困难战列</option>
+                  <option value="简单航母">简单航母</option>
+                  <option value="简单潜艇">简单潜艇</option>
+                  <option value="简单驱逐">简单驱逐</option>
+                  <option value="简单巡洋">简单巡洋</option>
+                  <option value="简单战列">简单战列</option>
+                </select>
+              </div>
+              <div class="auto-item-row">
+                <label>次数</label>
+                <input type="number" id="cfg-battle-times" class="input" min="1" max="10" value="3">
+              </div>
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div class="card config-card-ui">
-        <h3>界面设置</h3>
-
-        <div class="form-group">
-          <label>颜色主题</label>
-          <div class="config-ui-theme-row">
-            <select id="cfg-theme-mode" class="input">
-              <option value="dark">暗色</option>
-              <option value="light">浅色</option>
-              <option value="system">跟随系统</option>
-            </select>
-            <label class="config-ui-debug-toggle"><input type="checkbox" id="cfg-debug-mode"> 调试模式</label>
+          <div class="auto-item">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-exercise"> 自动演习</label>
+            <div class="auto-item-body" id="cfg-auto-exercise-body">
+              <label>演习舰队</label>
+              <select id="cfg-exercise-fleet" class="input">
+                <option value="1">第 1 舰队</option>
+                <option value="2">第 2 舰队</option>
+                <option value="3">第 3 舰队</option>
+                <option value="4">第 4 舰队</option>
+              </select>
+            </div>
           </div>
-        </div>
 
-        <div class="form-group">
-          <label>主色调</label>
-          <div class="input-row config-accent-row">
-            <input type="color" id="cfg-accent-color" value="#0f7dff" class="color-picker">
-            <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
-            <button class="btn btn-small" id="btn-reset-accent">重置</button>
+          <div class="auto-item auto-item-inline">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-normal-fight"> 自动常规出击 <span class="config-tip" title="每日自动执行任务列表中的所有任务。">?</span></label>
+          </div>
+
+          <div class="auto-item">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-decisive"> 自动决战</label>
+            <div class="auto-item-body" id="cfg-auto-decisive-body">
+              <div class="auto-item-row">
+                <label>保留票数</label>
+                <input type="number" id="cfg-decisive-ticket-reserve" class="input" min="0" value="0" style="width:80px">
+              </div>
+              <div class="auto-item-row">
+                <label>模板</label>
+                <select id="cfg-decisive-template" class="input">
+                  <option value="">未选择</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="auto-item">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-loot"> 每日自动刷战利品</label>
+            <div class="auto-item-body" id="cfg-auto-loot-body">
+              <div class="auto-item-row">
+                <label>地图方案</label>
+                <select id="cfg-loot-plan" class="input">
+                  <option value="0">9-2</option>
+                  <option value="1">7-4</option>
+                  <option value="2">8-5</option>
+                  <option value="3">2-1</option>
+                </select>
+              </div>
+              <div class="auto-item-row">
+                <label>战利品达到</label>
+                <div class="input-row" style="align-items:center;gap:8px">
+                  <input type="number" id="cfg-loot-stop-count" class="input" min="1" max="50" value="50" style="width:80px">
+                  <span style="font-size:12px;color:var(--text-muted)">个时停止</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -586,13 +639,72 @@
 
       </div><!-- /config-col-left -->
 
-      <!-- ═══ 右列：自动化设置 ═══ -->
+      <!-- ═══ 右列：环境与界面设置 ═══ -->
       <div class="config-col-right">
 
-      <div class="card config-card-update">
-        <h3>更新设置</h3>
-        <div class="form-group" style="margin-bottom:0">
-          <label>更新模式</label>
+      <div class="card config-card-runtime">
+        <h3>环境配置</h3>
+        <div class="form-group">
+          <label>Python 解释器路径 <span class="config-tip" title="需 Python 3.12/3.13；留空将按内置 → 系统顺序检测。修改后重启生效。">?</span></label>
+          <div class="input-row">
+            <input type="text" id="cfg-python-path" class="input" placeholder="留空自动检测">
+            <button class="btn btn-small" id="btn-browse-python">浏览</button>
+            <button class="btn btn-small" id="btn-validate-python">检测</button>
+            <span id="cfg-python-status" class="adb-status adb-status-unknown"></span>
+          </div>
+        </div>
+
+        <hr class="card-divider">
+
+        <div class="form-group">
+          <label>后端端口</label>
+          <div class="input-row config-runtime-row">
+            <input type="number" id="cfg-backend-port" class="input config-inline-number" min="1" max="65535" value="8438">
+            <span class="config-tip config-inline-note" title="修改后需重启生效">?</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>OCR 加速模式 <span class="config-tip" title="自动模式会在后端启动时检测 CUDA 可用性，避免默认落到 CPU。">?</span></label>
+          <div class="input-row config-runtime-row">
+            <select id="cfg-ocr-gpu-mode" class="input">
+              <option value="auto">自动检测 CUDA（推荐）</option>
+              <option value="cuda">强制使用 CUDA</option>
+              <option value="cpu">强制使用 CPU</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="auto-toggle"><input type="checkbox" id="cfg-debug-mode"> 调试模式 <span class="config-tip" title="开启后输出完整log，并且可启用调试用功能">?</span></label>
+        </div>
+
+        <div id="cfg-debug-advanced" style="display:none">
+          <div class="form-group">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-save-backend-screenshots"> 保存识别异常截图到本地 <span class="config-tip" title="勾选后自动保存识别异常的截图到本地">?</span></label>
+          </div>
+
+          <hr class="card-divider">
+
+          <div class="form-group">
+            <label class="auto-toggle"><input type="checkbox" id="cfg-use-external-backend"> 使用本地后端 <span class="config-tip" title="使用本地后端代码代替默认拉取的后端代码">?</span></label>
+          </div>
+
+          <div class="form-group" id="cfg-backend-repo-wrap" style="display:none">
+            <label>本地后端仓库路径 <span class="config-tip" title="启用本地后端后必须填写，用于加载本地 autowsgr 源码。">?</span></label>
+            <div class="input-row">
+              <input type="text" id="cfg-backend-repo-path" class="input" placeholder="如 E:\autowsgr-fork">
+              <button class="btn btn-small" id="btn-browse-backend-repo">浏览</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card config-card-ui">
+        <h3>更新与界面</h3>
+
+        <div class="form-group">
+          <label>更新模式 <span class="config-tip" title="手动模式下，不会在启动时自动检查或自动下载更新。">?</span></label>
           <div class="input-row config-runtime-row">
             <select id="cfg-update-mode" class="input">
               <option value="auto">自动更新（启动时自动检查）</option>
@@ -600,134 +712,29 @@
             </select>
             <button class="btn btn-small" id="btn-check-updates">立即检查更新</button>
           </div>
-          <span class="config-hint">手动模式下，不会在启动时自动检查或自动下载更新。</span>
         </div>
-      </div>
 
-      <div class="card config-card-auto">
-        <h3>自动化设置</h3>
-        <p class="config-hint">每日自动调度的任务开关。启用后，后端启动时自动执行对应任务。</p>
+        <hr class="card-divider">
 
-        <div class="auto-grid">
-
-        <!-- 远征 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-expedition" checked> 自动远征</label>
-          </div>
-          <div class="auto-section-body">
-            <div class="form-group">
-              <label>检查间隔（分钟）</label>
-              <input type="number" id="cfg-expedition-interval" class="input" min="1" max="120" value="15">
-            </div>
+        <div class="form-group">
+          <label>颜色主题</label>
+          <div class="config-ui-theme-row">
+            <select id="cfg-theme-mode" class="input">
+              <option value="dark">暗色</option>
+              <option value="light">浅色</option>
+              <option value="system">跟随系统</option>
+            </select>
           </div>
         </div>
 
-        <!-- 战役 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-battle"> 自动战役</label>
-          </div>
-          <div class="auto-section-body">
-            <div class="form-group">
-              <label>战役类型</label>
-              <select id="cfg-battle-type" class="input">
-                <option value="困难潜艇">困难潜艇</option>
-                <option value="困难航母">困难航母</option>
-                <option value="困难驱逐">困难驱逐</option>
-                <option value="困难巡洋">困难巡洋</option>
-                <option value="困难战列">困难战列</option>
-                <option value="简单航母">简单航母</option>
-                <option value="简单潜艇">简单潜艇</option>
-                <option value="简单驱逐">简单驱逐</option>
-                <option value="简单巡洋">简单巡洋</option>
-                <option value="简单战列">简单战列</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label>次数</label>
-              <input type="number" id="cfg-battle-times" class="input" min="1" max="10" value="3">
-            </div>
+        <div class="form-group">
+          <label>主色调</label>
+          <div class="input-row config-accent-row">
+            <input type="color" id="cfg-accent-color" value="#0f7dff" class="color-picker">
+            <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
+            <button class="btn btn-small" id="btn-reset-accent">重置</button>
           </div>
         </div>
-
-        <!-- 演习 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-exercise"> 自动演习</label>
-          </div>
-          <div class="auto-section-body">
-            <div class="form-group">
-              <label>演习舰队</label>
-              <select id="cfg-exercise-fleet" class="input">
-                <option value="1">第 1 舰队</option>
-                <option value="2">第 2 舰队</option>
-                <option value="3">第 3 舰队</option>
-                <option value="4">第 4 舰队</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <!-- 常规出击 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-normal-fight"> 自动常规出击</label>
-          </div>
-          <div class="auto-section-body">
-            <p class="config-hint">每日自动执行任务列表中的所有任务。</p>
-          </div>
-        </div>
-
-        <!-- 决战 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-decisive"> 自动决战</label>
-          </div>
-          <div class="auto-section-body">
-            <div class="form-group" style="margin-bottom:6px">
-              <div class="input-row" style="align-items:center;gap:8px">
-                <label style="font-size:12px;white-space:nowrap">保留票数</label>
-                <input type="number" id="cfg-decisive-ticket-reserve" class="input" min="0" value="0" style="width:60px">
-              </div>
-            </div>
-            <div class="form-group">
-              <div class="input-row" style="align-items:center;gap:8px">
-                <label style="font-size:12px;white-space:nowrap">模板</label>
-                <select id="cfg-decisive-template" class="input" style="flex:1;min-width:100px">
-                  <option value="">未选择</option>
-                </select>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 战利品 -->
-        <div class="auto-section">
-          <div class="auto-section-header">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-loot"> 每日自动刷战利品</label>
-          </div>
-          <div class="auto-section-body">
-            <div class="form-group">
-              <label>地图方案</label>
-              <select id="cfg-loot-plan" class="input">
-                <option value="0">9-2</option>
-                <option value="1">7-4</option>
-                <option value="2">8-5</option>
-                <option value="3">2-1</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <div class="input-row" style="align-items:center;gap:8px">
-                <label style="font-size:12px;white-space:nowrap">战利品达到</label>
-                <input type="number" id="cfg-loot-stop-count" class="input" min="1" max="50" value="50" style="width:60px">
-                <label style="font-size:12px;white-space:nowrap">个时停止</label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        </div><!-- /auto-grid -->
       </div>
 
       </div><!-- /config-col-right -->

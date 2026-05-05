@@ -54,6 +54,8 @@ export interface SchedulerTask {
   fleetPresets?: FleetPreset[];
   /** 当前使用的编队预设索引 (-1 = 未使用预设) */
   currentPresetIndex?: number;
+  /** 终点节点列表：经过其中任一节点即认定本轮完成。未设置时回退到最后一个 selected_node。 */
+  endpointNodes?: string[];
 }
 
 // ════════════════════════════════════════

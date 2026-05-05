@@ -23,6 +23,7 @@ import { StopConditionChecker } from './StopConditionChecker';
 import { ExpeditionTimer } from './ExpeditionTimer';
 import { TaskQueue, generateTaskId, parseUiCount } from './TaskQueue';
 import { TaskPriority, type SchedulerTaskType, type SchedulerTask, type SchedulerStatus, type SchedulerCallbacks } from '../../types/scheduler';
+import { toBackendName } from '../../data/shipData';
 
 // ════════════════════════════════════════
 // Scheduler 实现
@@ -155,6 +156,7 @@ export class Scheduler {
     currentPresetIndex?: number,
     forceRetry?: boolean,
     allowPolling?: boolean,
+    endpointNodes?: string[],
   ): string {
     const id = this._taskQueue.addTask(
       name,
@@ -169,6 +171,7 @@ export class Scheduler {
       currentPresetIndex,
       forceRetry,
       allowPolling,
+      endpointNodes,
     );
     this.notifyQueueChange();
     return id;
@@ -221,7 +224,6 @@ export class Scheduler {
     }
 
     // 用户手动停止后，恢复为“未开始执行”状态放回队列。
-    runningTask.remainingTimes = runningTask.totalTimes;
     runningTask.retryCount = 0;
     runningTask.backendTaskId = undefined;
     this.currentTask = null;
@@ -274,6 +276,7 @@ export class Scheduler {
         this._taskQueue.scheduleDeferredRetry(
           () => this.consumeNext(),
           (level, msg) => this.emitLog(level, msg),
+          this.repairManager.getBathingShips(),
         );
         this.setStatus('idle');
       } else {
@@ -298,6 +301,9 @@ export class Scheduler {
       } catch {
         this.emitLog('debug', '远征检查跳过');
       }
+
+      await this.handlePostExpedition();
+
       this.currentTask = null;
       this.consumeNext();
       return;
@@ -411,6 +417,7 @@ export class Scheduler {
     if (this._stopped) {
       Logger.debug(`handleTaskFinished: _stopped flag set, skipping follow-up for 「${finished.name}」`, 'scheduler');
       this._stopped = false;
+      this.callbacks.onTaskCompleted?.(finished.id, success, result, error);
       this.currentTask = null;
       this.setStatus('idle');
       this.notifyQueueChange();
@@ -422,15 +429,21 @@ export class Scheduler {
       this.callbacks.onTaskCompleted?.(finished.id, false, result, error);
       this.currentTask = null;
       if (this.scheduleRetry(finished, '执行失败')) return;
+      // 重试耗尽时，将失败轮计入次数并继续剩余轮次
+      const nextRemaining = finished.remainingTimes - 1;
+      if (nextRemaining > 0) {
+        const followUp = this.buildFollowUpTask(finished, nextRemaining);
+        this._taskQueue.insertByPriority(followUp, !finished.allowPolling);
+      }
       this.consumeNext();
       return;
     }
 
     const shouldCountRound = this.shouldCountAsCompletedRound(finished, result);
     if (!shouldCountRound) {
-      const expectedLastNode = this.getExpectedLastNode(finished);
-      if (expectedLastNode) {
-        this.emitLog('info', `任务「${finished.name}」未到达终点节点 ${expectedLastNode}，本轮不计入次数`);
+      const endpoints = this.getEndpointNodes(finished);
+      if (endpoints.length > 0) {
+        this.emitLog('info', `任务「${finished.name}」未到达终点节点 ${endpoints.join('/')}，本轮不计入次数`);
       }
     }
 
@@ -480,24 +493,32 @@ export class Scheduler {
       fleetId: finished.fleetId,
       fleetPresets: finished.fleetPresets,
       currentPresetIndex: finished.currentPresetIndex,
+      endpointNodes: finished.endpointNodes,
     };
   }
 
-  private getExpectedLastNode(task: SchedulerTask): string | null {
-    if (task.type !== 'normal_fight' && task.type !== 'event_fight') return null;
-    if (task.request.type !== 'normal_fight' && task.request.type !== 'event_fight') return null;
-
+  /**
+   * 获取本轮认定完成的终点节点列表。
+   * 优先使用 task.endpointNodes（用户在 plan 中显式配置），
+   * 回退到 selected_nodes 的最后一个节点。
+   */
+  private getEndpointNodes(task: SchedulerTask): string[] {
+    if (task.endpointNodes && task.endpointNodes.length > 0) {
+      return task.endpointNodes.map(n => n.trim().toUpperCase());
+    }
+    // 回退：取 selected_nodes 最后一个
+    if (task.type !== 'normal_fight' && task.type !== 'event_fight') return [];
+    if (task.request.type !== 'normal_fight' && task.request.type !== 'event_fight') return [];
     const selectedNodes = task.request.plan?.selected_nodes;
-    if (!selectedNodes || selectedNodes.length === 0) return null;
-
+    if (!selectedNodes || selectedNodes.length === 0) return [];
     const last = selectedNodes[selectedNodes.length - 1];
-    if (typeof last !== 'string' || !last.trim()) return null;
-    return last.trim().toUpperCase();
+    if (typeof last !== 'string' || !last.trim()) return [];
+    return [last.trim().toUpperCase()];
   }
 
   private shouldCountAsCompletedRound(task: SchedulerTask, result?: TaskResult | null): boolean {
-    const expectedLastNode = this.getExpectedLastNode(task);
-    if (!expectedLastNode) return true;
+    const endpoints = this.getEndpointNodes(task);
+    if (endpoints.length === 0) return true;
 
     const details = result?.details;
     if (!details || details.length === 0) return true;
@@ -507,7 +528,10 @@ export class Scheduler {
 
     return details.some((round) => {
       if (!Array.isArray(round.nodes)) return false;
-      return round.nodes.some((node) => String(node).trim().toUpperCase() === expectedLastNode);
+      return round.nodes.some((node) => {
+        const normalized = String(node).trim().toUpperCase();
+        return endpoints.includes(normalized);
+      });
     });
   }
 
@@ -532,8 +556,62 @@ export class Scheduler {
       this._taskQueue.scheduleDeferredRetry(
         () => this.consumeNext(),
         (level, msg) => this.emitLog(level, msg),
+        this.repairManager.getBathingShips(),
       );
       this.setStatus('idle');
+    }
+  }
+
+  // ── 内部: 远征后处理 ──
+
+  /**
+   * 远征检查完成后的附加操作:
+   * 1. 自动领取任务奖励
+   * 2. 智能浴室维修（仅在无战斗任务时执行）
+   */
+  private async handlePostExpedition(): Promise<void> {
+    try {
+      const rewardResp = await this.api.rewardCollect();
+      if (rewardResp.success) {
+        this.emitLog('info', '任务奖励已自动领取');
+      }
+    } catch {
+      this.emitLog('debug', '任务奖励领取跳过');
+    }
+
+    const hasCombatTask = this._taskQueue.items.some(t =>
+      t.type === 'normal_fight' || t.type === 'event_fight'
+        || t.type === 'campaign' || t.type === 'exercise' || t.type === 'decisive',
+    );
+    const currentIsCombat = this.currentTask
+      && (this.currentTask.type === 'normal_fight' || this.currentTask.type === 'event_fight'
+        || this.currentTask.type === 'campaign' || this.currentTask.type === 'exercise'
+        || this.currentTask.type === 'decisive');
+    if (hasCombatTask || currentIsCombat) return;
+
+    try {
+      const resp = await this.api.gameContext();
+      if (!resp.success || !resp.data?.fleets) return;
+
+      const shipsNeedRepair: string[] = [];
+      for (const fleet of resp.data.fleets) {
+        for (const ship of fleet.ships) {
+          if (!ship || !ship.name) continue;
+          if (ship.health < ship.max_health && ship.max_health > 0) {
+            const key = toBackendName(ship.name);
+            if (!this.repairManager.getBathingShips().has(key)) {
+              shipsNeedRepair.push(ship.name);
+            }
+          }
+        }
+      }
+
+      if (shipsNeedRepair.length > 0) {
+        this.emitLog('info', `远征后自动送修: ${shipsNeedRepair.join('、')}`);
+        await this.repairManager.sendToBath(shipsNeedRepair);
+      }
+    } catch {
+      this.emitLog('debug', '远征后自动维修检查跳过');
     }
   }
 

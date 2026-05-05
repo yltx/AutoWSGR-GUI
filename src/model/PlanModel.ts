@@ -3,7 +3,7 @@
  * 负责从 YAML 文件解析战斗方案，并提供节点参数的查询与合并。
  */
 import * as yaml from 'js-yaml';
-import type { PlanData, NodeArgs, FleetPreset, ShipSlot, ShipFilter } from '../types/model';
+import type { PlanData, NodeArgs, FleetPreset, ShipSlot, ShipFilter, EnemyRule } from '../types/model';
 
 export class PlanModel {
   data: PlanData;
@@ -30,6 +30,9 @@ export class PlanModel {
       selected_nodes: Array.isArray(parsed.selected_nodes)
         ? parsed.selected_nodes.map(String)
         : [],
+      endpoint_nodes: Array.isArray(parsed.endpoint_nodes)
+        ? parsed.endpoint_nodes.map(String)
+        : undefined,
       fight_condition: parsed.fight_condition != null ? Number(parsed.fight_condition) : undefined,
       repair_mode: parsed.repair_mode != null
         ? (Array.isArray(parsed.repair_mode)
@@ -37,8 +40,8 @@ export class PlanModel {
           : Number(parsed.repair_mode))
         : undefined,
       fleet_id: parsed.fleet_id != null ? Number(parsed.fleet_id) : undefined,
-      node_defaults: parsed.node_defaults as NodeArgs | undefined,
-      node_args: parsed.node_args as Record<string, NodeArgs> | undefined,
+      node_defaults: PlanModel.normalizeNodeArgs(parsed.node_defaults as NodeArgs | undefined),
+      node_args: PlanModel.normalizeNodeArgsMap(parsed.node_args as Record<string, NodeArgs> | undefined),
       fleet_presets: PlanModel.parseFleetPresets(parsed.fleet_presets),
       // 任务级字段
       times: parsed.times != null ? Number(parsed.times) : undefined,
@@ -118,6 +121,7 @@ export class PlanModel {
     };
 
     if (this.data.fleet_id != null) obj.fleet_id = this.data.fleet_id;
+    if (this.data.endpoint_nodes && this.data.endpoint_nodes.length > 0) obj.endpoint_nodes = this.data.endpoint_nodes;
     if (this.data.fight_condition != null) obj.fight_condition = this.data.fight_condition;
     if (this.data.repair_mode != null) obj.repair_mode = this.data.repair_mode;
 
@@ -211,5 +215,60 @@ export class PlanModel {
       if (filter.name || filter.nation || filter.ship_type || filter.priority || filter.min_level != null || filter.max_level != null) return filter;
     }
     return String(raw);
+  }
+
+  private static normalizeRuleAction(actionRaw: unknown): string | number {
+    if (typeof actionRaw === 'number' && Number.isFinite(actionRaw)) {
+      return Math.trunc(actionRaw);
+    }
+
+    const raw = String(actionRaw ?? '').trim();
+    if (!raw) return raw;
+
+    const aliases: Record<string, string> = {
+      detour: 'detour',
+      '迂回': 'detour',
+      retreat: 'retreat',
+      '撤退': 'retreat',
+    };
+
+    const lower = raw.toLowerCase();
+    const normalized = aliases[lower] ?? aliases[raw] ?? raw;
+    if (/^\d+$/.test(normalized)) {
+      return Number(normalized);
+    }
+    return normalized;
+  }
+
+  private static normalizeEnemyRules(rules: unknown): EnemyRule[] | undefined {
+    if (!Array.isArray(rules)) return undefined;
+    const normalized: EnemyRule[] = [];
+
+    for (const item of rules) {
+      if (!Array.isArray(item) || item.length < 2) continue;
+      const expr = String(item[0] ?? '').trim();
+      if (!expr) continue;
+      const action = PlanModel.normalizeRuleAction(item[1]);
+      normalized.push([expr, action]);
+    }
+
+    return normalized.length > 0 ? normalized : undefined;
+  }
+
+  private static normalizeNodeArgs(args: NodeArgs | undefined): NodeArgs | undefined {
+    if (!args) return undefined;
+    const normalized: NodeArgs = { ...args };
+    normalized.enemy_rules = PlanModel.normalizeEnemyRules(args.enemy_rules);
+    return normalized;
+  }
+
+  private static normalizeNodeArgsMap(nodeArgs: Record<string, NodeArgs> | undefined): Record<string, NodeArgs> | undefined {
+    if (!nodeArgs || typeof nodeArgs !== 'object') return undefined;
+    const normalized: Record<string, NodeArgs> = {};
+    for (const [nodeId, args] of Object.entries(nodeArgs)) {
+      const node = PlanModel.normalizeNodeArgs(args);
+      if (node) normalized[nodeId] = node;
+    }
+    return Object.keys(normalized).length > 0 ? normalized : undefined;
   }
 }

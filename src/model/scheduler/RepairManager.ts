@@ -24,6 +24,8 @@ export interface BathingShip {
   name: string;
   /** 送入泡澡的时间 */
   startTime: number;
+  /** 预计维修完成时间 (Date.now() 时间戳)。0 表示未知，需回退到轮询模式 */
+  repairEndTime: number;
   /** 是否已发送修理请求到后端 */
   requestSent: boolean;
 }
@@ -42,9 +44,11 @@ export class RepairManager {
   private api: ApiClient;
   /** 正在泡澡的舰船列表 (舰船名 → 记录) */
   private bathingShips: Map<string, BathingShip> = new Map();
+  private static readonly STORAGE_KEY = 'autowsgr_bathing_ships';
 
   constructor(api: ApiClient) {
     this.api = api;
+    this.restoreFromStorage();
   }
 
   /** 获取舰船的修理阈值（优先按名查找，回退到默认阈值） */
@@ -129,26 +133,65 @@ export class RepairManager {
   }
 
   /**
+   * 校验后端返回的维修秒数是否在合理范围内。
+   * 合理范围: 60 秒 ~ 86400 秒（24 小时）。不合理时返回 0，回退到轮询模式。
+   */
+  private static validateRepairSeconds(seconds: unknown): number {
+    if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+      return 0;
+    }
+    if (seconds >= 60 && seconds <= 86400) {
+      return seconds;
+    }
+    Logger.warn(`维修秒数 ${seconds}s 超出合理范围 [60, 86400]，回退到轮询模式`, 'repair');
+    return 0;
+  }
+
+  /**
    * 将舰船送入泡澡
    */
   async sendToBath(shipNames: string[]): Promise<void> {
     for (const name of shipNames) {
       const key = toBackendName(name);
       if (this.bathingShips.has(key)) continue;
+
       this.bathingShips.set(key, {
         name,
         startTime: Date.now(),
+        repairEndTime: 0,
         requestSent: false,
       });
 
       try {
-        await this.api.repairShip(name);
+        const resp = await this.api.repairShip(name);
         const entry = this.bathingShips.get(key);
-        if (entry) entry.requestSent = true;
-        Logger.info(`舰船「${name}」已送入泡澡修理`, 'repair');
+        if (!entry) continue;
+
+        const rawSeconds: unknown = (resp.data as any)?.repair_seconds;
+        const validatedSeconds = RepairManager.validateRepairSeconds(rawSeconds);
+
+        if (validatedSeconds > 0) {
+          entry.repairEndTime = Date.now() + validatedSeconds * 1000;
+          Logger.info(
+            `舰船「${name}」已送入泡澡修理，预计 ${validatedSeconds} 秒后完成`,
+            'repair',
+          );
+        } else {
+          entry.repairEndTime = 0;
+          Logger.info(
+            `舰船「${name}」已送入泡澡修理（维修时间未知，将轮询检查）`,
+            'repair',
+          );
+        }
+
+        entry.requestSent = true;
+        this.saveToStorage();
       } catch (e) {
         Logger.error(`舰船「${name}」送入泡澡失败: ${e}`, 'repair');
-        this.bathingShips.delete(key);
+        const entry = this.bathingShips.get(key);
+        if (entry) {
+          entry.requestSent = false;
+        }
       }
     }
   }
@@ -182,6 +225,7 @@ export class RepairManager {
         if (!this.needsRepair(ship, threshold)) {
           Logger.info(`舰船「${name}」泡澡修理完成`, 'repair');
           this.bathingShips.delete(name);
+          this.saveToStorage();
         }
       }
     } catch (e) {
@@ -220,8 +264,96 @@ export class RepairManager {
     return Array.from(this.bathingShips.keys());
   }
 
+  /** 获取泡澡中舰船列表（只读引用，供 TaskQueue 计算动态延迟） */
+  getBathingShips(): ReadonlyMap<string, BathingShip> {
+    return this.bathingShips;
+  }
+
   /** 清除所有泡澡记录 */
   clearAll(): void {
     this.bathingShips.clear();
+    this.saveToStorage();
+  }
+
+  /**
+   * 将 bathingShips 持久化到 localStorage。
+   * 仅保存尚未完成的维修记录。
+   */
+  private saveToStorage(): void {
+    try {
+      const now = Date.now();
+      const data = Array.from(this.bathingShips.entries())
+        .filter(([, ship]) => {
+          if (ship.repairEndTime === 0) return true;
+          return ship.repairEndTime > now;
+        })
+        .map(([key, ship]) => ({
+          key,
+          name: ship.name,
+          startTime: ship.startTime,
+          repairEndTime: ship.repairEndTime,
+          requestSent: ship.requestSent,
+        }));
+
+      if (data.length === 0) {
+        localStorage.removeItem(RepairManager.STORAGE_KEY);
+      } else {
+        localStorage.setItem(RepairManager.STORAGE_KEY, JSON.stringify(data));
+      }
+    } catch (e) {
+      Logger.warn(`保存泡澡状态失败: ${e}`, 'repair');
+    }
+  }
+
+  /**
+   * 从 localStorage 恢复泡澡状态。
+   * 在构造函数中调用，用于 GUI 重启后恢复维修记录。
+   */
+  private restoreFromStorage(): void {
+    try {
+      const raw = localStorage.getItem(RepairManager.STORAGE_KEY);
+      if (!raw) return;
+
+      const data: Array<{
+        key: string;
+        name: string;
+        startTime: number;
+        repairEndTime: number;
+        requestSent: boolean;
+      }> = JSON.parse(raw);
+
+      if (!Array.isArray(data)) {
+        Logger.warn('泡澡状态数据格式异常，已清空', 'repair');
+        localStorage.removeItem(RepairManager.STORAGE_KEY);
+        return;
+      }
+
+      const now = Date.now();
+      let restoredCount = 0;
+
+      for (const item of data) {
+        if (!item.key || !item.name) continue;
+        if (item.repairEndTime > 0 && item.repairEndTime <= now) continue;
+
+        this.bathingShips.set(item.key, {
+          name: item.name,
+          startTime: item.startTime,
+          repairEndTime: item.repairEndTime,
+          requestSent: item.requestSent,
+        });
+        restoredCount++;
+      }
+
+      if (restoredCount > 0) {
+        Logger.info(
+          `从本地存储恢复了 ${restoredCount} 艘泡澡中的舰船，将在下次任务前确认状态`,
+          'repair',
+        );
+      }
+    } catch (e) {
+      Logger.warn(`恢复泡澡状态失败，已清空: ${e}`, 'repair');
+      this.bathingShips.clear();
+      localStorage.removeItem(RepairManager.STORAGE_KEY);
+    }
   }
 }
