@@ -20,7 +20,7 @@ export interface SchedulerBinderHost {
 }
 
 export class SchedulerBinder {
-  private static readonly DEFAULT_EXERCISE_TOTAL = 6;
+  private static readonly DEFAULT_EXERCISE_TOTAL = 5;
   private static readonly LOG_DEDUP_WINDOW_MS = 1200;
 
   // ── 状态（从 AppController 迁移而来） ──
@@ -129,7 +129,46 @@ export class SchedulerBinder {
   }
 
   /**
-   * 从后端运行日志更新界面追踪状态（演习进度 + 战利品/舰船计数）。
+   * 后端回传战役剩余次数时，同步更新队列中战役任务的 remainingTimes。
+   * 仅当后端报告的剩余次数小于当前任务记录的剩余次数时才更新（避免覆盖用户设置）。
+   */
+  private updateCampaignRemains(remains: number, _total: number): void {
+    const scheduler = this.host.scheduler;
+    const running = scheduler.currentRunningTask;
+    const queue = scheduler.taskQueue;
+
+    // 计算当前战役任务（运行中 + 队列中）的总待执行次数
+    let campaignRemaining = 0;
+    if (running?.type === 'campaign') {
+      campaignRemaining += running.remainingTimes;
+    }
+    for (const task of queue) {
+      if (task.type === 'campaign') {
+        campaignRemaining += task.remainingTimes;
+      }
+    }
+
+    // 仅当后端报告的剩余次数更小时才同步（说明有其他战役消耗了次数）
+    if (remains < campaignRemaining) {
+      const diff = campaignRemaining - remains;
+      Logger.info(`战役次数同步: 后端报告剩余 ${remains}，前端队列待执行 ${campaignRemaining}，减少 ${diff} 次`);
+
+      // 优先从队列末尾的战役任务扣减
+      for (let i = queue.length - 1; i >= 0 && diff > 0; i--) {
+        const task = queue[i];
+        if (task.type !== 'campaign') continue;
+        const deduct = Math.min(diff, task.remainingTimes);
+        task.remainingTimes -= deduct;
+        if (task.remainingTimes <= 0) {
+          scheduler.removeTask(task.id);
+        }
+      }
+      scheduler.notifyQueueChange();
+    }
+  }
+
+  /**
+   * 从后端运行日志更新界面追踪状态（演习进度 + 战利品/舰船计数 + 战役次数）。
    * 返回 true 表示有可视状态变化，需要触发 renderMain。
    */
   private consumeRuntimeLogMessage(message: string): boolean {
@@ -144,6 +183,14 @@ export class SchedulerBinder {
     const shipMatch = message.match(/\[UI\] 舰船数量: (\d+\/\d+)/);
     if (shipMatch && shipMatch[1] !== this.trackedShip) {
       this.trackedShip = shipMatch[1];
+      changed = true;
+    }
+
+    const campaignRemainsMatch = message.match(/\[OPS\] 战役次数: (\d+)\/(\d+)/);
+    if (campaignRemainsMatch) {
+      const remains = parseInt(campaignRemainsMatch[1], 10);
+      const total = parseInt(campaignRemainsMatch[2], 10);
+      this.updateCampaignRemains(remains, total);
       changed = true;
     }
 

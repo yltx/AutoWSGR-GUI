@@ -14,7 +14,7 @@ export class NodeEditorView {
     this.infoEl = document.getElementById('node-info')!;
   }
 
-  show(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; slWhenDetourFails: boolean; isEndpoint: boolean; enemyRules: string }, mapNight = false): void {
+  show(nodeId: string, nodeType: MapNodeType, args: { enabled: boolean; formation: number; night: boolean; longMissileSupport: boolean; proceed: boolean; detour: boolean; canDetour: boolean; slWhenDetourFails: boolean; isEndpoint: boolean; isTerminal: boolean; enemyRules: string }, mapNight = false): void {
     this.infoEl.style.display = 'none';
     const isCombatNode = !NON_COMBAT_TYPES.has(nodeType);
 
@@ -69,6 +69,12 @@ export class NodeEditorView {
     }
     (document.getElementById('node-edit-long-missile-support') as HTMLInputElement).checked = args.longMissileSupport;
     (document.getElementById('node-edit-proceed') as HTMLInputElement).checked = args.proceed;
+    const proceedLabel = document.getElementById('node-edit-proceed-label') as HTMLElement;
+    if (args.isTerminal) {
+      proceedLabel.style.display = 'none';
+    } else {
+      proceedLabel.style.display = '';
+    }
     (document.getElementById('node-edit-rules') as HTMLTextAreaElement).value = args.enemyRules;
 
     this.placeholderEl.style.display = 'none';

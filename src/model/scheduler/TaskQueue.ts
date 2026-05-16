@@ -68,12 +68,21 @@ export class TaskQueue {
 
   /**
    * 按优先级插入队列。
-   * beforeSamePriority=true 时，会插入到同优先级任务之前。
+   * 同优先级内按 sortKey 升序排列（sortKey 越小越靠前）。
+   * beforeSamePriority=true 时，会插入到同优先级任务之前（用于重试/跟随）。
    */
   insertByPriority(task: SchedulerTask, beforeSamePriority = false): void {
-    const idx = this.queue.findIndex((t) =>
-      beforeSamePriority ? t.priority >= task.priority : t.priority > task.priority,
-    );
+    const idx = this.queue.findIndex((t) => {
+      if (t.priority < task.priority) return false;
+      if (t.priority > task.priority) return true;
+      // 同优先级: 按 sortKey 排序
+      const tKey = t.sortKey ?? Infinity;
+      const taskKey = task.sortKey ?? Infinity;
+      if (beforeSamePriority) {
+        return tKey >= taskKey;
+      }
+      return tKey > taskKey;
+    });
     if (idx === -1) {
       this.queue.push(task);
     } else {
@@ -96,6 +105,7 @@ export class TaskQueue {
     forceRetry?: boolean,
     allowPolling?: boolean,
     endpointNodes?: string[],
+    sortKey?: number,
   ): string {
     const id = generateTaskId();
     const task: SchedulerTask = {
@@ -116,6 +126,7 @@ export class TaskQueue {
       fleetPresets,
       currentPresetIndex: currentPresetIndex ?? -1,
       endpointNodes,
+      sortKey,
     };
     this.insertByPriority(task);
     return id;

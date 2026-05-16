@@ -56,6 +56,8 @@ export interface SchedulerTask {
   currentPresetIndex?: number;
   /** 终点节点列表：经过其中任一节点即认定本轮完成。未设置时回退到最后一个 selected_node。 */
   endpointNodes?: string[];
+  /** 同优先级内排序键（数值越小越靠前），用于周常等需要严格按章节顺序执行的场景 */
+  sortKey?: number;
 }
 
 // ════════════════════════════════════════

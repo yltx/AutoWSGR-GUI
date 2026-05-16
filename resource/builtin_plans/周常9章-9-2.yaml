@@ -24,14 +24,19 @@ node_defaults:
 node_args:
   A:
     detour: true
+    sl_when_detour_fails: true
   D:
     detour: true
+    sl_when_detour_fails: true
   G:
     detour: true
+    sl_when_detour_fails: true
   H:
     detour: true
+    sl_when_detour_fails: true
   M:
     detour: true
+    sl_when_detour_fails: true
   O:
     formation: 4
     night: true

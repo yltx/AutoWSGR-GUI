@@ -17,6 +17,7 @@ node_defaults:
 
 node_args:
   I:
+    formation: 4
     night: true
 
 fleet_presets:

@@ -157,6 +157,7 @@ export class Scheduler {
     forceRetry?: boolean,
     allowPolling?: boolean,
     endpointNodes?: string[],
+    sortKey?: number,
   ): string {
     const id = this._taskQueue.addTask(
       name,
@@ -172,6 +173,7 @@ export class Scheduler {
       forceRetry,
       allowPolling,
       endpointNodes,
+      sortKey,
     );
     this.notifyQueueChange();
     return id;
@@ -700,7 +702,7 @@ export class Scheduler {
     });
   }
 
-  private notifyQueueChange(): void {
+  notifyQueueChange(): void {
     this.callbacks.onQueueChange?.(this._taskQueue.items);
   }
 }

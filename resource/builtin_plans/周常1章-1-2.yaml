@@ -1,10 +1,12 @@
 ﻿# 周常第1章 — 地图 1-2
-# 编队: 任意4条驱逐
+# 编队方案:
+#   1) 岛风·改 + 3条日本驱逐
+#   2) T-23·改 + 3条德国驱逐
 # 默认复纵阵
 
 chapter: 1
 map: 2
-selected_nodes: [A, B, C]
+selected_nodes: [A, C]
 endpoint_nodes: [C]
 fleet_id: 1
 fight_condition: 1
@@ -20,10 +22,16 @@ node_args:
     night: true
 
 fleet_presets:
-  - name: 4驱逐
+  - name: 岛风日驱队
     ships:
-      - { ship_type: dd, min_level: 100 }
-      - { ship_type: dd, min_level: 100 }
-      - { ship_type: dd, min_level: 100 }
-      - { ship_type: dd, min_level: 100 }
+      - { name: 岛风(岛风型驱逐舰)·改, min_level: 100 }
+      - { nation: 日本, ship_type: dd, min_level: 100, priority: ['岛风(岛风型驱逐舰)·改', '黑潮·改', '阳炎·改', '早春·改'] }
+      - { nation: 日本, ship_type: dd, min_level: 100, priority: ['岛风(岛风型驱逐舰)·改', '黑潮·改', '阳炎·改', '早春·改'] }
+      - { nation: 日本, ship_type: dd, min_level: 100, priority: ['岛风(岛风型驱逐舰)·改', '黑潮·改', '阳炎·改', '早春·改'] }
+  - name: T-23德驱队
+    ships:
+      - { name: T-23·改, min_level: 100 }
+      - { nation: 德国, ship_type: dd, min_level: 100, priority: ['吕贝克·改', 'Z17·改', 'Z16·改', 'Z46·改', 'Z31·改', 'Z1·改', 'Z22·改', 'Z21·改'] }
+      - { nation: 德国, ship_type: dd, min_level: 100, priority: ['吕贝克·改', 'Z17·改', 'Z16·改', 'Z46·改', 'Z31·改', 'Z1·改', 'Z22·改', 'Z21·改'] }
+      - { nation: 德国, ship_type: dd, min_level: 100, priority: ['吕贝克·改', 'Z17·改', 'Z16·改', 'Z46·改', 'Z31·改', 'Z1·改', 'Z22·改', 'Z21·改'] }
 times: 3

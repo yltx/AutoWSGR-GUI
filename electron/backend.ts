@@ -150,7 +150,9 @@ export async function startBackend(): Promise<void> {
 
   const cwd = ctx.appRoot();
   const localSite = localSitePackages();
-  const localBackendRepo = resolveLocalBackendRepoPath();
+  const guiSettings = readGuiSettings();
+  const backendStartupMode = guiSettings.backend_startup_mode === 'external' ? 'external' : 'managed';
+  const localBackendRepo = backendStartupMode === 'external' ? resolveLocalBackendRepoPath() : null;
   const ocrGpuMode = readOcrGpuModeFromSettings();
   const saveBackendScreenshots = readSaveBackendScreenshotsFromSettings();
 

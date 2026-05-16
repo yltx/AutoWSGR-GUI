@@ -8,7 +8,7 @@ import type { CombatPlanReq, NodeDecisionReq, NormalFightReq } from '../../types
 import type { Scheduler } from '../../model/scheduler';
 import { TaskPriority } from '../../model/scheduler';
 import type { NodeArgs, TaskPreset } from '../../types/model';
-import { getNodeType, isNightNode, isDetourNode } from '../../model/MapDataLoader';
+import { getNodeType, isNightNode, isDetourNode, isTerminalNode } from '../../model/MapDataLoader';
 import type { MapData } from '../../model/MapDataLoader';
 import { toBackendName, resolveFleetPreset, resolveFleetPresetRules, shipSlotLabel } from '../../data/shipData';
 import { Logger } from '../../utils/Logger';
@@ -101,6 +101,7 @@ export class PlanController {
       const isEnabled = this.currentPlan.data.selected_nodes.includes(nodeId);
       const canDetour = this.currentMapData ? isDetourNode(this.currentMapData, nodeId) : false;
       const isEndpoint = (this.currentPlan.data.endpoint_nodes ?? []).includes(nodeId);
+      const isTerminal = this.currentMapData ? isTerminalNode(this.currentMapData, nodeId) : false;
       this.planView.showNodeEditor(nodeId, nodeType as any, {
         enabled: isEnabled,
         formation: args.formation ?? 2,
@@ -111,6 +112,7 @@ export class PlanController {
         canDetour,
         slWhenDetourFails: args.SL_when_detour_fails ?? false,
         isEndpoint,
+        isTerminal,
         enemyRules: rulesText,
       }, mapNight);
     };

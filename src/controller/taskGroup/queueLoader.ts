@@ -84,6 +84,7 @@ export async function loadGroupToQueue(
           !!item.forceRetry,
           !!item.allowPolling,
           plan.data.endpoint_nodes,
+          plan.data.chapter || undefined,
         );
       }
       loadedCount++;
@@ -216,6 +217,7 @@ export async function loadSingleItemToQueue(
         !!item.forceRetry,
         !!item.allowPolling,
         plan.data.endpoint_nodes,
+        plan.data.chapter || undefined,
       );
     }
 

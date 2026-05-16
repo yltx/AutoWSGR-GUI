@@ -69,3 +69,9 @@ export function isDetourNode(mapData: MapData, nodeId: string): boolean {
 export function isNightNode(mapData: MapData, nodeId: string): boolean {
   return mapData[nodeId]?.night ?? false;
 }
+
+/** 获取地图中某节点是否为终端节点（无后续节点，如 BOSS 点） */
+export function isTerminalNode(mapData: MapData, nodeId: string): boolean {
+  const next = mapData[nodeId]?.next;
+  return !next || next.length === 0;
+}
