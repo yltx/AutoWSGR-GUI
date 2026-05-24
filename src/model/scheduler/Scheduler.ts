@@ -496,6 +496,7 @@ export class Scheduler {
       fleetPresets: finished.fleetPresets,
       currentPresetIndex: finished.currentPresetIndex,
       endpointNodes: finished.endpointNodes,
+      sortKey: finished.sortKey,
     };
   }
 
