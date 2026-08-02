@@ -4,6 +4,7 @@
  */
 import { MainView } from '../../view/main/MainView';
 import { PlanPreviewView } from '../../view/plan/PlanPreviewView';
+import { FleetPlannerView } from '../../view/plan/FleetPlannerView';
 import { ConfigView } from '../../view/config/ConfigView';
 import { TaskGroupView } from '../../view/taskGroup/TaskGroupView';
 import { SetupWizardView } from '../../view/setup/SetupWizardView';
@@ -30,6 +31,7 @@ import { PRIORITY_LABELS, STATUS_TEXT } from './constants';
 export class AppController {
   private mainView: MainView;
   private planView: PlanPreviewView;
+  private fleetPlannerView: FleetPlannerView;
   private configView: ConfigView;
   private taskGroupView: TaskGroupView;
   private setupView: SetupWizardView;
@@ -48,6 +50,7 @@ export class AppController {
   private plansDir = '';
   private configDir = '';
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+  private shipLibraryUpdating = false;
 
   private templateCtrl!: TemplateController;
   private taskGroupCtrl!: TaskGroupController;
@@ -60,6 +63,7 @@ export class AppController {
   constructor() {
     this.mainView = new MainView();
     this.planView = new PlanPreviewView();
+    this.fleetPlannerView = new FleetPlannerView();
     this.configView = new ConfigView();
     this.taskGroupView = new TaskGroupView();
     this.setupView = new SetupWizardView();
@@ -280,7 +284,13 @@ export class AppController {
     document.querySelector(`.nav-tab[data-page="${pageId}"]`)?.classList.add('active');
     document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
     document.getElementById(`page-${pageId}`)?.classList.add('active');
-    if (pageId === 'config') this.refreshAdbStatus();
+    if (pageId === 'fleet') {
+      void this.fleetPlannerView.load();
+    }
+    if (pageId === 'config') {
+      this.refreshAdbStatus();
+      void this.refreshShipLibraryStatus();
+    }
   }
 
   // ════════════════════════════════════════
@@ -288,6 +298,12 @@ export class AppController {
   // ════════════════════════════════════════
 
   private bindActions(): void {
+    window.electronBridge?.onShipLibraryUpdateProgress?.((progress) => {
+      if (this.shipLibraryUpdating) {
+        this.configView.setShipLibraryStatus(progress.message, 'unknown');
+      }
+    });
+
     document.getElementById('btn-save-config')?.addEventListener('click', () => this.configCtrl.saveConfig());
     document.getElementById('btn-open-plans-dir')?.addEventListener('click', () => this.openFolder(this.plansDir));
     document.getElementById('btn-open-config-dir')?.addEventListener('click', () => this.openFolder(this.configDir));
@@ -357,6 +373,10 @@ export class AppController {
 
     document.getElementById('btn-check-updates')?.addEventListener('click', async () => {
       await this.checkUpdatesManually();
+    });
+
+    document.getElementById('btn-update-ship-library')?.addEventListener('click', async () => {
+      await this.updateShipLibrary();
     });
 
     document.getElementById('btn-check-adb')?.addEventListener('click', async () => {
@@ -485,6 +505,69 @@ export class AppController {
       }
     } catch {
       this.configView.setAdbStatus('检测失败（后端未启动？）', 'offline');
+    }
+  }
+
+  private async refreshShipLibraryStatus(): Promise<void> {
+    if (this.shipLibraryUpdating) return;
+    const bridge = window.electronBridge;
+    if (!bridge?.getShipLibraryStatus) return;
+    try {
+      const status = await bridge.getShipLibraryStatus();
+      if (status.error) {
+        this.configView.setShipLibraryStatus(status.error, 'error');
+      } else if (!status.exists) {
+        this.configView.setShipLibraryStatus('尚未建立本地资料库', 'unknown');
+      } else if (status.missingAssets > 0) {
+        this.configView.setShipLibraryStatus(
+          `已收录 ${status.shipCount} 艘，缺少 ${status.missingAssets} 个资源`,
+          'error',
+        );
+      } else {
+        const updatedAt = status.generatedAt
+          ? new Date(status.generatedAt).toLocaleString('zh-CN', { hour12: false })
+          : '时间未知';
+        this.configView.setShipLibraryStatus(
+          `已收录 ${status.shipCount} 艘 · ${updatedAt}`,
+          'ok',
+        );
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.configView.setShipLibraryStatus(`状态读取失败: ${message}`, 'error');
+    }
+  }
+
+  private async updateShipLibrary(): Promise<void> {
+    const bridge = window.electronBridge;
+    if (!bridge?.updateShipLibrary || this.shipLibraryUpdating) return;
+    this.shipLibraryUpdating = true;
+    this.configView.setShipLibraryUpdateLoading(true);
+    this.configView.setShipLibraryStatus('正在准备更新…', 'unknown');
+    try {
+      const result = await bridge.updateShipLibrary();
+      if (!result.success) {
+        const message = result.error || result.failures?.[0] || '未知错误';
+        this.configView.setShipLibraryStatus(`更新失败: ${message}`, 'error');
+        Logger.error(`舰船资料库更新失败: ${message}`);
+        return;
+      }
+      const summary = [
+        `${result.ship_count ?? 0} 艘`,
+        `新增 ${result.added ?? 0}`,
+        `变化 ${result.updated ?? 0}`,
+        `下载 ${result.downloaded ?? 0}`,
+      ].join('，');
+      this.configView.setShipLibraryStatus(`更新完成：${summary}`, 'ok');
+      Logger.info(`舰船资料库更新完成：${summary}`);
+      await this.fleetPlannerView.load(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.configView.setShipLibraryStatus(`更新失败: ${message}`, 'error');
+      Logger.error(`舰船资料库更新异常: ${message}`);
+    } finally {
+      this.shipLibraryUpdating = false;
+      this.configView.setShipLibraryUpdateLoading(false);
     }
   }
 

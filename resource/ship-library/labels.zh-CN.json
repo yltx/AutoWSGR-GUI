@@ -1,0 +1,53 @@
+{
+  "locale": "zh-CN",
+  "ship_types": {
+    "ap": "补给舰",
+    "av": "装甲航空母舰",
+    "bb": "战列舰",
+    "bbg": "导弹战列舰",
+    "bbv": "航空战列舰",
+    "bc": "战列巡洋舰",
+    "bm": "浅水重炮舰",
+    "ca": "重巡洋舰",
+    "cav": "航空巡洋舰",
+    "cbg": "导弹大型巡洋舰",
+    "cf": "旗舰",
+    "cg": "反舰导弹巡洋舰",
+    "cgaa": "防空导弹巡洋舰",
+    "cl": "轻巡洋舰",
+    "clt": "重雷装巡洋舰",
+    "cv": "航空母舰",
+    "cvl": "轻型航空母舰",
+    "dd": "驱逐舰",
+    "ddg": "反舰导弹驱逐舰",
+    "ddgaa": "防空导弹驱逐舰",
+    "sc": "重炮潜艇",
+    "ss": "潜水艇",
+    "ssg": "导弹潜艇"
+  },
+  "size_classes": {
+    "large": "大型舰",
+    "medium": "中型舰",
+    "small": "小型舰"
+  },
+  "role_classes": {
+    "main_force": "主力舰",
+    "escort": "护卫舰"
+  },
+  "countries": {
+    "china": "中国",
+    "france": "法国",
+    "germany": "德国",
+    "italy": "意大利",
+    "japan": "日本",
+    "other": "其他",
+    "soviet_union": "苏联",
+    "united_kingdom": "英国",
+    "united_states": "美国"
+  },
+  "variants": {
+    "normal": "普通",
+    "refit": "改造",
+    "special": "特殊"
+  }
+}

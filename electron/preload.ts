@@ -188,6 +188,39 @@ contextBridge.exposeInMainWorld('electronBridge', {
     ipcRenderer.on('update-status', (_event, status) => callback(status));
   },
 
+  getShipLibraryStatus: () => {
+    return ipcRenderer.invoke('get-ship-library-status');
+  },
+
+  getShipLibraryManifest: () => {
+    return ipcRenderer.invoke('get-ship-library-manifest');
+  },
+
+  updateShipLibrary: () => {
+    return ipcRenderer.invoke('update-ship-library');
+  },
+
+  onShipLibraryUpdateProgress: (
+    callback: (progress: { message: string }) => void,
+  ) => {
+    ipcRenderer.on(
+      'ship-library-update-progress',
+      (_event, progress) => callback(progress),
+    );
+  },
+
+  saveUserTeamPlan: (plan: unknown, overwrite = false) => {
+    return ipcRenderer.invoke('save-user-team-plan', plan, overwrite);
+  },
+
+  pickUserTeamPlan: () => {
+    return ipcRenderer.invoke('pick-user-team-plan');
+  },
+
+  listUserTeamPlans: () => {
+    return ipcRenderer.invoke('list-user-team-plans');
+  },
+
   onBackendLog: (callback: (line: string) => void) => {
     ipcRenderer.on('backend-log', (_event, line: string) => callback(line));
   },

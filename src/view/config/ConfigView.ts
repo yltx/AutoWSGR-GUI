@@ -47,6 +47,8 @@ export class ConfigView {
   private pythonStatus: HTMLElement | null;
   private adbStatus: HTMLElement | null;
   private validatePythonBtn: HTMLButtonElement | null;
+  private shipLibraryStatus: HTMLElement | null;
+  private updateShipLibraryBtn: HTMLButtonElement | null;
 
   constructor() {
     this.emuType = document.getElementById('cfg-emu-type') as HTMLSelectElement;
@@ -91,6 +93,10 @@ export class ConfigView {
     this.pythonStatus = document.getElementById('cfg-python-status');
     this.adbStatus = document.getElementById('cfg-adb-status');
     this.validatePythonBtn = document.getElementById('btn-validate-python') as HTMLButtonElement | null;
+    this.shipLibraryStatus = document.getElementById('ship-library-status');
+    this.updateShipLibraryBtn = document.getElementById(
+      'btn-update-ship-library',
+    ) as HTMLButtonElement | null;
 
     // 调色盘实时预览
     this.accentColor.addEventListener('input', () => {
@@ -275,6 +281,23 @@ export class ConfigView {
     if (!this.validatePythonBtn) return;
     this.validatePythonBtn.disabled = loading;
     this.validatePythonBtn.textContent = loading ? '检测中…' : '检测';
+  }
+
+  setShipLibraryStatus(text: string, status: 'ok' | 'error' | 'unknown'): void {
+    if (!this.shipLibraryStatus) return;
+    this.shipLibraryStatus.textContent = text;
+    const cls = status === 'ok'
+      ? 'adb-status-online'
+      : status === 'error'
+        ? 'adb-status-offline'
+        : 'adb-status-unknown';
+    this.shipLibraryStatus.className = `adb-status ${cls}`;
+  }
+
+  setShipLibraryUpdateLoading(loading: boolean): void {
+    if (!this.updateShipLibraryBtn) return;
+    this.updateShipLibraryBtn.disabled = loading;
+    this.updateShipLibraryBtn.textContent = loading ? '正在更新…' : '更新舰船数据库';
   }
 
   setEmulatorSerial(serial: string): void {

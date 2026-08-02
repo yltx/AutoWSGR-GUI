@@ -5,14 +5,16 @@
 import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec } from 'child_process';
+import { pathToFileURL } from 'url';
+import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater';
+import * as yaml from 'js-yaml';
 import {
   initPythonEnv, clearPythonCache,
   isAllowedPythonVersion, findPython, checkEnvironment,
   checkForUpdates, installDependencies, installPortablePython,
-  pullUpdates,
+  pullUpdates, ensurePip, localSitePackages, pipEnv,
 } from './pythonEnv';
 import { detectEmulator } from './emulatorDetect';
 import { initBackend, getBackendProcess, startBackend, stopBackend, runSetupScript } from './backend';
@@ -217,6 +219,626 @@ function copyDirNoOverwrite(src: string, dest: string): void {
   }
 }
 
+interface ShipLibraryStatus {
+  exists: boolean;
+  path: string;
+  generatedAt?: string;
+  shipCount: number;
+  assetCount: number;
+  missingAssets: number;
+  error?: string;
+}
+
+interface ShipLibraryUpdateResult {
+  success: boolean;
+  output?: string;
+  generated_at?: string;
+  ship_count?: number;
+  asset_count?: number;
+  added?: number;
+  updated?: number;
+  removed?: number;
+  downloaded?: number;
+  failed?: number;
+  failures?: string[];
+  error?: string;
+}
+
+interface ShipLibraryManifest {
+  schemaVersion: number;
+  generatedAt: string;
+  labels: Record<string, unknown>;
+  typeGroups: Record<string, unknown>;
+  ships: Array<Record<string, unknown>>;
+}
+
+/** 当前可写的舰船资料库目录。 */
+function shipLibraryDir(): string {
+  if (isPackaged()) {
+    return path.join(app.getPath('userData'), 'ship-library');
+  }
+  return path.join(resourceRoot(), 'resource', 'ship-library');
+}
+
+/** 打包后将内置资料库复制到用户目录，已有文件不覆盖。 */
+function initUserShipLibraryDir(): void {
+  if (!isPackaged()) return;
+  const bundledDir = path.join(resourceRoot(), 'resource', 'ship-library');
+  if (fs.existsSync(bundledDir)) {
+    copyDirNoOverwrite(bundledDir, shipLibraryDir());
+  }
+}
+
+const ALLOWED_FLEET_SHIP_TYPES = new Set([
+  'dd',
+  'cl',
+  'ca',
+  'cav',
+  'clt',
+  'bb',
+  'bc',
+  'bbv',
+  'cv',
+  'cvl',
+  'av',
+  'ss',
+  'ssg',
+  'cg',
+  'cgaa',
+  'ddg',
+  'ddgaa',
+  'bm',
+  'cbg',
+  'cf',
+  'ss_or_ssg',
+]);
+const TEAM_FILE_PATTERN = /^team[-_][^\\/]+\.ya?ml$/i;
+
+interface UserTeamShipRule {
+  name: string;
+  search_name?: string;
+  ship_type?: string[];
+  min_level?: number;
+  max_level?: number;
+}
+
+interface UserTeamPlanSlot {
+  name?: string;
+  search_name?: string;
+  ship_type?: string[];
+  min_level?: number;
+  max_level?: number;
+  candidates?: UserTeamShipRule[];
+}
+
+interface UserTeamPlan {
+  file?: string;
+  name: string;
+  ships: UserTeamPlanSlot[];
+}
+
+/** 用户编队目录在开发模式下固定为 resource/user_team_plans。 */
+function userTeamPlansDir(): string {
+  return path.join(
+    isPackaged() ? appRoot() : resourceRoot(),
+    'resource',
+    'user_team_plans',
+  );
+}
+
+function initUserTeamPlansDir(): void {
+  fs.mkdirSync(userTeamPlansDir(), { recursive: true });
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function positiveInteger(value: unknown, field: string): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (!Number.isInteger(value) || Number(value) < 1) {
+    throw new Error(`${field} 必须是大于或等于 1 的整数`);
+  }
+  return Number(value);
+}
+
+function normalizeUserTeamShipTypes(
+  raw: unknown,
+  field: string,
+): string[] | undefined {
+  if (raw === undefined || raw === null || raw === '') return undefined;
+  const values = typeof raw === 'string' ? [raw] : raw;
+  if (!Array.isArray(values) || values.length === 0) {
+    throw new Error(`${field} 必须是非空字符串列表`);
+  }
+  const result = values.map((value) => {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`${field} 必须是非空字符串列表`);
+    }
+    const shipType = value.trim().toLowerCase();
+    if (!ALLOWED_FLEET_SHIP_TYPES.has(shipType)) {
+      throw new Error(`${field} 不符合后端接口: ${shipType}`);
+    }
+    return shipType;
+  });
+  return [...new Set(result)];
+}
+
+/** 校验一艘主选或备选舰船自己的规则。 */
+function normalizeUserTeamShipRule(
+  raw: unknown,
+  field: string,
+): UserTeamShipRule {
+  if (!isPlainObject(raw)) throw new Error(`${field} 必须是对象`);
+  const allowedKeys = new Set([
+    'name',
+    'search_name',
+    'ship_type',
+    'min_level',
+    'max_level',
+  ]);
+  if (Object.keys(raw).some(key => !allowedKeys.has(key))) {
+    throw new Error(`${field} 包含后端不支持的字段`);
+  }
+  if (typeof raw.name !== 'string' || !raw.name.trim()) {
+    throw new Error(`${field}.name 必须是非空字符串`);
+  }
+
+  const result: UserTeamShipRule = { name: raw.name.trim() };
+  if (raw.search_name !== undefined) {
+    if (typeof raw.search_name !== 'string' || !raw.search_name.trim()) {
+      throw new Error(`${field}.search_name 必须是非空字符串`);
+    }
+    result.search_name = raw.search_name.trim();
+  }
+  const shipTypes = normalizeUserTeamShipTypes(
+    raw.ship_type,
+    `${field}.ship_type`,
+  );
+  if (shipTypes) result.ship_type = shipTypes;
+  const minLevel = positiveInteger(raw.min_level, `${field}.min_level`);
+  const maxLevel = positiveInteger(raw.max_level, `${field}.max_level`);
+  if (minLevel !== undefined) result.min_level = minLevel;
+  if (maxLevel !== undefined) result.max_level = maxLevel;
+  if (
+    minLevel !== undefined
+    && maxLevel !== undefined
+    && maxLevel < minLevel
+  ) {
+    throw new Error(`${field}.max_level 必须大于或等于 min_level`);
+  }
+  return result;
+}
+
+/** 校验单个位置；主选可以为空，但位置必须至少包含一艘主选或备选。 */
+function normalizeUserTeamSlot(raw: unknown): UserTeamPlanSlot | null {
+  if (raw === null) return null;
+  if (!isPlainObject(raw)) throw new Error('ships 中的位置必须是对象');
+  const allowedKeys = new Set([
+    'name',
+    'candidates',
+    'search_name',
+    'ship_type',
+    'min_level',
+    'max_level',
+  ]);
+  if (Object.keys(raw).some(key => !allowedKeys.has(key))) {
+    throw new Error('位置包含后端不支持的字段');
+  }
+  if (raw.candidates !== undefined && !Array.isArray(raw.candidates)) {
+    throw new Error('candidates 必须是列表');
+  }
+
+  const candidates = (raw.candidates ?? []).map(
+    (candidate: unknown, index: number) => normalizeUserTeamShipRule(
+      candidate,
+      `candidates[${index}]`,
+    ),
+  );
+  const hasPrimary = typeof raw.name === 'string' && Boolean(raw.name.trim());
+  if (!hasPrimary) {
+    if (
+      raw.search_name !== undefined
+      || raw.ship_type !== undefined
+      || raw.min_level !== undefined
+      || raw.max_level !== undefined
+    ) {
+      throw new Error('没有主选 name 时不能填写主选规则');
+    }
+    if (candidates.length === 0) {
+      throw new Error('位置至少需要一艘主选或备选舰船');
+    }
+    return { candidates };
+  }
+
+  const { candidates: _ignored, ...primaryFields } = raw;
+  const result: UserTeamPlanSlot = {
+    ...normalizeUserTeamShipRule(primaryFields, '主选'),
+  };
+  if (candidates.length > 0) result.candidates = candidates;
+  return result;
+}
+
+/** 校验独立编队文件：一个名称对应一支最多六个位置的舰队。 */
+function normalizeUserTeamPlan(raw: unknown): UserTeamPlan {
+  if (!isPlainObject(raw)) throw new Error('编队 YAML 根节点必须是对象');
+  const allowedKeys = new Set(['name', 'ships']);
+  if (Object.keys(raw).some(key => !allowedKeys.has(key))) {
+    throw new Error('编队 YAML 包含不支持的根字段');
+  }
+  if (typeof raw.name !== 'string' || !raw.name.trim()) {
+    throw new Error('name 不能为空');
+  }
+  if (!Array.isArray(raw.ships) || raw.ships.length < 1 || raw.ships.length > 6) {
+    throw new Error('ships 必须包含 1 到 6 个位置');
+  }
+  const ships = raw.ships
+    .map(normalizeUserTeamSlot)
+    .filter((slot): slot is UserTeamPlanSlot => slot !== null);
+  if (ships.length === 0) {
+    throw new Error('ships 至少需要一个有效位置');
+  }
+  return { name: raw.name.trim(), ships };
+}
+
+/** 使用行内 YAML 表示列表或备选对象，避免备选较多时纵向膨胀。 */
+function inlineYaml(value: unknown): string {
+  return yaml.dump(value, {
+    flowLevel: 0,
+    lineWidth: -1,
+    noRefs: true,
+    sortKeys: false,
+  }).trim();
+}
+
+/** 主选分行输出；纯备选位置不写 name，单个备选保持在同一行。 */
+function serializeUserTeamPlan(plan: UserTeamPlan): string {
+  const lines = [
+    `name: ${inlineYaml(plan.name)}`,
+    'ships:',
+  ];
+  for (const slot of plan.ships) {
+    if (slot.name !== undefined) {
+      lines.push(`  - name: ${inlineYaml(slot.name)}`);
+      if (slot.search_name !== undefined) {
+        lines.push(`    search_name: ${inlineYaml(slot.search_name)}`);
+      }
+      if (slot.ship_type !== undefined) {
+        lines.push(`    ship_type: ${inlineYaml(slot.ship_type)}`);
+      }
+      if (slot.min_level !== undefined) {
+        lines.push(`    min_level: ${slot.min_level}`);
+      }
+      if (slot.max_level !== undefined) {
+        lines.push(`    max_level: ${slot.max_level}`);
+      }
+    }
+    if (slot.candidates?.length) {
+      lines.push(slot.name === undefined ? '  - candidates:' : '    candidates:');
+      for (const candidate of slot.candidates) {
+        lines.push(`      - ${inlineYaml(candidate)}`);
+      }
+    }
+  }
+  return `${lines.join('\n')}\n`;
+}
+
+function teamFileName(name: string): string {
+  const safeName = name
+    .trim()
+    .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+    .replace(/[. ]+$/g, '')
+    .slice(0, 80);
+  if (!safeName) throw new Error('编队预设名称不能用于文件名');
+  return `team-${safeName}.yaml`;
+}
+
+function atomicWrite(filePath: string, content: string): void {
+  const temporary = `${filePath}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(temporary, content, 'utf-8');
+  try {
+    fs.renameSync(temporary, filePath);
+  } catch {
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    fs.renameSync(temporary, filePath);
+  }
+}
+
+function readUserTeamPlan(filePath: string): UserTeamPlan {
+  return normalizeUserTeamPlan(
+    yaml.load(fs.readFileSync(filePath, 'utf-8')),
+  );
+}
+
+function yamlFiles(directory: string): string[] {
+  if (!fs.existsSync(directory)) return [];
+  return fs.readdirSync(directory)
+    .filter(file => /\.ya?ml$/i.test(file))
+    .sort((left, right) => left.localeCompare(right, 'zh-CN'));
+}
+
+/** 只列出用户编队目录中命名和内容均合法的编队文件。 */
+function listUserTeamPlans(): {
+  plans: UserTeamPlan[];
+  errors: string[];
+} {
+  const directory = userTeamPlansDir();
+  const plans: UserTeamPlan[] = [];
+  const errors: string[] = [];
+  for (const file of yamlFiles(directory)) {
+    if (!TEAM_FILE_PATTERN.test(file)) continue;
+    try {
+      const plan = readUserTeamPlan(path.join(directory, file));
+      plans.push({ ...plan, file });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${file}: ${message}`);
+    }
+  }
+  return { plans, errors };
+}
+
+/** 读取清单，为配置页提供当前资料库状态。 */
+function getShipLibraryStatus(): ShipLibraryStatus {
+  const directory = shipLibraryDir();
+  const manifestPath = path.join(directory, 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    return {
+      exists: false,
+      path: directory,
+      shipCount: 0,
+      assetCount: 0,
+      missingAssets: 0,
+    };
+  }
+  try {
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
+      generated_at?: unknown;
+      counts?: Record<string, unknown>;
+    };
+    const counts = manifest.counts ?? {};
+    return {
+      exists: true,
+      path: directory,
+      generatedAt: typeof manifest.generated_at === 'string' ? manifest.generated_at : undefined,
+      shipCount: typeof counts.ships === 'number' ? counts.ships : 0,
+      assetCount: typeof counts.assets === 'number' ? counts.assets : 0,
+      missingAssets: typeof counts.missing_assets === 'number' ? counts.missing_assets : 0,
+    };
+  } catch (error) {
+    return {
+      exists: false,
+      path: directory,
+      shipCount: 0,
+      assetCount: 0,
+      missingAssets: 0,
+      error: `资料库清单读取失败: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+}
+
+function shipAssetUrl(relativePath: unknown): string {
+  if (typeof relativePath !== 'string' || !relativePath) return '';
+  const root = path.resolve(shipLibraryDir());
+  const absolutePath = path.resolve(root, relativePath);
+  if (absolutePath !== root && !absolutePath.startsWith(`${root}${path.sep}`)) return '';
+  return pathToFileURL(absolutePath).href;
+}
+
+/** 只向渲染进程提供舰队规划需要的清单字段和本地资源 URL。 */
+function getShipLibraryManifest(): ShipLibraryManifest {
+  const manifestPath = path.join(shipLibraryDir(), 'manifest.json');
+  if (!fs.existsSync(manifestPath)) {
+    throw new Error('舰船资料库尚未建立，请先在配置页更新舰船数据库');
+  }
+  const raw = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
+    schema_version?: unknown;
+    generated_at?: unknown;
+    labels?: unknown;
+    type_groups?: unknown;
+    ships?: unknown;
+  };
+  if (!Array.isArray(raw.ships)) {
+    throw new Error('舰船资料库清单格式无效');
+  }
+  return {
+    schemaVersion: typeof raw.schema_version === 'number' ? raw.schema_version : 0,
+    generatedAt: typeof raw.generated_at === 'string' ? raw.generated_at : '',
+    labels: raw.labels && typeof raw.labels === 'object'
+      ? raw.labels as Record<string, unknown>
+      : {},
+    typeGroups: raw.type_groups && typeof raw.type_groups === 'object'
+      ? raw.type_groups as Record<string, unknown>
+      : {},
+    ships: raw.ships.map((entry) => {
+      const ship = entry && typeof entry === 'object'
+        ? entry as Record<string, unknown>
+        : {};
+      return {
+        ...ship,
+        portraitUrl: shipAssetUrl(ship.portrait),
+        backgroundUrl: shipAssetUrl(ship.background),
+        frameUrl: shipAssetUrl(ship.frame),
+        typeIconUrl: shipAssetUrl(ship.type_icon),
+      };
+    }),
+  };
+}
+
+function shipLibraryUpdaterPath(): string {
+  const root = isPackaged() ? resourceRoot() : appRoot();
+  return path.join(root, 'tools', 'ship_library', 'update_ship_library.py');
+}
+
+function sendShipLibraryProgress(message: string): void {
+  mainWindow?.webContents.send('ship-library-update-progress', { message });
+}
+
+function runPython(
+  pythonCmd: string,
+  args: string[],
+): Promise<{ code: number; output: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(pythonCmd, args, {
+      cwd: appRoot(),
+      windowsHide: true,
+      env: pipEnv(),
+    });
+    let output = '';
+    child.stdout?.on('data', (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.stderr?.on('data', (chunk: Buffer) => {
+      output += chunk.toString();
+    });
+    child.once('error', (error) => {
+      resolve({ code: 1, output: error.message });
+    });
+    child.once('close', (code) => {
+      resolve({ code: code ?? 1, output });
+    });
+  });
+}
+
+function shipLibraryPythonBootstrap(): string {
+  const sitePackages = localSitePackages()
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'");
+  return [
+    'import runpy, site, sys',
+    `sp = r'${sitePackages}'`,
+    'sys.path.insert(0, sp)',
+    'site.addsitedir(sp)',
+    'script = sys.argv.pop(1)',
+    "runpy.run_path(script, run_name='__main__')",
+  ].join('; ');
+}
+
+/** 确保更新器依赖安装在 GUI 自己的 Python 包目录中。 */
+async function ensureShipLibraryUpdaterDependencies(
+  pythonCmd: string,
+): Promise<string | null> {
+  const probe = await runPython(pythonCmd, [
+    '-c',
+    [
+      'import site, sys',
+      `sp = r'${localSitePackages().replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`,
+      'sys.path.insert(0, sp)',
+      'site.addsitedir(sp)',
+      'import requests, bs4',
+    ].join('; '),
+  ]);
+  if (probe.code === 0) return null;
+
+  sendShipLibraryProgress('正在安装舰船数据库更新依赖…');
+  if (!(await ensurePip(pythonCmd))) {
+    return '舰船数据库更新依赖安装失败：当前 Python 无法使用 pip';
+  }
+  fs.mkdirSync(localSitePackages(), { recursive: true });
+  const install = await runPython(pythonCmd, [
+    '-m',
+    'pip',
+    'install',
+    '--target',
+    localSitePackages(),
+    'requests',
+    'beautifulsoup4',
+  ]);
+  if (install.code !== 0) {
+    return `舰船数据库更新依赖安装失败: ${install.output.trim().slice(-500)}`;
+  }
+  return null;
+}
+
+/** 使用当前 GUI Python 环境执行增量更新，并解析脚本的机器可读结果。 */
+async function runShipLibraryUpdate(): Promise<ShipLibraryUpdateResult> {
+  const pythonCmd = await findPython();
+  if (!pythonCmd) {
+    return { success: false, error: '找不到可用的 Python 3.12 或 3.13' };
+  }
+  const updaterPath = shipLibraryUpdaterPath();
+  if (!fs.existsSync(updaterPath)) {
+    return { success: false, error: `找不到舰船资料库更新程序: ${updaterPath}` };
+  }
+  const dependencyError = await ensureShipLibraryUpdaterDependencies(pythonCmd);
+  if (dependencyError) {
+    return { success: false, error: dependencyError };
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn(
+      pythonCmd,
+      [
+        '-c',
+        shipLibraryPythonBootstrap(),
+        updaterPath,
+        '--output',
+        shipLibraryDir(),
+        '--workers',
+        '8',
+        '--force-assets',
+      ],
+      {
+        cwd: appRoot(),
+        windowsHide: true,
+        env: pipEnv(),
+      },
+    );
+    let stdoutBuffer = '';
+    let stderr = '';
+    let result: ShipLibraryUpdateResult | null = null;
+
+    const handleLine = (rawLine: string): void => {
+      const line = rawLine.trim();
+      if (!line) return;
+      if (line.startsWith('PROGRESS sources')) {
+        sendShipLibraryProgress('正在获取舰R百科数据…');
+      } else {
+        const records = line.match(/^PROGRESS records parsed=(\d+)$/);
+        const assets = line.match(
+          /^PROGRESS assets (\d+)\/(\d+) downloaded=(\d+) failed=(\d+)$/,
+        );
+        if (records) {
+          sendShipLibraryProgress(`已读取 ${records[1]} 艘舰船，正在检查本地资源…`);
+        } else if (assets) {
+          sendShipLibraryProgress(
+            `正在检查资源 ${assets[1]}/${assets[2]}，已下载 ${assets[3]}，失败 ${assets[4]}`,
+          );
+        }
+      }
+      if (line.startsWith('RESULT_JSON=')) {
+        try {
+          result = JSON.parse(line.slice('RESULT_JSON='.length)) as ShipLibraryUpdateResult;
+        } catch {
+          result = { success: false, error: '更新程序返回了无效结果' };
+        }
+      }
+    };
+
+    child.stdout.setEncoding('utf-8');
+    child.stdout.on('data', (chunk: string) => {
+      stdoutBuffer += chunk;
+      const lines = stdoutBuffer.split(/\r?\n/);
+      stdoutBuffer = lines.pop() ?? '';
+      lines.forEach(handleLine);
+    });
+    child.stderr.setEncoding('utf-8');
+    child.stderr.on('data', (chunk: string) => {
+      stderr += chunk;
+    });
+    child.once('error', (error) => {
+      resolve({ success: false, error: `更新程序启动失败: ${error.message}` });
+    });
+    child.once('close', (code) => {
+      if (stdoutBuffer) handleLine(stdoutBuffer);
+      resolve(result ?? {
+        success: false,
+        error: stderr.trim() || `更新程序异常退出（代码 ${code ?? 'unknown'}）`,
+      });
+    });
+  });
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1280,
@@ -242,7 +864,7 @@ function createWindow(): BrowserWindow {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:${BACKEND_PORT} ws://localhost:${BACKEND_PORT}`
+          `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' file: data:; connect-src 'self' http://localhost:${BACKEND_PORT} ws://localhost:${BACKEND_PORT}`
         ],
       },
     });
@@ -487,6 +1109,87 @@ ipcMain.handle('check-environment', async () => {
   return await checkEnvironment();
 });
 
+ipcMain.handle('get-ship-library-status', () => {
+  return getShipLibraryStatus();
+});
+
+ipcMain.handle('get-ship-library-manifest', () => {
+  return getShipLibraryManifest();
+});
+
+ipcMain.handle('save-user-team-plan', (
+  _event,
+  rawPlan: unknown,
+  overwrite: boolean,
+) => {
+  try {
+    const plan = normalizeUserTeamPlan(rawPlan);
+    const file = teamFileName(plan.name);
+    const filePath = path.join(userTeamPlansDir(), file);
+    if (fs.existsSync(filePath) && overwrite !== true) {
+      return {
+        success: false,
+        exists: true,
+        file,
+        error: '存在同名配置',
+      };
+    }
+    const content = serializeUserTeamPlan(plan);
+    atomicWrite(filePath, content);
+    return { success: true, file, plan: { ...plan, file } };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+});
+
+ipcMain.handle('pick-user-team-plan', async () => {
+  const directory = userTeamPlansDir();
+  const result = await dialog.showOpenDialog({
+    title: '加载编队预设',
+    defaultPath: directory,
+    properties: ['openFile'],
+    filters: [{ name: '编队 YAML', extensions: ['yaml', 'yml'] }],
+  });
+  if (result.canceled || result.filePaths.length === 0) {
+    return { success: false, canceled: true };
+  }
+
+  const filePath = path.resolve(result.filePaths[0]);
+  const file = path.basename(filePath);
+  if (
+    path.dirname(filePath).toLowerCase() !== path.resolve(directory).toLowerCase()
+    || !TEAM_FILE_PATTERN.test(file)
+  ) {
+    return { success: false, error: '当前yaml格式不符合规则' };
+  }
+  try {
+    const plan = readUserTeamPlan(filePath);
+    return { success: true, file, plan: { ...plan, file } };
+  } catch {
+    return { success: false, error: '当前yaml格式不符合规则' };
+  }
+});
+
+ipcMain.handle('list-user-team-plans', () => {
+  return listUserTeamPlans();
+});
+
+let shipLibraryUpdateRunning = false;
+ipcMain.handle('update-ship-library', async () => {
+  if (shipLibraryUpdateRunning) {
+    return { success: false, error: '舰船资料库正在更新，请稍候' };
+  }
+  shipLibraryUpdateRunning = true;
+  try {
+    return await runShipLibraryUpdate();
+  } finally {
+    shipLibraryUpdateRunning = false;
+  }
+});
+
 /*
  * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
 ipcMain.handle('check-updates', async () => {
@@ -612,6 +1315,8 @@ app.whenReady().then(() => {
     getMainWindow: () => mainWindow,
   });
   initUserPlansDir();
+  initUserShipLibraryDir();
+  initUserTeamPlansDir();
   initAutoUpdater();
   createWindow();
 

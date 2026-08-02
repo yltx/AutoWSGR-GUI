@@ -55,6 +55,13 @@
         ]
       },
       {
+        "from": "tools/ship_library",
+        "to": "tools/ship_library",
+        "filter": [
+          "update_ship_library.py"
+        ]
+      },
+      {
         "from": "setup.bat",
         "to": "setup.bat"
       },
