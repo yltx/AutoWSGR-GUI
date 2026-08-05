@@ -12,6 +12,7 @@
     <div class="nav-title">WSGR GUI <span class="nav-version" id="app-version"></span></div>
     <div class="nav-tabs">
       <button class="nav-tab active" data-page="main">主页</button>
+      <button class="nav-tab" data-page="fleet">舰队规划</button>
       <button class="nav-tab" data-page="plan">方案预览</button>
       <button class="nav-tab" data-page="config">配置</button>
     </div>
@@ -126,6 +127,159 @@
             <div class="log-container" id="log-container"></div>
           </div>
         </div>
+      </div>
+    </section>
+
+    <!-- 舰队规划页面 -->
+    <section id="page-fleet" class="page">
+      <div class="fleet-planner-layout">
+        <section class="fleet-planner-fleet card">
+          <div class="fleet-formation-heading fleet-planner-toolbar">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-primary">舰队编队</h3>
+            <label class="fleet-preset-name-field">
+              <span>预设名称</span>
+              <input
+                class="input"
+                id="fleet-preset-name"
+                type="text"
+                maxlength="80"
+                placeholder="输入舰队预设名称"
+              >
+            </label>
+            <div class="fleet-preset-actions">
+              <button class="btn btn-small" id="btn-new-team-plan" type="button">新建</button>
+              <button class="btn btn-small btn-primary" id="btn-save-team-plan" type="button">保存</button>
+              <button class="btn btn-small" id="btn-load-team-plan" type="button">加载</button>
+              <button class="btn btn-small" id="btn-clear-fleet" type="button">清空</button>
+            </div>
+            <div class="fleet-toolbar-level">
+              <label class="config-switch fleet-level-switch">
+                <input type="checkbox" id="fleet-level-enabled">
+                <span class="config-switch-track" aria-hidden="true"></span>
+                <span>等级限制</span>
+              </label>
+              <div class="fleet-level-fields" id="fleet-level-fields" hidden>
+                <label>
+                  <span>最小</span>
+                  <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                </label>
+                <label>
+                  <span>最大</span>
+                  <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                </label>
+              </div>
+            </div>
+          </div>
+          <section class="fleet-formation-section">
+            <div class="fleet-slot-scroll">
+              <div class="fleet-slot-list" id="fleet-slot-list" aria-label="编队槽位"></div>
+            </div>
+          </section>
+
+          <div class="fleet-formation-heading fleet-backup-heading">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-backup" id="fleet-backup-title">位置 1 的备选队列</h3>
+            <div class="fleet-backup-actions">
+              <button class="btn btn-small" id="btn-backup-follow-mode" type="button" aria-pressed="false">舰船跟随</button>
+              <button class="btn btn-small btn-primary" id="btn-add-fleet-backup" type="button">增加备选</button>
+              <button class="btn btn-small" id="btn-copy-fleet-backup" type="button">复制备选</button>
+              <label class="config-switch fleet-level-switch">
+                <input type="checkbox" id="fleet-backup-level-enabled">
+                <span class="config-switch-track" aria-hidden="true"></span>
+                <span>等级限制</span>
+              </label>
+              <div class="fleet-level-fields" id="fleet-backup-level-fields" hidden>
+                <label>
+                  <span>最小</span>
+                  <input class="input" id="fleet-backup-min-level" type="number" min="1" step="1">
+                </label>
+                <label>
+                  <span>最大</span>
+                  <input class="input" id="fleet-backup-max-level" type="number" min="1" step="1">
+                </label>
+              </div>
+            </div>
+          </div>
+          <section class="fleet-formation-section fleet-backup-section">
+            <div class="fleet-backup-scroll">
+              <div class="fleet-backup-slot-list" id="fleet-backup-slot-list" aria-label="备选编队槽位"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="fleet-planner-library card">
+          <div class="fleet-library-header">
+            <div class="fleet-library-title">
+              <h2>舰娘图鉴</h2>
+              <span id="fleet-library-count">正在读取资料库…</span>
+            </div>
+            <div class="fleet-library-search-actions">
+              <label class="fleet-search">
+                <span aria-hidden="true">⌕</span>
+                <input id="fleet-ship-search" type="search" placeholder="搜索舰名或编号" autocomplete="off">
+              </label>
+              <div class="fleet-library-filter-triggers">
+                <button class="btn btn-small fleet-filter-trigger" type="button" data-fleet-filter-trigger="filter" aria-expanded="false">
+                  <span class="fleet-filter-trigger-name">筛选</span>
+                  <span id="fleet-filter-count"></span>
+                </button>
+                <button class="btn btn-small" id="btn-reset-fleet-filter" type="button">恢复默认</button>
+              </div>
+            </div>
+            <div class="fleet-filter-popover" id="fleet-filter-popover" hidden>
+              <div class="fleet-filter-popover-header">
+                <div class="fleet-filter-popover-heading">
+                  <strong>综合筛选</strong>
+                  <label class="config-switch fleet-refit-filter">
+                    <span>过滤改造</span>
+                    <input id="fleet-filter-refit-only" type="checkbox">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+                <div class="fleet-filter-popover-actions">
+                  <button class="btn btn-small btn-primary" id="btn-confirm-fleet-filter" type="button">确定</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">舰型分组</span>
+                <div class="fleet-filter-options" id="fleet-filter-groups">
+                  <button class="fleet-filter-option active" type="button" data-filter-kind="group" data-filter-value="all">全部</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="large">大型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="medium">中型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="small">小型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="main_force">主力舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="escort">护卫舰</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">类型</span>
+                <div class="fleet-filter-options fleet-filter-options-scroll" id="fleet-filter-types"></div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">国籍</span>
+                <div class="fleet-filter-options" id="fleet-filter-countries"></div>
+              </div>
+              <div class="fleet-filter-section fleet-filter-sort-section">
+                <span class="fleet-filter-label">排序规则</span>
+                <div class="fleet-filter-sort-controls">
+                  <div class="fleet-filter-options">
+                    <button class="fleet-filter-option" type="button" data-sort-field="type">类型</button>
+                    <button class="fleet-filter-option" type="button" data-sort-field="name">名称</button>
+                    <button class="fleet-filter-option active" type="button" data-sort-field="id">编号</button>
+                  </div>
+                  <label class="fleet-sort-direction">
+                    <span>正序</span>
+                    <input type="checkbox" id="fleet-sort-desc">
+                    <span class="fleet-sort-track" aria-hidden="true"></span>
+                    <span>倒序</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="fleet-ship-gallery" id="fleet-ship-gallery">
+            <div class="fleet-library-empty">正在加载本地舰船资料库…</div>
+          </div>
+        </section>
       </div>
     </section>
 
@@ -1024,6 +1178,92 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="generic-prompt-ok">确定</button>
         <button class="btn" id="generic-prompt-cancel">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 舰队规划：加载编队预设 -->
+  <div id="fleet-team-loader" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-team-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>加载舰队预设</h3>
+          <p>读取系统与用户编队目录中的合法 team-*.yaml 配置。</p>
+        </div>
+        <div class="fleet-team-loader-header-actions">
+          <span id="fleet-team-loader-count">共读取 0 个舰队预设</span>
+          <button class="btn btn-small" id="btn-refresh-team-loader" type="button">刷新</button>
+        </div>
+      </div>
+      <input
+        class="input"
+        id="fleet-team-loader-search"
+        type="search"
+        placeholder="搜索预设名称"
+        autocomplete="off"
+      >
+      <div class="fleet-team-loader-content">
+        <div class="fleet-team-loader-list" id="fleet-team-loader-list"></div>
+        <div class="fleet-team-loader-preview-column">
+          <div class="fleet-team-loader-tools">
+            <div class="fleet-team-loader-system-filter">
+              <span>过滤系统预设</span>
+              <label class="config-switch">
+                <input type="checkbox" id="fleet-team-loader-filter-system" checked>
+                <span class="config-switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="fleet-team-loader-sort">
+              <span>排序方式</span>
+              <div class="fleet-team-loader-sort-controls">
+                <div class="fleet-team-loader-sort-fields">
+                  <button
+                    class="fleet-team-loader-sort-option"
+                    data-team-loader-sort-field="name"
+                    type="button"
+                  >名称</button>
+                  <button
+                    class="fleet-team-loader-sort-option active"
+                    data-team-loader-sort-field="modifiedAt"
+                    type="button"
+                  >修改时间</button>
+                </div>
+                <label class="fleet-sort-direction">
+                  <span>倒序</span>
+                  <input type="checkbox" id="fleet-team-loader-sort-asc">
+                  <span class="fleet-sort-track" aria-hidden="true"></span>
+                  <span>正序</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="fleet-team-loader-preview fleet-team-preview">
+            <div class="fleet-team-preview-heading">
+              <h3 id="fleet-team-loader-preview-title">编队预览：未选择</h3>
+              <p class="fleet-team-preview-hint">点击主编队位置，查看该位置对应的备选队列。</p>
+            </div>
+            <div id="fleet-team-loader-preview-slots" class="fleet-team-main-preview"></div>
+            <h4 id="fleet-team-loader-backup-title">【位置1】的备选队列</h4>
+            <div id="fleet-team-loader-backup-slots" class="fleet-team-backup-preview"></div>
+          </div>
+        </div>
+      </div>
+      <p class="fleet-dialog-status" id="fleet-team-loader-status"></p>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-team-loader" type="button">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-team-loader" type="button" disabled>加载</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 舰队规划：复制当前位置的备选队列 -->
+  <div id="fleet-backup-copy-dialog" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-backup-copy-dialog">
+      <h3>复制备选队列</h3>
+      <p id="fleet-backup-copy-description">选择需要接收备选队列的主选位置。</p>
+      <div id="fleet-backup-copy-targets" class="fleet-backup-copy-targets"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-backup-copy" type="button">取消</button>
       </div>
     </div>
   </div>

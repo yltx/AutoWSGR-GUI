@@ -1,4 +1,12 @@
 /** 通过 preload 注入的 IPC 桥 */
+import type {
+  PlanPresetSource,
+  ShipLibraryManifest,
+  UserTeamPlan,
+  UserTeamPlanListResult,
+  UserTeamPlanResult,
+} from './ipc.js';
+
 export interface ElectronBridge {
   openDirectoryDialog: (title?: string) => Promise<string | null>;
   openFileDialog: (filters: { name: string; extensions: string[] }[], defaultDir?: string) => Promise<{ path: string; content: string } | null>;
@@ -13,6 +21,14 @@ export interface ElectronBridge {
   getPlansDir: () => Promise<string>;
   getConfigDir: () => Promise<string>;
   listPlanFiles: () => Promise<{ name: string; file: string }[]>;
+  getShipLibraryManifest: () => Promise<ShipLibraryManifest>;
+  saveUserTeamPlan: (
+    plan: UserTeamPlan,
+    overwrite?: boolean,
+    currentFile?: string,
+    currentSource?: PlanPresetSource,
+  ) => Promise<UserTeamPlanResult>;
+  listTeamPlans: () => Promise<UserTeamPlanListResult>;
   openFolder: (folderPath: string) => Promise<void>;
   checkEnvironment: () => Promise<{
     pythonCmd: string | null;

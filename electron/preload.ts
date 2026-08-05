@@ -116,6 +116,29 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('list-plan-files');
   },
 
+  getShipLibraryManifest: () => {
+    return ipcRenderer.invoke('fleet-planner:get-ship-library');
+  },
+
+  saveUserTeamPlan: (
+    plan: unknown,
+    overwrite = false,
+    currentFile?: string,
+    currentSource?: 'system' | 'user',
+  ) => {
+    return ipcRenderer.invoke(
+      'fleet-planner:save-team-plan',
+      plan,
+      overwrite,
+      currentFile,
+      currentSource,
+    );
+  },
+
+  listTeamPlans: () => {
+    return ipcRenderer.invoke('fleet-planner:list-team-plans');
+  },
+
   getConfigDir: () => {
     return ipcRenderer.invoke('get-config-dir');
   },

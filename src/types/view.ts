@@ -262,6 +262,88 @@ export interface PresetFormValues {
   fightFleetId?: number;
 }
 
+export interface FleetRuleDraftViewObject {
+  readonly shipTypes: readonly string[];
+  readonly levelEnabled: boolean;
+  readonly minLevel: number | null;
+  readonly maxLevel: number | null;
+}
+
+export interface FleetShipViewObject {
+  readonly id: number;
+  readonly name: string;
+  readonly searchName: string;
+  readonly variant: 'normal' | 'refit' | 'special';
+  readonly rarity: number;
+  readonly shipType: string;
+  readonly sizeClass: string;
+  readonly roleClass: string;
+  readonly country: string;
+  readonly portraitUrl: string;
+  readonly backgroundUrl: string;
+  readonly frameUrl: string;
+  readonly typeIconUrl: string;
+  readonly wikiUrl?: string;
+}
+
+export interface FleetShipLabelsViewObject {
+  readonly locale?: string;
+  readonly shipTypes: Readonly<Record<string, string>>;
+  readonly sizeClasses: Readonly<Record<string, string>>;
+  readonly roleClasses: Readonly<Record<string, string>>;
+  readonly countries: Readonly<Record<string, string>>;
+  readonly variants: Readonly<Record<string, string>>;
+}
+
+export interface FleetCandidateDraftViewObject
+  extends FleetRuleDraftViewObject {
+  readonly ship: FleetShipViewObject | null;
+}
+
+export interface FleetSlotDraftViewObject
+  extends FleetRuleDraftViewObject {
+  readonly primary: FleetShipViewObject | null;
+  readonly candidates: readonly FleetCandidateDraftViewObject[];
+}
+
+export interface FleetDraftViewObject {
+  readonly name: string;
+  readonly slots: readonly FleetSlotDraftViewObject[];
+}
+
+export interface FleetShipLibraryViewObject {
+  readonly labels: FleetShipLabelsViewObject;
+  readonly ships: readonly FleetShipViewObject[];
+  readonly colorfulBackgroundUrl: string;
+}
+
+export interface TeamPlanShipRuleViewObject {
+  name: string;
+  searchName?: string;
+  shipTypes: string[];
+  minLevel?: number;
+  maxLevel?: number;
+}
+
+export interface TeamPlanSlotViewObject {
+  primary?: TeamPlanShipRuleViewObject;
+  candidates: TeamPlanShipRuleViewObject[];
+}
+
+export interface TeamPlanViewObject {
+  id: string;
+  name: string;
+  source: 'system' | 'user';
+  modifiedAt?: number;
+  selected: boolean;
+  ships: TeamPlanSlotViewObject[];
+}
+
+export interface TeamPlanListViewObject {
+  plans: TeamPlanViewObject[];
+  errorCount: number;
+}
+
 /** 新建方案表单值 */
 export interface NewPlanFormValues {
   chapter: string;

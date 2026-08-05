@@ -16,6 +16,13 @@ import {
 } from './pythonEnv';
 import { detectEmulator } from './emulatorDetect';
 import { initBackend, getBackendProcess, startBackend, stopBackend, runSetupScript } from './backend';
+import { registerFleetPlannerIpc } from './ipc/FleetPlannerIpc';
+import { AppPaths } from './services/AppPaths';
+import { AtomicFileStore } from './services/AtomicFileStore';
+import { BundledShipLibraryService } from './services/BundledShipLibraryService';
+import { TeamPlanCodec } from './services/TeamPlanCodec';
+import { TeamPlanRepository } from './services/TeamPlanRepository';
+import { TeamPlanService } from './services/TeamPlanService';
 
 const execAsync = promisify(exec);
 
@@ -180,6 +187,28 @@ function resourceRoot(): string {
   }
   return path.join(__dirname, '..', '..');
 }
+
+const fleetPlannerPaths = new AppPaths({
+  moduleDirectory: __dirname,
+  isPackaged,
+  getPath: name => app.getPath(name),
+  getResourcesPath: () => process.resourcesPath,
+});
+const teamPlanCodec = new TeamPlanCodec();
+const teamPlanRepository = new TeamPlanRepository(
+  fleetPlannerPaths,
+  new AtomicFileStore(),
+  teamPlanCodec,
+);
+const teamPlanService = new TeamPlanService(
+  teamPlanCodec,
+  teamPlanRepository,
+);
+
+registerFleetPlannerIpc(ipcMain, {
+  shipLibrary: new BundledShipLibraryService(fleetPlannerPaths),
+  teamPlans: teamPlanService,
+});
 
 /** 将相对路径解析为绝对路径 */
 function resolveAppPath(filePath: string): string {
@@ -612,6 +641,7 @@ app.whenReady().then(() => {
     getMainWindow: () => mainWindow,
   });
   initUserPlansDir();
+  teamPlanRepository.initializeUserDirectory();
   initAutoUpdater();
   createWindow();
 

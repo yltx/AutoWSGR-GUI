@@ -18,6 +18,7 @@ import { Logger } from '../../utils/Logger';
 import { showPrompt, showConfirm, showAlert } from '../shared/DialogHelper';
 import { TemplateController } from '../template/TemplateController';
 import { TaskGroupController } from '../taskGroup/TaskGroupController';
+import { FleetPlannerController } from '../plan/FleetPlannerController';
 import { PlanController } from '../plan/PlanController';
 import { StartupController } from '../startup/StartupController';
 
@@ -30,6 +31,7 @@ import { PRIORITY_LABELS, STATUS_TEXT } from './constants';
 export class AppController {
   private mainView: MainView;
   private planView: PlanPreviewView;
+  private fleetPlannerCtrl: FleetPlannerController;
   private configView: ConfigView;
   private taskGroupView: TaskGroupView;
   private setupView: SetupWizardView;
@@ -60,6 +62,7 @@ export class AppController {
   constructor() {
     this.mainView = new MainView();
     this.planView = new PlanPreviewView();
+    this.fleetPlannerCtrl = new FleetPlannerController();
     this.configView = new ConfigView();
     this.taskGroupView = new TaskGroupView();
     this.setupView = new SetupWizardView();
@@ -280,6 +283,7 @@ export class AppController {
     document.querySelector(`.nav-tab[data-page="${pageId}"]`)?.classList.add('active');
     document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
     document.getElementById(`page-${pageId}`)?.classList.add('active');
+    if (pageId === 'fleet') void this.fleetPlannerCtrl.load();
     if (pageId === 'config') this.refreshAdbStatus();
   }
 
