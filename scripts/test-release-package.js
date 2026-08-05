@@ -21,16 +21,17 @@ const asar = require('@electron/asar');
 const yaml = require('js-yaml');
 
 const root = path.resolve(__dirname, '..');
-const unpacked = path.join(root, 'release', 'win-unpacked');
-const packagedResources = path.join(
-  unpacked,
-  'resources',
-  'resource',
-);
+const releaseRoot = path.join(root, 'release');
 const sourceResources = path.join(root, 'resource');
 const packageJson = JSON.parse(
   fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
 );
+const releaseDistributions = [
+  { id: 'personal', artifactLabel: 'Personal' },
+  { id: 'public', artifactLabel: 'Public' },
+].filter(distribution => (
+  fs.existsSync(path.join(releaseRoot, distribution.id))
+));
 const v6MigrationPlans = [
   'bettle-E1炸鱼.yaml',
   'bettle-E5夜战.yaml',
@@ -64,7 +65,7 @@ function countFiles(directory) {
   return total;
 }
 
-function assertResourceDirectory(name) {
+function assertResourceDirectory(name, packagedResources) {
   const source = path.join(sourceResources, name);
   const packaged = path.join(packagedResources, name);
   const sourceCount = countFiles(source);
@@ -77,129 +78,186 @@ function assertResourceDirectory(name) {
   );
 }
 
-assertFile(
-  path.join(unpacked, 'AutoWSGR-GUI.exe'),
-  'GUI 可执行文件',
-);
-assertFile(
-  path.join(unpacked, 'resources', 'app.asar'),
-  'GUI app.asar',
-);
-const asarFiles = asar.listPackage(
-  path.join(unpacked, 'resources', 'app.asar'),
-).map(file => file.replaceAll('\\', '/').replace(/^\/+/, ''));
-for (const file of [
-  'dist/electron/main.js',
-  'dist/electron/preload.js',
-  'dist/renderer.bundle.js',
-  'dist/src/shared/taskPreset.js',
-  'src/view/index.html',
-  'src/view/styles/styles.css',
-]) {
-  assert.equal(asarFiles.includes(file), true, `ASAR 缺失: ${file}`);
-}
-for (const directory of [
-  'dist/src/adapter/',
-  'dist/src/controller/',
-  'dist/src/model/',
-  'dist/src/types/',
-  'dist/src/utils/',
-  'dist/src/view/',
-]) {
-  assert.equal(
-    asarFiles.some(file => file.startsWith(directory)),
-    false,
-    `ASAR 不应重复包含 Renderer 模块: ${directory}`,
+function assertReleasePackage(distribution) {
+  const releaseDirectory = path.join(releaseRoot, distribution.id);
+  const unpacked = path.join(releaseDirectory, 'win-unpacked');
+  const resources = path.join(unpacked, 'resources');
+  const packagedResources = path.join(resources, 'resource');
+  const artifactName = (
+    `AutoWSGR-GUI-${distribution.artifactLabel}`
+    + `-Setup-${packageJson.version}.exe`
   );
-}
-assertFile(
-  path.join(unpacked, 'python', 'python.exe'),
-  '内置 Python',
-);
-assertFile(
-  path.join(unpacked, 'python', 'python312._pth'),
-  'Python 路径配置',
-);
-assertFile(path.join(unpacked, 'adb', 'adb.exe'), '内置 ADB');
-assertFile(
-  path.join(unpacked, 'redist', 'vc_redist.x64.exe'),
-  'VC++ 运行库',
-);
+  const label = `${distribution.id} 包`;
 
-for (const directory of [
-  'maps',
-  'system_battle_plans',
-  'system_team_plans',
-  'system_daily_plans',
-  'migrations/v6/system_battle_plans',
-  'ship-library',
-]) {
-  assertResourceDirectory(directory);
-}
-
-for (const file of v6MigrationPlans) {
   assertFile(
+    path.join(unpacked, 'AutoWSGR-GUI.exe'),
+    `${label} GUI 可执行文件`,
+  );
+  const asarPath = path.join(resources, 'app.asar');
+  assertFile(asarPath, `${label} GUI app.asar`);
+  const asarFiles = asar.listPackage(asarPath)
+    .map(file => file.replaceAll('\\', '/').replace(/^\/+/, ''));
+  for (const file of [
+    'dist/electron/main.js',
+    'dist/electron/preload.js',
+    'dist/renderer.bundle.js',
+    'dist/src/shared/taskPreset.js',
+    'src/view/index.html',
+    'src/view/styles/styles.css',
+  ]) {
+    assert.equal(
+      asarFiles.includes(file),
+      true,
+      `${label} ASAR 缺失: ${file}`,
+    );
+  }
+  for (const directory of [
+    'dist/src/adapter/',
+    'dist/src/controller/',
+    'dist/src/model/',
+    'dist/src/types/',
+    'dist/src/utils/',
+    'dist/src/view/',
+  ]) {
+    assert.equal(
+      asarFiles.some(file => file.startsWith(directory)),
+      false,
+      `${label} ASAR 不应重复包含 Renderer 模块: ${directory}`,
+    );
+  }
+
+  assertFile(
+    path.join(unpacked, 'python', 'python.exe'),
+    `${label}内置 Python`,
+  );
+  assertFile(
+    path.join(unpacked, 'python', 'python312._pth'),
+    `${label} Python 路径配置`,
+  );
+  assertFile(
+    path.join(unpacked, 'adb', 'adb.exe'),
+    `${label}内置 ADB`,
+  );
+  assertFile(
+    path.join(unpacked, 'redist', 'vc_redist.x64.exe'),
+    `${label} VC++ 运行库`,
+  );
+
+  for (const directory of [
+    'maps',
+    'system_battle_plans',
+    'system_team_plans',
+    'system_daily_plans',
+    'migrations/v6/system_battle_plans',
+    'ship-library',
+  ]) {
+    assertResourceDirectory(directory, packagedResources);
+  }
+
+  for (const file of v6MigrationPlans) {
+    assertFile(
+      path.join(
+        packagedResources,
+        'migrations',
+        'v6',
+        'system_battle_plans',
+        file,
+      ),
+      `${label} v6 迁移快照 ${file}`,
+    );
+  }
+
+  for (const file of [
+    'builtin_templates.json',
+    'ship-library/manifest.json',
+    'ship-library/labels.zh-CN.json',
+    'ship-library/database/ships.sqlite3',
+  ]) {
+    assertFile(
+      path.join(packagedResources, file),
+      `${label}内置资源 ${file}`,
+    );
+  }
+
+  for (const directory of [
+    'user_battle_plans',
+    'user_team_plans',
+  ]) {
+    assert.equal(
+      fs.existsSync(path.join(packagedResources, directory)),
+      false,
+      `${label}不应打入用户可写目录: ${directory}`,
+    );
+  }
+
+  const packagedBackendManifest = JSON.parse(fs.readFileSync(
+    path.join(resources, 'backend-distribution.json'),
+    'utf8',
+  ));
+  const expectedBackendManifest = JSON.parse(fs.readFileSync(
     path.join(
-      packagedResources,
-      'migrations',
-      'v6',
-      'system_battle_plans',
-      file,
+      root,
+      'build',
+      'backend-distributions',
+      `${distribution.id}.json`,
     ),
-    `v6 迁移快照 ${file}`,
+    'utf8',
+  ));
+  assert.deepEqual(
+    packagedBackendManifest,
+    expectedBackendManifest,
+    `${label}后端发行清单不一致`,
   );
-}
+  assert.match(
+    packagedBackendManifest.commit,
+    /^[0-9a-f]{40}$/,
+    `${label}后端必须固定到明确提交`,
+  );
 
-for (const file of [
-  'builtin_templates.json',
-  'ship-library/manifest.json',
-  'ship-library/labels.zh-CN.json',
-  'ship-library/database/ships.sqlite3',
-]) {
-  assertFile(path.join(packagedResources, file), `内置资源 ${file}`);
-}
-
-for (const directory of [
-  'user_battle_plans',
-  'user_team_plans',
-]) {
+  const channel = packageJson.build.publish.channel;
+  const appUpdate = yaml.load(fs.readFileSync(
+    path.join(resources, 'app-update.yml'),
+    'utf8',
+  ));
   assert.equal(
-    fs.existsSync(path.join(packagedResources, directory)),
-    false,
-    `用户可写目录不应打入安装资源: ${directory}`,
+    appUpdate.channel,
+    channel,
+    `${label} app-update.yml 频道不一致`,
+  );
+
+  const channelManifestPath = path.join(
+    releaseDirectory,
+    `${channel}.yml`,
+  );
+  assertFile(channelManifestPath, `${label} ${channel} 更新清单`);
+  const channelManifest = yaml.load(fs.readFileSync(
+    channelManifestPath,
+    'utf8',
+  ));
+  assert.equal(
+    channelManifest.path,
+    artifactName,
+    `${label}更新清单安装包名称不一致`,
+  );
+  assertFile(
+    path.join(releaseDirectory, artifactName),
+    `${label} NSIS 安装包`,
+  );
+  assertFile(
+    path.join(releaseDirectory, `${artifactName}.blockmap`),
+    `${label} NSIS blockmap`,
+  );
+
+  console.log(
+    `${distribution.id} release package passed: `
+    + `${packageJson.version} (${channel})`,
   );
 }
 
-const backendRequirement = fs.readFileSync(
-  path.join(root, 'electron', 'pythonEnv', 'backendRequirement.ts'),
-  'utf8',
+assert.ok(
+  releaseDistributions.length > 0,
+  '未找到 release/personal 或 release/public 打包产物',
 );
-assert.match(
-  backendRequirement,
-  /MANAGED_AUTOWSGR_COMMIT[\s\S]*[0-9a-f]{40}/,
-  'managed AutoWSGR 必须固定到明确提交',
-);
-
-const channel = packageJson.build.publish.channel;
-const appUpdate = yaml.load(fs.readFileSync(
-  path.join(unpacked, 'resources', 'app-update.yml'),
-  'utf8',
-));
-assert.equal(appUpdate.channel, channel, 'app-update.yml 频道不一致');
-
-assertFile(
-  path.join(root, 'release', `${channel}.yml`),
-  `${channel} 更新清单`,
-);
-assertFile(
-  path.join(
-    root,
-    'release',
-    `AutoWSGR-GUI-Setup-${packageJson.version}.exe`,
-  ),
-  'NSIS 安装包',
-);
-
-console.log(
-  `release package tests passed: ${packageJson.version} (${channel})`,
-);
+for (const distribution of releaseDistributions) {
+  assertReleasePackage(distribution);
+}

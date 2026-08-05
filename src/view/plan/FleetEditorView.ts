@@ -201,13 +201,7 @@ export class FleetEditorView {
       if (!slot || !event.dataTransfer) return;
       const position = Number(slot.dataset['fleetSlot']);
       const sourceSlot = this.currentFleet().slots[position];
-      const movableCandidateOnly = (
-        this.backupFollowMode === 'position'
-        && sourceSlot
-        && !sourceSlot.primary
-        && !this.isSlotEmpty(sourceSlot)
-      );
-      if (!sourceSlot?.primary && !movableCandidateOnly) return;
+      if (!sourceSlot || this.isSlotEmpty(sourceSlot)) return;
       this.rememberBackupScroll();
       event.dataTransfer.effectAllowed = 'copyMove';
       event.dataTransfer.setData(
@@ -483,7 +477,8 @@ export class FleetEditorView {
         && sameShipTypes
         && candidate.levelEnabled === targetCandidate.levelEnabled
         && candidate.minLevel === targetCandidate.minLevel
-        && candidate.maxLevel === targetCandidate.maxLevel;
+        && candidate.maxLevel === targetCandidate.maxLevel
+        && candidate.relaxed === targetCandidate.relaxed;
     });
   }
 
@@ -546,12 +541,18 @@ export class FleetEditorView {
     update: FleetRuleUpdate,
     candidateIndex?: number,
   ): void {
-    this.applyEdit({
+    const result = this.applyEdit({
       type: 'update-rule',
       position: this.activePosition,
       candidateIndex,
       update,
     });
+    if (!result.changed) return;
+    if (candidateIndex === undefined) {
+      this.renderSlots();
+    } else {
+      this.renderBackupSlots();
+    }
   }
 
   private renderSlots(): void {
@@ -563,6 +564,7 @@ export class FleetEditorView {
         slot.primary,
         index,
         'formation',
+        slot.relaxed,
         slot.primary === null && !this.isSlotEmpty(slot),
       ));
     });
@@ -575,7 +577,12 @@ export class FleetEditorView {
       ?? captureScrollPosition(this.backupScroll);
     const fragment = document.createDocumentFragment();
     this.currentSlot().candidates.forEach((candidate, index) => {
-      fragment.append(this.createFleetSlot(candidate.ship, index, 'backup'));
+      fragment.append(this.createFleetSlot(
+        candidate.ship,
+        index,
+        'backup',
+        candidate.relaxed,
+      ));
     });
     this.backupSlotList.replaceChildren(fragment);
     restoreScrollPosition(this.backupScroll, preservedScroll);
@@ -618,6 +625,7 @@ export class FleetEditorView {
     ship: ShipLibraryShip | null,
     index: number,
     group: FleetEditorSlotGroup,
+    relaxed: boolean,
     candidateOnly = false,
   ): HTMLButtonElement {
     const slot = document.createElement('button');
@@ -634,12 +642,7 @@ export class FleetEditorView {
         && index === this.activeBackupIndex;
     slot.classList.toggle('active', active);
     slot.classList.toggle('candidate-only', candidateOnly);
-    slot.draggable = Boolean(ship)
-      || (
-        group === 'formation'
-        && candidateOnly
-        && this.backupFollowMode === 'position'
-      );
+    slot.draggable = Boolean(ship) || candidateOnly;
     if (candidateOnly) {
       slot.setAttribute(
         'aria-label',
@@ -657,10 +660,21 @@ export class FleetEditorView {
     }
 
     if (ship) {
-      slot.append(createShipArtwork(
+      const artwork = createShipArtwork(
         ship,
         this.host.shipTypeDisplay(ship),
-      ));
+      );
+      const validationPreview = document.createElement('span');
+      validationPreview.className = 'fleet-validation-preview';
+      const validationBadge = document.createElement('span');
+      validationBadge.className = [
+        'fleet-validation-badge',
+        relaxed ? 'is-relaxed' : 'is-strict',
+      ].join(' ');
+      validationBadge.textContent = relaxed ? '弱校验' : '强校验';
+      validationPreview.append(validationBadge);
+      artwork.append(validationPreview);
+      slot.append(artwork);
       const remove = document.createElement('span');
       remove.className = 'fleet-slot-remove';
       if (group === 'formation') {

@@ -340,6 +340,7 @@ export class ConfigController {
       ocrGpuMode: this.gateway?.getOcrGpuMode() ?? 'auto',
       ocrGpu: cfg.ocr.gpu,
       ocrMirror: cfg.ocr.mirror,
+      enhancedShipOcr: cfg.ocr.enhanced_ship_ocr,
       ocrConfidence: cfg.ocr.ship_name_match_confidence,
       shipNameAliasesText: formatStringMap(
         cfg.ocr.ship_name_aliases,
@@ -510,6 +511,7 @@ export class ConfigController {
         ...model.current.ocr,
         gpu: collected.ocrGpu,
         mirror: collected.ocrMirror,
+        enhanced_ship_ocr: collected.enhancedShipOcr,
         ship_name_match_confidence: collected.ocrConfidence,
         ship_name_aliases: shipNameAliases,
         ship_name_corrections: shipNameCorrections,

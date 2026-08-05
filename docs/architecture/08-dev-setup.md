@@ -43,9 +43,13 @@ npm run dev
 | `npm run test:scheduler-domain` | 验证逻辑任务身份、后触发、取消和排序 |
 | `npm run test:ocr-log-analyzer` | 验证独立 OCR 日志提取、复核和纠错规则生成工具 |
 | `npm run test:python-environment` | 验证 managed/external Python、CUDA 和后端环境一致性 |
+| `npm run test:backend-distributions` | 验证自用包和公用包的后端来源及强制更新策略 |
 | `npm run test:task-group-migration` | 构建后验证任务组迁移和往返兼容 |
 | `npm start` | 等同于 `build` + `electron .`（含 chcp 65001） |
-| `npm run dist` | 完整打包：下载 Python + ADB → 编译 → electron-builder NSIS 安装包 |
+| `npm run dist` | 完整生成公用 NSIS 安装包 |
+| `npm run dist:personal` | 生成指向 ShiinaKuroko 分支的自用安装包 |
+| `npm run dist:public` | 生成指向默认主库 main 的公用安装包 |
+| `npm run dist:all` | 一次生成自用和公用两个安装包 |
 | `npm run pack` | 编译 + `electron-builder --dir`（生成目录，不打安装包） |
 | `npm run prepare-python` | 单独下载便携版 Python |
 | `npm run prepare-adb` | 单独下载 ADB 工具 |
@@ -118,7 +122,10 @@ flowchart LR
 }
 ```
 
-**打包目标**：Windows NSIS 安装包 (`release/AutoWSGR-GUI-Setup-x.x.x.exe`)
+**打包目标**：Windows NSIS 安装包：
+
+- 自用包：`release/personal/AutoWSGR-GUI-Personal-Setup-x.x.x.exe`
+- 公用包：`release/public/AutoWSGR-GUI-Public-Setup-x.x.x.exe`
 
 **包含内容**：
 - `dist/` — 编译后的 JS
@@ -133,7 +140,9 @@ flowchart LR
 
 ### NSIS 自定义
 
-`build/installer.nsh` 包含 NSIS 安装程序的自定义脚本（如安装向导页面定制）。
+`build/installer.nsh` 用于公用包；`build/installer-personal.nsh` 还会清除
+`.env_ready`，使自用包首次启动时强制更新个人分支后端。两个包分别携带
+`backend-distribution.json`，版本号相同也不会混用后端来源。
 
 ---
 
@@ -157,14 +166,17 @@ flowchart LR
 | `userData/task_groups.json` | Electron userData | Electron userData |
 | `userData/templates/` | Electron userData | Electron userData |
 
-启动迁移会扫描本次运行所在的旧项目根目录。即使 `userData` 已存在，也会
-深度合并旧设置，并迁移旧任务组、模板和递归扫描发现的有效计划 YAML。
+启动迁移会扫描本次运行所在的旧项目根目录。未初始化的 `userData` 或同一来源
+未完成的迁移会先显示分类选择窗口；旧设置始终深度合并，用户可分别选择日常
+任务 YAML、任务队列、任务 YAML。任务队列选项包含队列依赖的自定义模板，任务
+YAML 选项包含作战计划引用的编队 YAML。
 旧字段覆盖同名当前字段，当前版本独有字段继续保留。不同内容的同名任务组、
 计划、舰队和模板以“（旧版）”保留，不会覆盖现有文件。迁移按旧来源路径和
 内容哈希记录完成状态及实际输出文件名，状态保存在
 `userData/.migration-state.json`，并由 `MigrationStateStore` 独占读写。源文件
-不会删除；本次实际执行迁移后会弹窗展示总数、成功数、失败数，失败项在下次
-启动继续尝试。
+不会删除。关闭选择窗口或迁移未完整结束时异常退出，不封存旧来源，下次启动
+仍会询问；明确不迁移或所选项目全部完成后才停止询问。本次实际执行迁移后会
+弹窗展示总数、成功数、失败数，失败项在下次启动继续尝试。
 
 迁移状态最高版本当前为 **v7**。`UserDataMigrationService` 维护旧来源和 v6
 库存迁移，升级系统预设库存、保存仍被引用的已删除系统计划，并把旧胖次数字

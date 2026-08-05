@@ -37,6 +37,8 @@ const {
   buildDependencyInstallPlan,
 } = require('../dist/electron/pythonEnv/installer.js');
 const {
+  BACKEND_DISTRIBUTION,
+  FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL,
   MANAGED_AUTOWSGR_COMMIT,
   MANAGED_AUTOWSGR_REQUIREMENT,
 } = require('../dist/electron/pythonEnv/backendRequirement.js');
@@ -121,8 +123,11 @@ try {
   );
   assert.equal(
     MANAGED_AUTOWSGR_COMMIT,
-    'b0f473fb1ec5318c2c4cff4795a804a3d2dd25bd',
+    '32b5cb2cb4cc20f4c1255a8d42784aaf24e1f432',
   );
+  assert.equal(BACKEND_DISTRIBUTION.id, 'personal');
+  assert.equal(BACKEND_DISTRIBUTION.ref, 'ShiinaKuroko');
+  assert.equal(FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL, true);
   assert.equal(
     MANAGED_AUTOWSGR_REQUIREMENT.endsWith(
       `${MANAGED_AUTOWSGR_COMMIT}.zip`,
@@ -133,6 +138,11 @@ try {
   assert.equal(managedUpdateArgs.at(-1), MANAGED_AUTOWSGR_REQUIREMENT);
   assert.equal(managedUpdateArgs.includes('autowsgr'), false);
   assert.equal(managedUpdateArgs.includes(localSite), true);
+  const forcedUpdateArgs = buildManagedAutowsgrUpdateArgs(
+    localSite,
+    true,
+  );
+  assert.equal(forcedUpdateArgs.includes('--force-reinstall'), true);
   const contractProbeLines = buildBackendRuntimeContractProbeLines();
   assert.equal(
     contractProbeLines.some(

@@ -52,6 +52,7 @@ export interface ConfigViewObject {
   ocrGpuMode: 'auto' | 'cpu' | 'cuda';
   ocrGpu: boolean;
   ocrMirror: 'origin' | 'github' | 'tencent' | 'modelscope';
+  enhancedShipOcr: boolean;
   ocrConfidence: number;
   shipNameAliasesText: string;
   shipNameCorrectionsText: string;
@@ -137,6 +138,7 @@ export interface FleetRuleDraftViewObject {
   readonly levelEnabled: boolean;
   readonly minLevel: number | null;
   readonly maxLevel: number | null;
+  readonly relaxed: boolean;
 }
 
 export interface FleetCandidateDraftViewObject

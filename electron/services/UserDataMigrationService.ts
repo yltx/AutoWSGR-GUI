@@ -44,6 +44,21 @@ export type LegacyPlanReferenceTarget =
     taskType: 'exercise' | 'campaign' | 'decisive';
   };
 
+/** 用户在旧配置迁移窗口中选择的数据类别。 */
+export interface LegacyMigrationSelection {
+  dailyPlans: boolean;
+  taskQueue: boolean;
+  taskYamls: boolean;
+}
+
+export const DEFAULT_LEGACY_MIGRATION_SELECTION: Readonly<
+LegacyMigrationSelection
+> = {
+  dailyPlans: true,
+  taskQueue: true,
+  taskYamls: true,
+};
+
 /** 当前旧用户数据迁移版本。 */
 export const USER_DATA_MIGRATION_VERSION = 6;
 
@@ -107,6 +122,7 @@ export class UserDataMigrationService {
       'plans',
       'templates',
       path.join('resource', 'user_battle_plans'),
+      path.join('resource', 'user_daily_plans'),
       path.join('resource', 'user_team_plans'),
     ].some(relativePath => fs.existsSync(
       path.join(legacyRoot, relativePath),
@@ -182,8 +198,12 @@ export class UserDataMigrationService {
     return report;
   }
 
-  /** 合并旧设置、任务组和模板，并保留旧目录中的源文件。 */
-  migrateLegacyUserDataFiles(): LegacyMigrationSummary {
+  /** 始终迁移设置，并按用户选择迁移任务队列及其模板。 */
+  migrateLegacyUserDataFiles(
+    selection: LegacyMigrationSelection = (
+      DEFAULT_LEGACY_MIGRATION_SELECTION
+    ),
+  ): LegacyMigrationSummary {
     const allowed = this.shouldMigrateLegacyInstallation();
     const summary = emptyLegacyMigrationSummary(allowed);
     if (!allowed) return summary;
@@ -216,29 +236,31 @@ export class UserDataMigrationService {
       path.join(targetRoot, 'gui_settings.json'),
       () => this.reconcilePreviouslyMigratedLootPlanSelection(),
     );
-    this.recordResult(
-      summary,
-      path.join(legacyRoot, 'task_groups.json'),
-      () => this.migrateLegacyTaskGroups(
+    if (selection.taskQueue) {
+      this.recordResult(
+        summary,
         path.join(legacyRoot, 'task_groups.json'),
-        path.join(targetRoot, 'task_groups.json'),
-      ),
-    );
-    const legacyTemplates = path.join(legacyRoot, 'templates');
-    if (fs.existsSync(legacyTemplates)) {
-      for (const source of this.regularFiles(legacyTemplates)) {
-        this.recordResult(
-          summary,
-          source,
-          () => this.migrateTemplate(
+        () => this.migrateLegacyTaskGroups(
+          path.join(legacyRoot, 'task_groups.json'),
+          path.join(targetRoot, 'task_groups.json'),
+        ),
+      );
+      const legacyTemplates = path.join(legacyRoot, 'templates');
+      if (fs.existsSync(legacyTemplates)) {
+        for (const source of this.regularFiles(legacyTemplates)) {
+          this.recordResult(
+            summary,
             source,
-            path.join(
-              targetRoot,
-              'templates',
-              path.relative(legacyTemplates, source),
+            () => this.migrateTemplate(
+              source,
+              path.join(
+                targetRoot,
+                'templates',
+                path.relative(legacyTemplates, source),
+              ),
             ),
-          ),
-        );
+          );
+        }
       }
     }
     if (summary.failed === 0) {

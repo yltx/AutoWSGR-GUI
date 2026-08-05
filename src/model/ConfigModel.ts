@@ -38,6 +38,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   ocr: {
     gpu: false,
     mirror: 'modelscope',
+    enhanced_ship_ocr: false,
     ship_name_match_confidence: 0.65,
     ship_name_corrections: {},
     ship_name_aliases: {},
@@ -167,6 +168,9 @@ export class ConfigModel {
       if (typeof ocr.gpu === 'boolean') base.ocr.gpu = ocr.gpu;
       if (['origin', 'github', 'tencent', 'modelscope'].includes(String(ocr.mirror))) {
         base.ocr.mirror = String(ocr.mirror) as UserSettings['ocr']['mirror'];
+      }
+      if (typeof ocr.enhanced_ship_ocr === 'boolean') {
+        base.ocr.enhanced_ship_ocr = ocr.enhanced_ship_ocr;
       }
       base.ocr.ship_name_match_confidence = this.clampNumber(
         ocr.ship_name_match_confidence,

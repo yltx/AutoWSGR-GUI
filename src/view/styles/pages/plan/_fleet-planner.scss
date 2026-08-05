@@ -585,7 +585,7 @@
 }
 
 .fleet-planner-layout > .card.fleet-planner-fleet {
-  padding: 3px;
+  padding: 5px;
 }
 
 .fleet-planner-fleet,
@@ -610,18 +610,19 @@
 }
 
 .fleet-planner-toolbar {
+  width: 100%;
   gap: 6px;
   padding-inline-start: 3px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
 }
 
 .fleet-preset-name-field {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  min-width: 0;
+  margin-left: auto;
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 600;
@@ -632,7 +633,7 @@
 
   .input {
     width: 120px;
-    min-width: 80px;
+    min-width: calc(8em + 14px);
     padding: 4px 6px;
     font-size: 10px;
   }
@@ -649,6 +650,19 @@
 .fleet-backup-actions {
   display: flex;
   flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.fleet-planner-toolbar .fleet-toolbar-level {
+  display: grid;
+  flex-basis: 100%;
+  grid-template-columns: max-content minmax(0, 1fr);
+  min-width: 0;
+}
+
+.fleet-primary-rule-controls {
+  display: flex;
   align-items: center;
   gap: 6px;
 }
@@ -678,17 +692,31 @@
   overflow: hidden;
 }
 
+.fleet-validation-note {
+  align-self: center;
+  justify-self: end;
+  max-width: 100%;
+  margin: 0 0 0 auto;
+  color: var(--danger);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: right;
+  white-space: normal;
+}
+
 .fleet-formation-heading {
   display: flex;
   flex: 0 0 auto;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
   gap: 6px;
+  width: 100%;
   min-height: 30px;
   margin-bottom: 3px;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  white-space: nowrap;
+  overflow: visible;
+  white-space: normal;
 }
 
 .fleet-backup-heading {
@@ -696,6 +724,7 @@
 }
 
 .fleet-backup-actions {
+  flex-wrap: wrap;
   min-width: 0;
 }
 
@@ -923,6 +952,45 @@
   left: 4%;
   padding: clamp(1px, 1.5cqw, 2px) clamp(2px, 3cqw, 4px);
   font-size: clamp(6px, 7.8cqw, 10px);
+}
+
+.fleet-validation-preview {
+  position: absolute;
+  z-index: 8;
+  top: 15%;
+  left: 4%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: clamp(2px, 2cqw, 3px);
+  pointer-events: none;
+}
+
+.fleet-validation-badge {
+  min-width: clamp(31px, 31cqw, 45px);
+  padding: clamp(1px, 1.5cqw, 2px) clamp(2px, 3cqw, 4px);
+  overflow: hidden;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 4px;
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(7px) saturate(130%);
+  font-size: clamp(6px, 7.8cqw, 10px);
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.58);
+  white-space: nowrap;
+
+  &.is-relaxed {
+    background: rgba(25, 117, 218, 0.76);
+  }
+
+  &.is-strict {
+    background: rgba(198, 57, 66, 0.76);
+  }
 }
 
 .fleet-slot .fleet-ship-type-icon {

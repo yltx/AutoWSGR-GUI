@@ -99,6 +99,7 @@ export interface UserTeamShipRule {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export interface UserTeamPlanSlot {
@@ -107,6 +108,7 @@ export interface UserTeamPlanSlot {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
   candidates?: UserTeamShipRule[];
 }
 

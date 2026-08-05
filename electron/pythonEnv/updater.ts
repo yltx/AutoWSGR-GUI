@@ -24,10 +24,12 @@ export interface AutoUpdateDeps {
 /** 生成 managed 后端更新参数，确保自动更新不会改装 PyPI 裸包。 */
 export function buildManagedAutowsgrUpdateArgs(
   targetDir: string,
+  forceInstall = false,
 ): string[] {
   return [
     '-m', 'pip', 'install',
     '--upgrade',
+    ...(forceInstall ? ['--force-reinstall'] : []),
     '--target', targetDir,
     '--no-build-isolation',
     '--no-deps',
@@ -38,9 +40,17 @@ export function buildManagedAutowsgrUpdateArgs(
 }
 
 /** 确保 managed 环境使用 GUI 明确支持的后端版本。 */
-export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps): Promise<string | null> {
+export async function autoUpdateAutowsgr(
+  pythonCmd: string,
+  deps: AutoUpdateDeps,
+  forceInstall = false,
+): Promise<string | null> {
   try {
-    deps.sendProgress('正在检查 autowsgr 更新…');
+    deps.sendProgress(
+      forceInstall
+        ? '正在强制更新个人分支 autowsgr…'
+        : '正在检查 autowsgr 更新…',
+    );
 
     // 单次 Python 调用检查本地版本、活动资源和 GUI 运行契约。
     const spFwd = deps.localSitePackages().replace(/\\/g, '\\\\');
@@ -81,6 +91,8 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
     const supportsRuntimeContract = info.runtime_contract === true;
 
     if (
+      !forceInstall
+      &&
       localVer
       && supportsLatestEvent
       && supportsRuntimeContract
@@ -95,15 +107,18 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
       ...(!supportsRuntimeContract ? ['缺少 GUI 运行契约'] : []),
     ];
     deps.sendProgress(
-      `当前 autowsgr ${incompatibilities.join('、')}，正在安装 GUI 兼容版本…`,
+      forceInstall
+        ? '正在重新安装本包指定的个人分支后端…'
+        : `当前 autowsgr ${incompatibilities.join('、')}，正在安装 GUI 兼容版本…`,
     );
+    const failureVersion = forceInstall ? null : localVer;
     const targetDir = deps.localSitePackages();
     if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
 
     // 确保 pip 可用。
     if (!(await deps.ensurePip(pythonCmd))) {
       deps.sendProgress('WARNING pip 不可用，autowsgr 升级跳过');
-      return localVer;
+      return failureVersion;
     }
 
     const buildDepsCode = await new Promise<number>((resolve) => {
@@ -126,13 +141,13 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
     });
     if (buildDepsCode !== 0) {
       deps.sendProgress('WARNING GUI 兼容后端构建依赖安装失败');
-      return localVer;
+      return failureVersion;
     }
 
     const exitCode = await new Promise<number>((resolve) => {
       const proc = spawn(
         pythonCmd,
-        buildManagedAutowsgrUpdateArgs(targetDir),
+        buildManagedAutowsgrUpdateArgs(targetDir, forceInstall),
         {
         cwd: deps.appRoot(),
         windowsHide: true,
@@ -148,7 +163,7 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
 
     if (exitCode !== 0) {
       deps.sendProgress('WARNING autowsgr 升级失败，使用当前版本继续');
-      return localVer;
+      return failureVersion;
     }
 
     // 升级后一次性验证版本和关键依赖。
@@ -191,11 +206,11 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
 
       if (!eventReady) {
         deps.sendProgress('WARNING GUI 兼容后端安装后仍缺少 20260730 活动资源');
-        return localVer;
+        return failureVersion;
       }
       if (!runtimeContractReady) {
         deps.sendProgress('WARNING GUI 兼容后端安装后仍不支持运行契约');
-        return localVer;
+        return failureVersion;
       }
 
       if (missing.length > 0) {
@@ -254,7 +269,7 @@ export async function autoUpdateAutowsgr(pythonCmd: string, deps: AutoUpdateDeps
     }
 
     deps.sendProgress('WARNING 无法验证 GUI 兼容后端安装结果');
-    return localVer;
+    return failureVersion;
   } catch {
     deps.sendProgress('autowsgr 更新检查跳过（环境不可用或检查超时）');
     return null;

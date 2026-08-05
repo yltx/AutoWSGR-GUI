@@ -264,6 +264,7 @@ export class PlanController {
                 : undefined,
               min_level: slot.min_level,
               max_level: slot.max_level,
+              relaxed: slot.relaxed,
             }
       )),
     }));

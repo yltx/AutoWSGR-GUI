@@ -297,6 +297,23 @@ const crossRepoCases = [
     '            max_level: 90',
     '',
   ].join('\n')),
+  buildFleetContractCase('relaxed-primary-and-candidate', [
+    'chapter: 1',
+    'map: 1',
+    'fleet_presets:',
+    '  - name: 宽泛规则',
+    '    ships:',
+    '      - name: 重庆',
+    '        search_name: 重庆',
+    '        ship_type: [kp]',
+    '        relaxed: true',
+    '        candidates:',
+    '          - 长春',
+    '          - name: 昆西',
+    '            ship_type: [cl]',
+    '            relaxed: true',
+    '',
+  ].join('\n')),
 ];
 
 const legacyApiRules = crossRepoCases[1].request.plan.fleet_rules;
@@ -396,4 +413,11 @@ assert.deepEqual(
   backendContracts[1].api[2].candidates.map(rule => rule.name),
   ['胡德'],
 );
+const relaxedApiRule = crossRepoCases[4].request.plan.fleet_rules[0];
+assert.equal(relaxedApiRule.relaxed, true);
+assert.equal(relaxedApiRule.candidates[0].relaxed, undefined);
+assert.equal(relaxedApiRule.candidates[1].relaxed, true);
+assert.equal(backendContracts[4].api[0].primary.relaxed, true);
+assert.equal(backendContracts[4].api[0].candidates[0].relaxed, false);
+assert.equal(backendContracts[4].api[0].candidates[1].relaxed, true);
 console.log('GUI/AutoWSGR API contract tests passed');

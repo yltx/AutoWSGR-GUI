@@ -244,7 +244,7 @@
         <div class="fleet-planner-layout">
           <section class="fleet-planner-fleet card">
             <div class="fleet-formation-heading fleet-planner-toolbar">
-              <h3 class="fleet-formation-tag fleet-queue-badge is-primary">舰队编队</h3>
+              <h3 class="fleet-formation-tag fleet-queue-badge is-primary">主选队列</h3>
               <label class="fleet-preset-name-field">
                 <span>预设名称</span>
                 <input
@@ -262,21 +262,31 @@
                 <button class="btn btn-small" id="btn-clear-fleet" type="button">清空</button>
               </div>
               <div class="fleet-toolbar-level">
-                <label class="config-switch fleet-level-switch">
-                  <input type="checkbox" id="fleet-level-enabled">
-                  <span class="config-switch-track" aria-hidden="true"></span>
-                  <span>等级限制</span>
-                </label>
-                <div class="fleet-level-fields" id="fleet-level-fields" hidden>
-                  <label>
-                    <span>最小</span>
-                    <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                <div class="fleet-primary-rule-controls">
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-relaxed-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>宽泛校验</span>
                   </label>
-                  <label>
-                    <span>最大</span>
-                    <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-level-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>等级限制</span>
                   </label>
+                  <div class="fleet-level-fields" id="fleet-level-fields" hidden>
+                    <label>
+                      <span>最小</span>
+                      <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                    </label>
+                    <label>
+                      <span>最大</span>
+                      <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                    </label>
+                  </div>
                 </div>
+                <p class="fleet-validation-note">
+                  宽泛校验：指在编队识别时仅要求名称一致，等级和舰船类型会校验但不做强制性要求
+                </p>
               </div>
             </div>
             <section class="fleet-formation-section">
@@ -291,6 +301,11 @@
                 <button class="btn btn-small" id="btn-backup-follow-mode" type="button" aria-pressed="false">舰船跟随</button>
                 <button class="btn btn-small btn-primary" id="btn-add-fleet-backup" type="button">增加备选</button>
                 <button class="btn btn-small" id="btn-copy-fleet-backup" type="button">复制备选</button>
+                <label class="config-switch fleet-level-switch">
+                  <input type="checkbox" id="fleet-backup-relaxed-enabled">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>宽泛校验</span>
+                </label>
                 <label class="config-switch fleet-level-switch">
                   <input type="checkbox" id="fleet-backup-level-enabled">
                   <span class="config-switch-track" aria-hidden="true"></span>
@@ -1668,6 +1683,19 @@
                     <input type="checkbox" id="cfg-ocr-gpu">
                     <span class="config-switch-track" aria-hidden="true"></span>
                     <span>使用 GPU</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>增强船只识别</strong>
+                  <span>开启后将提升选船识别率。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-enhanced-ship-ocr">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用 RapidOCR</span>
                   </label>
                 </div>
               </div>

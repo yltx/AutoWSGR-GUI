@@ -28,6 +28,9 @@ export class FleetRuleView {
   private readonly maxLevel = document.getElementById(
     'fleet-max-level',
   ) as HTMLInputElement;
+  private readonly relaxedEnabled = document.getElementById(
+    'fleet-relaxed-enabled',
+  ) as HTMLInputElement;
   private readonly backupLevelEnabled = document.getElementById(
     'fleet-backup-level-enabled',
   ) as HTMLInputElement;
@@ -39,6 +42,9 @@ export class FleetRuleView {
   ) as HTMLInputElement;
   private readonly backupMaxLevel = document.getElementById(
     'fleet-backup-max-level',
+  ) as HTMLInputElement;
+  private readonly backupRelaxedEnabled = document.getElementById(
+    'fleet-backup-relaxed-enabled',
   ) as HTMLInputElement;
 
   constructor(private readonly host: FleetRuleViewHost) {
@@ -59,6 +65,8 @@ export class FleetRuleView {
     this.maxLevel.value = primary.maxLevel === null
       ? ''
       : String(primary.maxLevel);
+    this.relaxedEnabled.checked = hasPrimary && primary.relaxed;
+    this.relaxedEnabled.disabled = !hasPrimary;
     this.updateLevelValidity(primary, this.minLevel, this.maxLevel);
 
     const backup = this.host.backupRule();
@@ -74,6 +82,8 @@ export class FleetRuleView {
     this.backupMaxLevel.value = backup.maxLevel === null
       ? ''
       : String(backup.maxLevel);
+    this.backupRelaxedEnabled.checked = hasBackup && backup.relaxed;
+    this.backupRelaxedEnabled.disabled = !hasBackup;
     this.updateLevelValidity(
       backup,
       this.backupMinLevel,
@@ -108,6 +118,11 @@ export class FleetRuleView {
         this.maxLevel,
       );
     });
+    this.relaxedEnabled.addEventListener('change', () => {
+      this.host.updatePrimaryRule({
+        relaxed: this.relaxedEnabled.checked,
+      });
+    });
     this.backupLevelEnabled.addEventListener('change', () => {
       const rule = this.host.backupRule();
       const levelEnabled = rule.ship !== null
@@ -135,6 +150,11 @@ export class FleetRuleView {
         this.backupMinLevel,
         this.backupMaxLevel,
       );
+    });
+    this.backupRelaxedEnabled.addEventListener('change', () => {
+      this.host.updateBackupRule({
+        relaxed: this.backupRelaxedEnabled.checked,
+      });
     });
   }
 

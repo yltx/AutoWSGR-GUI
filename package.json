@@ -1,6 +1,6 @@
 {
   "name": "wsgrgui",
-  "version": "2.0.0-alpha",
+  "version": "2.0.5-dev",
   "description": "AutoWSGR YAML 管理与自动化桌面界面",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -28,13 +28,17 @@
     "test:main-services": "npm run build && node scripts/test-main-services.js",
     "test:main-ipc": "npm run build && node scripts/test-main-ipc.js",
     "test:python-environment": "npm run build && node scripts/test-python-environment.js",
+    "test:backend-distributions": "npm run build && node scripts/test-backend-distributions.js",
     "test:release-package": "node scripts/test-release-package.js",
     "start": "chcp 65001 >nul && npm run build && electron .",
     "dev": "chcp 65001 >nul && npm run clean && npm run build:css && tsc && node scripts/bundle.js && electron .",
     "prepare-python": "node scripts/prepare-python.js",
     "prepare-adb": "node scripts/prepare-adb.js",
-    "pack": "npm run clean:release && npm run build && electron-builder --dir --publish never",
-    "dist": "npm run clean:release && npm run prepare-python && npm run prepare-adb && npm run build && electron-builder --publish never"
+    "pack": "npm run clean:release && npm run build && electron-builder --dir --config build/electron-builder.public.cjs --publish never",
+    "dist": "npm run clean:release && npm run dist:public",
+    "dist:personal": "npm run prepare-python && npm run prepare-adb && npm run build && electron-builder --config build/electron-builder.personal.cjs --publish never",
+    "dist:public": "npm run prepare-python && npm run prepare-adb && npm run build && electron-builder --config build/electron-builder.public.cjs --publish never",
+    "dist:all": "npm run clean:release && npm run prepare-python && npm run prepare-adb && npm run build && electron-builder --config build/electron-builder.personal.cjs --publish never && electron-builder --config build/electron-builder.public.cjs --publish never"
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",
@@ -143,7 +147,7 @@
       "provider": "github",
       "owner": "yltx",
       "repo": "AutoWSGR-GUI",
-      "channel": "alpha"
+      "channel": "dev"
     }
   }
 }

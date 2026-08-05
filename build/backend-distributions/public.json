@@ -1,0 +1,7 @@
+{
+  "id": "public",
+  "repository": "OpenWSGR/AutoWSGR",
+  "ref": "main",
+  "commit": "824a6203172fcc535d0aa8e4f828349fdbd48e06",
+  "forceUpdateOnInstall": false
+}

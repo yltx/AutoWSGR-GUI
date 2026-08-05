@@ -137,8 +137,9 @@ function testGuiUpdatePolicy() {
   assert.match(workflow, /X\.Y\.Z-dev\.N/);
   assert.match(
     workflow,
-    /release\/\$\{\{ steps\.version\.outputs\.CHANNEL \}\}\.yml/,
+    /release\/public\/\$\{\{ steps\.version\.outputs\.CHANNEL \}\}\.yml/,
   );
+  assert.match(workflow, /AutoWSGR-GUI-Public-Setup-/);
   assert.doesNotMatch(workflow, /^\s+release\/latest\.yml\s*$/m);
 }
 

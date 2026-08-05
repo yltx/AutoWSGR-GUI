@@ -46,6 +46,7 @@ export interface DailyAutomationConfig {
 export interface OCRConfig {
   gpu: boolean;
   mirror: 'origin' | 'github' | 'tencent' | 'modelscope';
+  enhanced_ship_ocr: boolean;
   ship_name_match_confidence: number;
   ship_name_corrections: Record<string, string>;
   ship_name_aliases: Record<string, string>;
@@ -124,6 +125,7 @@ export interface ShipRule {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export interface ShipFilter {
@@ -134,6 +136,7 @@ export interface ShipFilter {
   candidates?: ShipRule[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export type ShipSlot = string | ShipFilter | null;

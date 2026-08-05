@@ -90,6 +90,7 @@ export class ConfigView {
   private ocrGpuMode = element<HTMLSelectElement>('cfg-ocr-gpu-mode');
   private ocrGpu = element<HTMLInputElement>('cfg-ocr-gpu');
   private ocrMirror = element<HTMLSelectElement>('cfg-ocr-mirror');
+  private enhancedShipOcr = element<HTMLInputElement>('cfg-enhanced-ship-ocr');
   private ocrConfidence = element<HTMLInputElement>('cfg-ocr-confidence');
   private ocrConfidenceRange = element<HTMLInputElement>('cfg-ocr-confidence-range');
   private shipNameAliases = element<HTMLTextAreaElement>('cfg-ship-name-aliases');
@@ -234,6 +235,7 @@ export class ConfigView {
     this.ocrGpuMode.value = vo.ocrGpuMode;
     this.ocrGpu.checked = vo.ocrGpu;
     this.ocrMirror.value = vo.ocrMirror;
+    this.enhancedShipOcr.checked = vo.enhancedShipOcr;
     this.setRangeValue(this.ocrConfidenceRange, this.ocrConfidence, vo.ocrConfidence);
     this.shipNameAliases.value = vo.shipNameAliasesText;
     this.shipNameCorrections.value = vo.shipNameCorrectionsText;
@@ -312,6 +314,7 @@ export class ConfigView {
       ocrGpuMode: this.ocrGpuMode.value as ConfigViewObject['ocrGpuMode'],
       ocrGpu: this.ocrGpu.checked,
       ocrMirror: this.ocrMirror.value as ConfigViewObject['ocrMirror'],
+      enhancedShipOcr: this.enhancedShipOcr.checked,
       ocrConfidence: this.clamp(this.ocrConfidence.value, 0, 1, 0.65),
       shipNameAliasesText: this.shipNameAliases.value,
       shipNameCorrectionsText: this.shipNameCorrections.value,

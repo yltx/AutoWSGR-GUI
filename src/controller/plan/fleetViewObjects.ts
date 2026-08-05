@@ -50,6 +50,7 @@ function userTeamSlotToShipSlot(slot: UserTeamPlanSlot): ShipFilter {
     candidates: slot.candidates?.map(cloneShipRule),
     min_level: slot.min_level,
     max_level: slot.max_level,
+    relaxed: slot.relaxed,
   };
 }
 
@@ -117,6 +118,7 @@ export function toTeamPlanSlotViewObject(
             ship_type: slot.ship_type,
             min_level: slot.min_level,
             max_level: slot.max_level,
+            relaxed: slot.relaxed,
           },
           primaryName,
         )

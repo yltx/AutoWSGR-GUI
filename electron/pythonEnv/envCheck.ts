@@ -25,6 +25,9 @@ import {
   buildBackendRuntimeContractProbeLines,
 } from './backendContractProbe';
 import { PYTHON_DEPENDENCY_SPECS } from './dependencies';
+import {
+  FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL,
+} from './backendRequirement';
 
 const execAsync = promisify(exec);
 
@@ -136,6 +139,16 @@ function shouldAutoUpdate(environment: PythonEnvironment): boolean {
   const ctx = getCtx();
   return environment.startupMode === 'managed'
     && ctx.getUpdateMode() !== 'manual';
+}
+
+/** 自用包在安装器清除环境标记后必须重新安装一次指定后端。 */
+function shouldForceManagedBackendInstall(
+  environment: PythonEnvironment,
+): boolean {
+  return (
+    environment.startupMode === 'managed'
+    && FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL
+  );
 }
 
 function autoUpdateSkipMessage(environment: PythonEnvironment): string {
@@ -411,9 +424,25 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
 
     // 自动模式下检查并更新 autowsgr。
     let finalVer = autowsgrVersion;
-    if (shouldAutoUpdate(environment)) {
-      const updatedVer = await autoUpdateAutowsgr(pythonCmd, buildAutoUpdateDeps());
+    const forceBackendInstall = (
+      shouldForceManagedBackendInstall(environment)
+    );
+    if (shouldAutoUpdate(environment) || forceBackendInstall) {
+      const updatedVer = await autoUpdateAutowsgr(
+        pythonCmd,
+        buildAutoUpdateDeps(),
+        forceBackendInstall,
+      );
       finalVer = updatedVer || autowsgrVersion;
+      if (forceBackendInstall && !updatedVer) {
+        ctx.sendProgress('WARNING 个人分支后端强制更新未完成，下次启动将重试');
+        return {
+          pythonCmd,
+          pythonVersion,
+          missingPackages: [],
+          allReady: true,
+        };
+      }
     } else {
       ctx.sendProgress(autoUpdateSkipMessage(environment));
     }

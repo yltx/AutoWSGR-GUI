@@ -23,7 +23,14 @@ import { SafePathService } from './services/SafePathService';
 import { SecureFileService } from './services/SecureFileService';
 import { WindowService } from './services/WindowService';
 import { SingleInstanceService } from './services/SingleInstanceService';
-import { UserDataMigrationService } from './services/UserDataMigrationService';
+import {
+  DEFAULT_LEGACY_MIGRATION_SELECTION,
+  UserDataMigrationService,
+  type LegacyMigrationSelection,
+} from './services/UserDataMigrationService';
+import {
+  LegacyMigrationPrompt,
+} from './services/LegacyMigrationPrompt';
 import { MigrationStateStore } from './services/MigrationStateStore';
 import {
   LEGACY_PLAN_MIGRATION_STAGE,
@@ -105,9 +112,10 @@ const migrationConflictService = new MigrationConflictService(
   appPaths,
   atomicFileStore,
 );
-const legacyUserDataMigration = isPrimaryInstance
-  ? userDataMigrationService.migrateLegacyUserDataFiles()
-  : emptyLegacyMigrationSummary();
+let legacyUserDataMigration = emptyLegacyMigrationSummary();
+const legacyMigrationPrompt = new LegacyMigrationPrompt({
+  createWindow: options => new BrowserWindow(options),
+});
 const guiSettingsStore = new GuiSettingsStore(
   () => path.join(appPaths.userDataRoot(), 'gui_settings.json'),
   atomicFileStore,
@@ -335,7 +343,24 @@ function sendProgress(msg: string): void {
 if (isPrimaryInstance) initializeApplicationLifecycle();
 
 function initializeApplicationLifecycle(): void {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    let migrationSelection: LegacyMigrationSelection = {
+      ...DEFAULT_LEGACY_MIGRATION_SELECTION,
+    };
+    if (userDataMigrationService.shouldMigrateLegacyInstallation()) {
+      const selected = await legacyMigrationPrompt.show();
+      if (!selected) {
+        app.quit();
+        return;
+      }
+      migrationSelection = selected;
+      legacyUserDataMigration = (
+        userDataMigrationService.migrateLegacyUserDataFiles(
+          migrationSelection,
+        )
+      );
+    }
+
     initPythonEnv({
       appRoot,
       sendProgress,
@@ -366,7 +391,9 @@ function initializeApplicationLifecycle(): void {
     const presetInventoryResult = (
       userDataMigrationService.migratePresetInventory()
     );
-    const legacyPlanResult = legacyPlanMigration.migrate();
+    const legacyPlanResult = legacyPlanMigration.migrate(
+      migrationSelection,
+    );
     const legacyMigrationResult = mergeLegacyMigrationSummaries(
       legacyUserDataMigration,
       legacyPlanResult,

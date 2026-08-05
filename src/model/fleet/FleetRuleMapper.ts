@@ -22,6 +22,7 @@ function toFleetShipRule(
   if (rule.ship_type) result.ship_type = [...rule.ship_type];
   if (rule.min_level != null && Number.isFinite(rule.min_level)) result.min_level = Math.max(1, Math.floor(rule.min_level));
   if (rule.max_level != null && Number.isFinite(rule.max_level)) result.max_level = Math.max(1, Math.floor(rule.max_level));
+  if (rule.relaxed === true) result.relaxed = true;
   return result;
 }
 
@@ -56,6 +57,7 @@ export function resolveFleetPresetRules(
     if (slot.ship_type) rule.ship_type = [...slot.ship_type];
     if (slot.min_level != null && Number.isFinite(slot.min_level)) rule.min_level = Math.max(1, Math.floor(slot.min_level));
     if (slot.max_level != null && Number.isFinite(slot.max_level)) rule.max_level = Math.max(1, Math.floor(slot.max_level));
+    if (slot.relaxed === true) rule.relaxed = true;
     if (slot.candidates?.length) {
       rule.candidates = slot.candidates.map(
         candidate => toFleetShipRule(candidate, aliases),

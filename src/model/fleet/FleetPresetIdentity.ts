@@ -26,6 +26,7 @@ function normalizeRule(rule: ShipRule): Record<string, unknown> {
     ship_type: normalizeShipTypes(rule.ship_type),
     min_level: rule.min_level ?? null,
     max_level: rule.max_level ?? null,
+    relaxed: rule.relaxed === true,
   };
 }
 
@@ -48,6 +49,7 @@ function normalizeFilter(filter: ShipFilter): Record<string, unknown> {
     ship_type: normalizeShipTypes(filter.ship_type),
     min_level: filter.min_level ?? null,
     max_level: filter.max_level ?? null,
+    relaxed: filter.relaxed === true,
   };
 }
 

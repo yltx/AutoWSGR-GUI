@@ -157,6 +157,7 @@ async function runRendererTest(root, tempDirectory) {
     ocrGpuMode: 'cuda',
     ocrGpu: true,
     ocrMirror: 'github',
+    enhancedShipOcr: true,
     ocrConfidence: 0.73,
     shipNameAliasesText: '测试别名:U-47',
     shipNameCorrectionsText: '测试错字:U-81',
@@ -822,6 +823,11 @@ async function runRendererTest(root, tempDirectory) {
     '',
   ].join('\n'));
   rendererAssert.equal(
+    model.current.ocr.enhanced_ship_ocr,
+    false,
+    '旧配置缺少 enhanced_ship_ocr 时必须保持默认关闭',
+  );
+  rendererAssert.equal(
     model.migratedGuiAutomation.lootPlanId,
     'bettle-old-8-5AI六潜胖次.yaml',
     '旧 usersettings.yaml 的索引没有保持 8-5 语义',
@@ -1255,6 +1261,7 @@ async function runRendererTest(root, tempDirectory) {
   rendererAssert.deepStrictEqual(savedYaml.ocr, {
     gpu: sample.ocrGpu,
     mirror: sample.ocrMirror,
+    enhanced_ship_ocr: sample.enhancedShipOcr,
     ship_name_match_confidence: sample.ocrConfidence,
     ship_name_corrections: {
       ...shipNameCorrections,
@@ -1542,6 +1549,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-ocr-gpu-mode',
     'cfg-cuda-path',
     'cfg-ocr-gpu',
+    'cfg-enhanced-ship-ocr',
     'cfg-ocr-confidence-range',
     'cfg-ocr-confidence',
     'cfg-ship-name-aliases',

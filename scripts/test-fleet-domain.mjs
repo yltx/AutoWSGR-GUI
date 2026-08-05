@@ -469,24 +469,62 @@ assert.equal(
 );
 
 const positionBindingDraft = createFleetDraft();
-positionBindingDraft.slots[0].primary = testShip(10, '位置模式主选');
-positionBindingDraft.slots[0].candidates[0] =
+const positionSource = positionBindingDraft.slots[0];
+positionSource.primary = testShip(10, '位置模式主选');
+positionSource.candidates[0] =
   createFleetCandidateDraft(testShip(21, '来源位置保留备选'));
 const positionTarget = positionBindingDraft.slots[1];
 positionTarget.candidates[0] =
   createFleetCandidateDraft(testShip(22, '目标位置备选'));
 moveFleetPrimary(positionBindingDraft.slots, 0, 1, 'position');
-assert.equal(positionTarget.primary.name, '位置模式主选');
-assert.equal(positionTarget.candidates[0].ship.name, '目标位置备选');
+assert.equal(positionBindingDraft.slots[0], positionTarget);
+assert.equal(positionBindingDraft.slots[1], positionSource);
 assert.equal(positionBindingDraft.slots[0].primary, null);
 assert.equal(
   positionBindingDraft.slots[0].candidates[0].ship.name,
   '来源位置保留备选',
 );
+assert.equal(positionBindingDraft.slots[1].primary.name, '位置模式主选');
+assert.equal(
+  positionBindingDraft.slots[1].candidates[0].ship.name,
+  '目标位置备选',
+);
+
+const movedPrimaryFromReservedPosition = createFleetDraft();
+movedPrimaryFromReservedPosition.slots[0].primary =
+  testShip(23, '待右移主选');
+movedPrimaryFromReservedPosition.slots[0].relaxed = true;
+movedPrimaryFromReservedPosition.slots[0].candidates[0] =
+  createFleetCandidateDraft(testShip(24, '留在位置1的备选'));
+moveFleetPrimary(
+  movedPrimaryFromReservedPosition.slots,
+  0,
+  3,
+  'position',
+);
+assert.equal(movedPrimaryFromReservedPosition.slots[0].primary, null);
+assert.equal(
+  movedPrimaryFromReservedPosition.slots[0].candidates[0].ship.name,
+  '留在位置1的备选',
+);
+assert.equal(
+  movedPrimaryFromReservedPosition.slots[1].primary.name,
+  '待右移主选',
+);
+assert.equal(movedPrimaryFromReservedPosition.slots[1].relaxed, true);
+assert.equal(movedPrimaryFromReservedPosition.slots[2].primary, null);
+assert.equal(movedPrimaryFromReservedPosition.slots[3].primary, null);
+
+const movedOnlyPrimary = createFleetDraft();
+const onlyPrimary = testShip(25, '无备选主选');
+movedOnlyPrimary.slots[0].primary = onlyPrimary;
+moveFleetPrimary(movedOnlyPrimary.slots, 0, 3, 'position');
+assert.equal(movedOnlyPrimary.slots[0].primary, onlyPrimary);
+assert.equal(movedOnlyPrimary.slots[1].primary, null);
 
 const candidateOnlyReorderDraft = createFleetDraft();
-const candidateOnlySlots = candidateOnlyReorderDraft.slots.slice(0, 3);
-candidateOnlySlots.forEach((slot, index) => {
+const candidateOnlySlots = [...candidateOnlyReorderDraft.slots];
+candidateOnlySlots.slice(0, 3).forEach((slot, index) => {
   slot.candidates[0] = createFleetCandidateDraft(
     testShip(51 + index, `纯备选位置${index + 1}`),
   );
@@ -498,19 +536,34 @@ assert.equal(
 assert.equal(candidateOnlyReorderDraft.slots[0], candidateOnlySlots[2]);
 assert.equal(candidateOnlyReorderDraft.slots[1], candidateOnlySlots[1]);
 assert.equal(candidateOnlyReorderDraft.slots[2], candidateOnlySlots[0]);
+assert.deepEqual(
+  candidateOnlyReorderDraft.slots.slice(0, 3).map(slot => (
+    slot.candidates[0].ship.name
+  )),
+  ['纯备选位置1', '纯备选位置2', '纯备选位置3'],
+);
 assert.equal(
   moveFleetPrimary(candidateOnlyReorderDraft.slots, 2, 0, 'ship'),
-  null,
+  candidateOnlySlots[0],
+);
+assert.deepEqual(
+  candidateOnlyReorderDraft.slots.slice(0, 3).map(slot => (
+    slot.candidates[0].ship.name
+  )),
+  ['纯备选位置3', '纯备选位置2', '纯备选位置1'],
 );
 
 const candidateOnlyMoveToEndDraft = createFleetDraft();
-const candidateOnlyMoveSlots = candidateOnlyMoveToEndDraft.slots.slice(0, 3);
-candidateOnlyMoveSlots.forEach((slot, index) => {
+const candidateOnlyMoveSlots = [...candidateOnlyMoveToEndDraft.slots];
+candidateOnlyMoveSlots.slice(0, 3).forEach((slot, index) => {
   slot.candidates[0] = createFleetCandidateDraft(
     testShip(61 + index, `移动纯备选${index + 1}`),
   );
 });
-moveFleetPrimary(candidateOnlyMoveToEndDraft.slots, 0, 5, 'position');
+assert.equal(
+  moveFleetPrimary(candidateOnlyMoveToEndDraft.slots, 0, 5, 'position'),
+  candidateOnlyMoveSlots[0],
+);
 assert.equal(
   candidateOnlyMoveToEndDraft.slots[0],
   candidateOnlyMoveSlots[1],
@@ -523,6 +576,315 @@ assert.equal(
   candidateOnlyMoveToEndDraft.slots[2],
   candidateOnlyMoveSlots[0],
 );
+assert.deepEqual(
+  candidateOnlyMoveToEndDraft.slots.slice(0, 3).map(slot => (
+    slot.candidates[0].ship.name
+  )),
+  ['移动纯备选1', '移动纯备选2', '移动纯备选3'],
+);
+});
+
+await runScenario('位置模式重排时备选队列固定在原位置', () => {
+const insertedShiftDraft = createFleetDraft();
+insertedShiftDraft.slots[0].primary = testShip(201, '位置1主选');
+insertedShiftDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(202, '位置1备选'),
+);
+insertedShiftDraft.slots[1].candidates[0] = createFleetCandidateDraft(
+  testShip(203, '位置2纯备选'),
+);
+const insertedShiftSlot = createFleetDraft().slots[0];
+insertedShiftSlot.primary = testShip(204, '插入位置2');
+insertFleetPrimary(
+  insertedShiftDraft.slots,
+  1,
+  insertedShiftSlot,
+  'position',
+);
+assert.equal(insertedShiftDraft.slots[1].primary.name, '插入位置2');
+assert.equal(
+  insertedShiftDraft.slots[1].candidates[0].ship.name,
+  '位置2纯备选',
+);
+assert.equal(insertedShiftDraft.slots[2].primary, null);
+assert.equal(
+  insertedShiftDraft.slots[2].candidates.some(candidate => candidate.ship),
+  false,
+);
+
+const insertedShiftPrimaryDraft = createFleetDraft();
+insertedShiftPrimaryDraft.slots[0].primary = testShip(211, '主选1');
+insertedShiftPrimaryDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(212, '备选1'),
+);
+insertedShiftPrimaryDraft.slots[1].primary = testShip(213, '主选2');
+insertedShiftPrimaryDraft.slots[1].candidates[0] = createFleetCandidateDraft(
+  testShip(214, '备选2'),
+);
+const insertedShiftPrimarySlot = createFleetDraft().slots[0];
+insertedShiftPrimarySlot.primary = testShip(215, '插入主选');
+insertFleetPrimary(
+  insertedShiftPrimaryDraft.slots,
+  1,
+  insertedShiftPrimarySlot,
+  'position',
+);
+assert.equal(insertedShiftPrimaryDraft.slots[1].primary.name, '插入主选');
+assert.equal(insertedShiftPrimaryDraft.slots[2].primary.name, '主选2');
+assert.equal(
+  insertedShiftPrimaryDraft.slots[1].candidates[0].ship.name,
+  '备选2',
+);
+assert.equal(
+  insertedShiftPrimaryDraft.slots[2].candidates
+    .some(candidate => candidate.ship),
+  false,
+);
+});
+
+await runScenario('顶层集合卡片遵守跟随与升降级规则', () => {
+const positionCandidateOnlyDraft = createFleetDraft();
+for (const [index, names] of [
+  [0, ['位置1备选A', '位置1备选B', '位置1备选C']],
+  [1, ['位置2备选A', '位置2备选B']],
+]) {
+  names.forEach((name, candidateIndex) => {
+    positionCandidateOnlyDraft.slots[index].candidates[candidateIndex] =
+      createFleetCandidateDraft(testShip(220 + index * 10 + candidateIndex, name));
+  });
+}
+const positionSourceSlot = positionCandidateOnlyDraft.slots[0];
+const positionTargetSlot = positionCandidateOnlyDraft.slots[1];
+const positionCandidateOnlyResult = applyFleetDraftEdit(
+  positionCandidateOnlyDraft,
+  {
+    type: 'drop-formation',
+    source: { group: 'formation', position: 0 },
+    targetPosition: 1,
+    selection: {
+      group: 'formation',
+      position: 0,
+      candidateIndex: 0,
+    },
+    backupFollowMode: 'position',
+  },
+);
+
+const shipCandidateOnlyDraft = createFleetDraft();
+shipCandidateOnlyDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(240, '舰船模式位置1备选'),
+);
+shipCandidateOnlyDraft.slots[1].candidates[0] = createFleetCandidateDraft(
+  testShip(241, '舰船模式位置2备选'),
+);
+const shipCandidateOnlySlots = [...shipCandidateOnlyDraft.slots];
+const shipCandidateOnlyResult = applyFleetDraftEdit(shipCandidateOnlyDraft, {
+  type: 'drop-formation',
+  source: { group: 'formation', position: 0 },
+  targetPosition: 1,
+  selection: {
+    group: 'formation',
+    position: 0,
+    candidateIndex: 0,
+  },
+  backupFollowMode: 'ship',
+});
+
+for (const backupFollowMode of ['ship', 'position']) {
+  const inheritedQueueDraft = createFleetDraft();
+  const inheritedPrimary = testShip(
+    backupFollowMode === 'ship' ? 242 : 243,
+    `${backupFollowMode}模式单主选`,
+  );
+  inheritedQueueDraft.slots[0].primary = inheritedPrimary;
+  inheritedQueueDraft.slots[1].candidates[0] = createFleetCandidateDraft(
+    testShip(244, '继承备选A'),
+  );
+  inheritedQueueDraft.slots[1].candidates[1] = createFleetCandidateDraft(
+    testShip(245, '继承备选B'),
+  );
+  const inheritedCollection = inheritedQueueDraft.slots[1];
+  const inheritedQueueResult = applyFleetDraftEdit(inheritedQueueDraft, {
+    type: 'drop-formation',
+    source: { group: 'formation', position: 0 },
+    targetPosition: 1,
+    selection: {
+      group: 'formation',
+      position: 0,
+      candidateIndex: 0,
+    },
+    backupFollowMode,
+  });
+  assert.equal(inheritedQueueResult.changed, true);
+  assert.equal(inheritedQueueDraft.slots[0], inheritedCollection);
+  assert.equal(inheritedQueueDraft.slots[0].primary, inheritedPrimary);
+  assert.deepEqual(
+    inheritedQueueDraft.slots[0].candidates
+      .filter(candidate => candidate.ship)
+      .map(candidate => candidate.ship.name),
+    ['继承备选A', '继承备选B'],
+  );
+  assert.equal(isFleetSlotEmpty(inheritedQueueDraft.slots[1]), true);
+}
+
+for (const backupFollowMode of ['ship', 'position']) {
+  const exchangedCollectionDraft = createFleetDraft();
+  const candidateCollection = exchangedCollectionDraft.slots[0];
+  candidateCollection.candidates[0] = createFleetCandidateDraft(
+    testShip(246, '合集备选'),
+  );
+  const primaryCollection = exchangedCollectionDraft.slots[1];
+  primaryCollection.primary = testShip(247, '合集主选');
+  primaryCollection.candidates[0] = createFleetCandidateDraft(
+    testShip(248, '主选队列备选'),
+  );
+  const exchangedCollectionResult = applyFleetDraftEdit(
+    exchangedCollectionDraft,
+    {
+      type: 'drop-formation',
+      source: { group: 'formation', position: 0 },
+      targetPosition: 1,
+      selection: {
+        group: 'formation',
+        position: 0,
+        candidateIndex: 0,
+      },
+      backupFollowMode,
+    },
+  );
+  assert.equal(exchangedCollectionResult.changed, true);
+  assert.equal(exchangedCollectionDraft.slots[0], primaryCollection);
+  assert.equal(exchangedCollectionDraft.slots[1], candidateCollection);
+  assert.equal(
+    exchangedCollectionDraft.slots[0].candidates[0].ship.name,
+    backupFollowMode === 'ship' ? '主选队列备选' : '合集备选',
+  );
+  assert.equal(
+    exchangedCollectionDraft.slots[1].candidates[0].ship.name,
+    backupFollowMode === 'ship' ? '合集备选' : '主选队列备选',
+  );
+}
+
+const promotionDraft = createFleetDraft();
+promotionDraft.slots[0].primary = testShip(249, '待降级主选');
+promotionDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(250, '待升级备选'),
+);
+const promotionResult = applyFleetDraftEdit(promotionDraft, {
+  type: 'drop-formation',
+  source: { group: 'backup', position: 0, candidateIndex: 0 },
+  targetPosition: 0,
+  selection: {
+    group: 'formation',
+    position: 0,
+    candidateIndex: 0,
+  },
+  backupFollowMode: 'ship',
+});
+assert.equal(promotionResult.changed, true);
+assert.equal(promotionDraft.slots[0].primary.name, '待升级备选');
+assert.equal(
+  promotionDraft.slots[0].candidates[0].ship.name,
+  '待降级主选',
+);
+
+const demotionDraft = createFleetDraft();
+demotionDraft.slots[0].primary = testShip(251, '主动降级主选');
+const demotionResult = applyFleetDraftEdit(demotionDraft, {
+  type: 'drop-backup',
+  source: { group: 'formation', position: 0 },
+  targetPosition: 0,
+  targetCandidateIndex: 0,
+});
+assert.equal(demotionResult.changed, true);
+assert.equal(demotionDraft.slots[0].primary, null);
+assert.equal(
+  demotionDraft.slots[0].candidates[0].ship.name,
+  '主动降级主选',
+);
+
+const galleryBindingDraft = createFleetDraft();
+galleryBindingDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(252, '待绑定备选A'),
+);
+galleryBindingDraft.slots[0].candidates[1] = createFleetCandidateDraft(
+  testShip(253, '待绑定备选B'),
+);
+galleryBindingDraft.slots[0].candidates[2] = createFleetCandidateDraft(
+  testShip(254, '待绑定备选C'),
+);
+galleryBindingDraft.slots[1].primary = testShip(255, '位置2主选');
+const galleryPrimary = testShip(256, '图鉴插入主选');
+const galleryBindingResult = applyFleetDraftEdit(galleryBindingDraft, {
+  type: 'drop-formation',
+  source: { group: 'gallery', ship: galleryPrimary },
+  targetPosition: 0,
+  selection: {
+    group: 'formation',
+    position: 0,
+    candidateIndex: 0,
+  },
+  backupFollowMode: 'ship',
+});
+
+const promotionFocusDraft = createFleetDraft();
+promotionFocusDraft.slots[0].primary = testShip(260, '晋升来源主选');
+promotionFocusDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(261, '待晋升备选'),
+);
+promotionFocusDraft.slots[1].primary = testShip(262, '晋升前位置2主选');
+const promotionFocusResult = applyFleetDraftEdit(promotionFocusDraft, {
+  type: 'drop-formation',
+  source: {
+    group: 'backup',
+    position: 0,
+    candidateIndex: 0,
+  },
+  targetPosition: 2,
+  selection: {
+    group: 'backup',
+    position: 0,
+    candidateIndex: 0,
+  },
+  backupFollowMode: 'ship',
+});
+
+assert.equal(positionCandidateOnlyResult.changed, true);
+assert.equal(positionCandidateOnlyDraft.slots[0], positionTargetSlot);
+assert.equal(positionCandidateOnlyDraft.slots[1], positionSourceSlot);
+assert.deepEqual(
+  positionCandidateOnlyDraft.slots.slice(0, 2).map(slot => (
+    slot.candidates
+      .filter(candidate => candidate.ship)
+      .map(candidate => candidate.ship.name)
+  )),
+  [
+    ['位置1备选A', '位置1备选B', '位置1备选C'],
+    ['位置2备选A', '位置2备选B'],
+  ],
+);
+assert.equal(shipCandidateOnlyResult.changed, true);
+assert.equal(shipCandidateOnlyDraft.slots[0], shipCandidateOnlySlots[1]);
+assert.equal(shipCandidateOnlyDraft.slots[1], shipCandidateOnlySlots[0]);
+assert.deepEqual(
+  shipCandidateOnlyDraft.slots.slice(0, 2).map(slot => (
+    slot.candidates[0].ship.name
+  )),
+  ['舰船模式位置2备选', '舰船模式位置1备选'],
+);
+assert.equal(galleryBindingResult.changed, true);
+assert.equal(galleryBindingDraft.slots[0].primary, galleryPrimary);
+assert.deepEqual(
+  galleryBindingDraft.slots[0].candidates
+    .filter(candidate => candidate.ship)
+    .map(candidate => candidate.ship.name),
+  ['待绑定备选A', '待绑定备选B', '待绑定备选C'],
+);
+assert.deepEqual(promotionFocusResult.selection, {
+  group: 'formation',
+  position: 2,
+  candidateIndex: 0,
+});
 });
 
 await runScenario('统一编辑入口处理赋值规则拖拽复制与清空', () => {
@@ -576,18 +938,21 @@ assert.equal(applyFleetDraftEdit(editorAssignmentDraft, {
     levelEnabled: true,
     minLevel: 30,
     maxLevel: 90,
+    relaxed: true,
   },
 }).changed, true);
 assert.equal(editorAssignmentDraft.slots[0].levelEnabled, true);
 assert.equal(editorAssignmentDraft.slots[0].minLevel, 30);
 assert.equal(editorAssignmentDraft.slots[0].maxLevel, 90);
+assert.equal(editorAssignmentDraft.slots[0].relaxed, true);
 assert.equal(applyFleetDraftEdit(editorAssignmentDraft, {
   type: 'update-rule',
   position: 0,
   candidateIndex: 0,
-  update: { minLevel: 50 },
+  update: { minLevel: 50, relaxed: true },
 }).changed, true);
 assert.equal(editorAssignmentDraft.slots[0].candidates[0].minLevel, 50);
+assert.equal(editorAssignmentDraft.slots[0].candidates[0].relaxed, true);
 
 const editorShipFollowDraft = createFollowModeDraft();
 const shipFollowResult = applyFleetDraftEdit(editorShipFollowDraft, {
@@ -626,6 +991,39 @@ assert.equal(
   '备选A',
 );
 assert.equal(positionFollowResult.selection.position, 1);
+
+for (const backupFollowMode of ['ship', 'position']) {
+  const promotedBackupDraft = createFleetDraft();
+  promotedBackupDraft.slots[0].primary = testShip(123, '已有主选1');
+  promotedBackupDraft.slots[1].primary = testShip(124, '已有主选2');
+  promotedBackupDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+    testShip(125, '待晋升备选'),
+  );
+  promotedBackupDraft.slots[0].candidates[0].relaxed = true;
+  const promotedBackupResult = applyFleetDraftEdit(promotedBackupDraft, {
+    type: 'drop-formation',
+    source: {
+      group: 'backup',
+      position: 0,
+      candidateIndex: 0,
+    },
+    targetPosition: 3,
+    selection: {
+      group: 'formation',
+      position: 0,
+      candidateIndex: 0,
+    },
+    backupFollowMode,
+  });
+  assert.equal(promotedBackupResult.changed, true);
+  assert.equal(promotedBackupDraft.slots[2].primary.name, '待晋升备选');
+  assert.equal(promotedBackupDraft.slots[2].relaxed, true);
+  assert.equal(promotedBackupDraft.slots[3].primary, null);
+  assert.equal(
+    promotedBackupDraft.slots[0].candidates[0].ship,
+    null,
+  );
+}
 
 const editorCrossGroupDraft = createFollowModeDraft();
 const movedToBackup = applyFleetDraftEdit(editorCrossGroupDraft, {
@@ -676,6 +1074,7 @@ editorCopyDraft.slots[0].candidates[0] = createFleetCandidateDraft(
 );
 editorCopyDraft.slots[0].candidates[0].levelEnabled = true;
 editorCopyDraft.slots[0].candidates[0].minLevel = 40;
+editorCopyDraft.slots[0].candidates[0].relaxed = true;
 assert.equal(applyFleetDraftEdit(editorCopyDraft, {
   type: 'copy-backups',
   sourcePosition: 0,
@@ -686,6 +1085,7 @@ assert.equal(
   '复制备选',
 );
 assert.equal(editorCopyDraft.slots[1].candidates[0].minLevel, 40);
+assert.equal(editorCopyDraft.slots[1].candidates[0].relaxed, true);
 assert.notEqual(
   editorCopyDraft.slots[1].candidates[0],
   editorCopyDraft.slots[0].candidates[0],
@@ -706,11 +1106,13 @@ persistedDraft.slots[0].primary = testShip(201, '主选持久化');
 persistedDraft.slots[0].shipTypes = ['cl'];
 persistedDraft.slots[0].levelEnabled = true;
 persistedDraft.slots[0].minLevel = 20;
+persistedDraft.slots[0].relaxed = true;
 persistedDraft.slots[0].candidates[0] = createFleetCandidateDraft(
   testShip(202, '主选的备选'),
 );
 persistedDraft.slots[0].candidates[0].levelEnabled = true;
 persistedDraft.slots[0].candidates[0].maxLevel = 90;
+persistedDraft.slots[0].candidates[0].relaxed = true;
 persistedDraft.slots[1].candidates[0] = createFleetCandidateDraft(
   testShip(203, '纯候选'),
 );
@@ -728,9 +1130,11 @@ assert.deepEqual(persistedPlan.ships[0], {
   name: '主选持久化',
   ship_type: ['cl'],
   min_level: 20,
+  relaxed: true,
   candidates: [{
     name: '主选的备选',
     max_level: 90,
+    relaxed: true,
   }],
 });
 assert.equal('name' in persistedPlan.ships[1], false);
@@ -757,10 +1161,103 @@ assert.equal(restoredDraft.slots[1].candidates[0].ship.name, '纯候选');
 assert.deepEqual(restoredDraft.slots[1].shipTypes, ['dd']);
 assert.equal(restoredDraft.slots[1].minLevel, 30);
 assert.equal(restoredDraft.slots[1].maxLevel, 80);
+assert.equal(restoredDraft.slots[0].relaxed, true);
+assert.equal(restoredDraft.slots[0].candidates[0].relaxed, true);
 assert.deepEqual(
   fleetDraftToTeamPlan(restoredDraft, restoredDraft.name),
   persistedPlan,
 );
+
+const toggledDraft = createFleetDraft();
+toggledDraft.slots[0].primary = testShip(204, '开关主选');
+toggledDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+  testShip(205, '开关备选'),
+);
+applyFleetDraftEdit(toggledDraft, {
+  type: 'update-rule',
+  position: 0,
+  update: { relaxed: true },
+});
+applyFleetDraftEdit(toggledDraft, {
+  type: 'update-rule',
+  position: 0,
+  candidateIndex: 0,
+  update: { relaxed: true },
+});
+const enabledRelaxedPlan = fleetDraftToTeamPlan(toggledDraft, '开启宽泛校验');
+assert.equal(enabledRelaxedPlan.ships[0].relaxed, true);
+assert.equal(enabledRelaxedPlan.ships[0].candidates[0].relaxed, true);
+applyFleetDraftEdit(toggledDraft, {
+  type: 'update-rule',
+  position: 0,
+  update: { relaxed: false },
+});
+applyFleetDraftEdit(toggledDraft, {
+  type: 'update-rule',
+  position: 0,
+  candidateIndex: 0,
+  update: { relaxed: false },
+});
+const disabledRelaxedPlan = fleetDraftToTeamPlan(toggledDraft, '关闭宽泛校验');
+assert.equal(Object.hasOwn(disabledRelaxedPlan.ships[0], 'relaxed'), false);
+assert.equal(
+  Object.hasOwn(disabledRelaxedPlan.ships[0].candidates[0], 'relaxed'),
+  false,
+);
+
+let combinationId = 300;
+for (const withShipType of [false, true]) {
+  for (const withLevel of [false, true]) {
+    for (const withRelaxed of [false, true]) {
+      const combinationDraft = createFleetDraft();
+      const primary = testShip(combinationId++, `组合主选${combinationId}`);
+      const candidate = testShip(combinationId++, `组合备选${combinationId}`);
+      combinationDraft.slots[0].primary = primary;
+      combinationDraft.slots[0].candidates[0] = createFleetCandidateDraft(
+        candidate,
+      );
+      for (const rule of [
+        combinationDraft.slots[0],
+        combinationDraft.slots[0].candidates[0],
+      ]) {
+        rule.shipTypes = withShipType ? ['dd'] : [];
+        rule.levelEnabled = withLevel;
+        rule.minLevel = withLevel ? 20 : null;
+        rule.maxLevel = withLevel ? 90 : null;
+        rule.relaxed = withRelaxed;
+      }
+      const combinationPlan = fleetDraftToTeamPlan(
+        combinationDraft,
+        `属性组合${combinationId}`,
+      );
+      const expectedKeys = [
+        'name',
+        ...(withShipType ? ['ship_type'] : []),
+        ...(withLevel ? ['min_level', 'max_level'] : []),
+        ...(withRelaxed ? ['relaxed'] : []),
+      ];
+      assert.deepEqual(Object.keys(combinationPlan.ships[0]), [
+        ...expectedKeys,
+        'candidates',
+      ]);
+      assert.deepEqual(
+        Object.keys(combinationPlan.ships[0].candidates[0]),
+        expectedKeys,
+      );
+      const loadedCombinationDraft = fleetDraftFromTeamPlan(
+        combinationPlan,
+        [primary, candidate],
+      );
+      assert.deepEqual(
+        fleetDraftToTeamPlan(
+          loadedCombinationDraft,
+          combinationPlan.name,
+        ),
+        combinationPlan,
+      );
+    }
+  }
+}
 
 assert.throws(
   () => fleetDraftToTeamPlan(createFleetDraft(), '空舰队'),
@@ -937,6 +1434,24 @@ assert.notEqual(
     ],
   }),
 );
+assert.notEqual(
+  fleetPresetIdentityKey(existingFleetPresets[0]),
+  fleetPresetIdentityKey({
+    name: '已有编队',
+    ships: [
+      '海伦娜',
+      {
+        candidates: [
+          { name: '昆西', ship_type: ['cl'], relaxed: true },
+          { name: '克利夫兰' },
+        ],
+        ship_type: ['cl', 'ca'],
+        min_level: 10,
+        relaxed: true,
+      },
+    ],
+  }),
+);
 });
 
 const manifest = {
@@ -1010,7 +1525,11 @@ const catalogPlans = [
     source: 'system',
     name: '纯候选编队',
     ships: [{
-      candidates: [{ name: '海伦娜', min_level: 100 }],
+      candidates: [{
+        name: '海伦娜',
+        min_level: 100,
+        relaxed: true,
+      }],
     }],
   },
 ];
@@ -1072,6 +1591,7 @@ const secondAppend = presetController.appendPreset(
 );
 assert.ok(firstAppend);
 assert.ok(secondAppend);
+assert.equal(firstAppend[0].ships[0].candidates[0].relaxed, true);
 firstAppend[0].ships[0].candidates[0].name = '修改副本';
 assert.equal(
   secondAppend[0].ships[0].candidates[0].name,
