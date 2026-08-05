@@ -1,6 +1,6 @@
 # 后端通信
 
-> 涉及文件：`electron/preload.ts` · `electron/main.ts`（IPC handlers）· `src/model/ApiClient.ts` · `src/types/api.ts` · `src/types/electronBridge.ts`
+> 涉及文件：`electron/preload.ts` · `electron/main.ts`（IPC handlers）· `electron/ipc/` · `electron/services/` · `src/adapter/IpcAdapter.ts` · `src/model/ApiClient.ts` · `src/types/api.ts` · `src/types/electronBridge.ts`
 
 ## 概述
 
@@ -114,6 +114,25 @@ graph LR
 | `getAppVersion()` | 同步获取应用版本号 |
 | `getBackendPort()` | 同步获取后端端口 |
 | `setBackendPort(port)` | 设置后端端口 |
+
+### 独立编队 IPC
+
+编队规划只暴露三个面向用例的 handler：
+
+| Channel | Renderer 方法 | 能力 |
+|---------|---------------|------|
+| `fleet-planner:get-ship-library` | `getShipLibraryManifest()` | 读取打包内只读舰船 manifest |
+| `fleet-planner:save-team-plan` | `saveUserTeamPlan()` | 校验并原子保存受管编队 YAML |
+| `fleet-planner:list-team-plans` | `listTeamPlans()` | 枚举系统和用户编队并返回逐文件错误 |
+
+renderer 不传入绝对路径。保存和列表操作固定在
+`resource/system_team_plans` 与 `%userData%/user_team_plans`；舰船图片路径
+经过 `realpath` containment 检查后才转换成 `file://` URL，阻止 `..`、符号
+链接和 junction 逃逸。
+
+`src/types/ipc.ts` 只描述通信 DTO。`src/adapter/FleetPlannerDtoAdapter.ts`
+负责 snake_case DTO 与 camelCase 领域合同的双向转换，Model、Controller、
+ViewObject 和 View 不直接依赖 IPC DTO。
 
 ---
 

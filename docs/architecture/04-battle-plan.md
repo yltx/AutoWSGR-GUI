@@ -223,9 +223,45 @@ flowchart TB
 
 ---
 
+## 独立编队规划
+
+独立编队规划与战斗方案中的 `fleet_presets` 是两个不同用例。当前切片只负责：
+
+```text
+加载打包舰船库 → 编辑六个主选/备选位置 → 校验 → 原子保存 YAML → 重新加载
+```
+
+### 状态和分层
+
+- `FleetPlannerController` 持有唯一可写 `FleetDraft`。
+- `src/model/fleet/` 实现槽位、候选队列、舰种和等级规则。
+- `src/types/fleet.ts` 是 camelCase 领域合同；`src/types/ipc.ts` 是
+  snake_case 通信 DTO，两者只在 `FleetPlannerDtoAdapter` 中转换。
+- View 只接收 `FleetShipViewObject`，编辑意图只提交舰船 ID。
+- `localStorage` 仅保存改造过滤和备选跟随方式，不保存编队业务状态。
+
+### 持久化合同
+
+用户编队写入 Electron 的 `%userData%/user_team_plans`，文件名为
+`team-*.yaml` 或 `team_*.yaml`。写入使用临时文件加原子替换；替换失败时保留
+旧文件。加载再保存时保留计划、槽位和候选规则中的未知扩展字段。
+
+`ship_type` 只接受 native 0.3 的 22 个规范代码以及组合条件
+`ss_or_ssg`。旧 Wiki 代码不属于运行时编队合同。
+
+打包内的 `resource/ship-library/manifest.json` 和图片是只读资料，不会复制到
+用户目录，也不会由 renderer 接收任意文件路径。
+
+当前切片不绑定战斗方案、不修改游戏内舰队、不调用 Python 后端执行换船，也不
+提供在线舰船库更新。
+
+---
+
 ## 与其他系统的关系
 
 - **任务调度**：方案通过 `controller/plan/presetFlow.ts` 的 `executePresetFlow()` 构建 `TaskRequest` 后交给 `Scheduler`
 - **模板与任务组**：模板的 `planPaths` 引用方案文件；任务组 item 可以是 `kind: "plan"` 类型
 - **配置系统**：方案中的 `fleet_id` 和 `repair_mode` 可被配置页覆盖
 - **共享组件**：`view/shared/ShipAutocomplete.ts` 提供舰船名自动补全，被 `FleetEditDialog` 使用
+- **独立编队**：`FleetPlannerController` 保存独立 YAML；当前不与
+  `PlanController`、`Scheduler` 或 Python 后端建立运行时绑定

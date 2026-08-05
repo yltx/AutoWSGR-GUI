@@ -15,13 +15,14 @@ AutoWSGR-GUI 是一个基于 **Electron** 的桌面应用，为 [AutoWSGR](https
 ```mermaid
 graph TB
   subgraph Renderer["渲染进程 (src/)"]
-    View["View 层<br/>MainView(Facade) · PlanPreviewView(Facade)<br/>ConfigView · TaskGroupView<br/>TemplateLibraryView · SetupWizardView"]
-    Controller["Controller 层<br/>AppController · StartupController<br/>PlanController · TaskGroupController<br/>TemplateController · SchedulerBinder<br/>── ControllerHost 接口解耦 ──"]
-    Model["Model 层<br/>Scheduler · CronScheduler · TaskQueue<br/>ApiClient · ConfigModel · PlanModel<br/>TemplateModel · TaskGroupModel<br/>RepairManager · StopConditionChecker"]
+    View["View 层<br/>MainView(Facade) · PlanPreviewView(Facade)<br/>FleetPlannerView · ConfigView · TaskGroupView<br/>TemplateLibraryView · SetupWizardView"]
+    Controller["Controller 层<br/>AppController · StartupController<br/>PlanController · FleetPlannerController<br/>TaskGroupController · TemplateController · SchedulerBinder<br/>── ControllerHost 接口解耦 ──"]
+    Model["Model 层<br/>Scheduler · CronScheduler · TaskQueue<br/>ApiClient · ConfigModel · PlanModel · FleetDraft<br/>TemplateModel · TaskGroupModel<br/>RepairManager · StopConditionChecker"]
   end
 
   subgraph Main["Electron 主进程 (electron/)"]
-    IPC["IPC Handlers<br/>main.ts · preload.ts"]
+    IPC["IPC Handlers<br/>main.ts · preload.ts · ipc/"]
+    Storage["受管文件与资源服务<br/>services/"]
     PyEnv["Python 环境管理<br/>pythonEnv/ (7 个模块)"]
     Backend["后端进程管理<br/>backend.ts"]
     Emulator["模拟器检测<br/>emulatorDetect.ts"]
@@ -37,6 +38,7 @@ graph TB
   Model -->|"HTTP / WebSocket"| ASGI
   Controller -->|"contextBridge (preload.ts)"| IPC
   IPC --> PyEnv
+  IPC --> Storage
   IPC --> Backend
   IPC --> Emulator
   Backend -->|"spawn 子进程"| ASGI
@@ -49,7 +51,7 @@ graph TB
 | **View** | `src/view/` | 纯 UI 渲染，接收 ViewObject 显示；不含业务逻辑。大型视图采用 Facade 模式内部拆分 |
 | **Controller** | `src/controller/` | 从 Model 提取数据 → 拼装 ViewObject → 调用 View 渲染；处理用户事件 → 调用 Model / IPC。通过 ControllerHost 接口解耦 |
 | **Model** | `src/model/` | 业务实体 + 领域服务：调度、配置、方案解析、后端通信 |
-| **Types** | `src/types/` | 跨层共享的 TypeScript 类型定义，按领域拆分为 5 个文件 |
+| **Types** | `src/types/` | 按领域和通信方向拆分的 TypeScript 合同；领域模型、ViewObject 和 IPC DTO 分离 |
 | **主进程** | `electron/` | 窗口管理、IPC handler、Python 环境发现/安装、后端子进程生命周期、模拟器检测 |
 | **Python 后端** | 外部 | 游戏自动化核心逻辑：模拟器连接、战斗执行、OCR 识别 |
 
@@ -64,6 +66,8 @@ AutoWSGR-GUI/
 │   ├── preload.ts              # contextBridge 安全 API 暴露
 │   ├── backend.ts              # Python 后端启动/停止
 │   ├── emulatorDetect.ts       # 模拟器注册表检测
+│   ├── ipc/                    # 面向用例的窄 IPC handler
+│   ├── services/               # 受管文件、原子写入和只读资源服务
 │   └── pythonEnv/              # Python 环境管理子模块
 │       ├── context.ts          # 共享上下文与缓存状态
 │       ├── finder.ts           # Python 可执行文件发现
@@ -82,6 +86,7 @@ AutoWSGR-GUI/
 │   │   └── shared/             # 共享基接口：ControllerHost · DialogHelper
 │   ├── model/                  # 数据模型 + 业务服务
 │   │   ├── scheduler/          # 调度子模块：Scheduler · CronScheduler · TaskQueue · ExpeditionTimer · StopConditionChecker · RepairManager
+│   │   ├── fleet/              # 独立编队领域草稿与编辑命令
 │   │   ├── ApiClient.ts        # HTTP/WebSocket 后端通信
 │   │   ├── ConfigModel.ts      # 配置数据模型
 │   │   ├── PlanModel.ts        # 方案解析/序列化
@@ -101,14 +106,19 @@ AutoWSGR-GUI/
 │   │   ├── api.ts              # API / WebSocket 通信类型
 │   │   ├── electronBridge.ts   # IPC 桥接口
 │   │   ├── model.ts            # 业务实体类型（PlanData 等）
+│   │   ├── fleet.ts            # 独立编队领域合同
+│   │   ├── fleetEditor.ts      # 编队页用户意图
+│   │   ├── ipc.ts              # 编队 IPC DTO
 │   │   ├── scheduler.ts        # 调度器公共类型
 │   │   └── view.ts             # ViewObject 接口
 │   ├── data/                   # 静态数据（舰船数据库）
+│   ├── adapter/                # IPC DTO/领域转换与 renderer 能力适配
 │   └── utils/                  # 工具类（Logger）
 ├── resource/                   # 只读资源
 │   ├── builtin_plans/          # 内置战斗方案 (.yaml)
 │   ├── builtin_templates.json  # 内置模板
 │   ├── maps/                   # 地图 JSON（节点坐标、连线）
+│   ├── ship-library/           # 打包内只读舰船 manifest 与图片
 │   └── images/                 # 图片资源
 ├── templates/                  # 用户自定义模板
 ├── plans/                      # 用户战斗方案目录
@@ -194,6 +204,10 @@ Controller 从 Model 提取数据，拼装为 **ViewObject**（定义在 `src/ty
 Model → Controller.extractViewObject() → ViewObject → View.render(vo)
 ```
 
+独立编队额外通过 `FleetPlannerDtoAdapter` 隔离 IPC DTO。Model 和 View
+均不直接依赖 `src/types/ipc.ts`；View 只上报舰船 ID，Controller 将其解析为
+领域舰船后再执行编辑命令。
+
 ### View Facade 模式
 
 大型视图组件采用 Facade 模式：`MainView` 持有 `LogView` / `TaskQueueView` / `StatusBar`，`PlanPreviewView` 持有 `MapView` / `NodeEditorView` / `FleetPresetView`。Controller 只与 Facade 交互，无需感知内部拆分。
@@ -228,6 +242,9 @@ Model → Controller.extractViewObject() → ViewObject → View.render(vo)
 | `api.ts` | API 响应、TaskRequest、WebSocket 消息类型 | ApiClient、Controller |
 | `electronBridge.ts` | IPC 桥接口 `ElectronBridge` | Controller、StartupController |
 | `model.ts` | 业务实体：PlanData、NodeArgs、FleetPreset、StopCondition | Model、Controller |
+| `fleet.ts` | 独立编队领域：舰船库、编队计划、来源和保存结果 | Fleet Model、Controller、IPC Adapter |
+| `fleetEditor.ts` | 编队页用户意图和编辑结果 | Fleet View、Controller |
+| `ipc.ts` | 独立编队 IPC DTO（snake_case 持久化合同） | Electron、preload、IPC Adapter |
 | `scheduler.ts` | 调度器：TaskPriority、SchedulerTask、SchedulerCallbacks | Scheduler、SchedulerBinder |
 | `view.ts` | ViewObject：MainViewObject、PlanPreviewViewObject 等 | Controller → View |
 

@@ -37,8 +37,21 @@ npm run dev
 | `npm start` | 等同于 `build` + `electron .`（含 chcp 65001） |
 | `npm run dist` | 完整打包：下载 Python + ADB → 编译 → electron-builder NSIS 安装包 |
 | `npm run pack` | 编译 + `electron-builder --dir`（生成目录，不打安装包） |
+| `npm run test:fleet-domain` | 验证编队领域规则、DTO 边界和未知字段往返 |
+| `npm run test:fleet-planner-services` | 构建后验证 YAML、原子写入、路径安全、舰船库和 IPC |
+| `npm run test:fleet-planner` | 依次执行全部编队测试 |
+| `npm run sync:fleet-types` | 从 native 0.3 舰种定义重新生成 GUI 合同 |
+| `npm run check:fleet-types` | 检查生成的 22 舰种合同是否漂移 |
 | `npm run prepare-python` | 单独下载便携版 Python |
 | `npm run prepare-adb` | 单独下载 ADB 工具 |
+
+舰种同步命令需要能导入 `autowsgr_native>=0.3.0` 的解释器。仓库没有便携版
+Python 时，先通过 `AUTOWSGR_PYTHON` 显式指定环境，例如：
+
+```powershell
+$env:AUTOWSGR_PYTHON = 'C:\path\to\python.exe'
+npm run check:fleet-types
+```
 
 ---
 
@@ -98,7 +111,7 @@ flowchart LR
 **包含内容**：
 - `dist/` — 编译后的 JS
 - `src/view/` — HTML/CSS
-- `resource/` — 内置方案 + 模板 + 地图
+- `resource/` — 内置方案、模板、地图和只读舰船库
 - `python/` — 便携版 Python
 - `adb/` — ADB 工具
 
@@ -114,6 +127,9 @@ flowchart LR
 |------|--------------|--------------|
 | `appRoot()` | 项目根目录 | `%LOCALAPPDATA%/autowsgr-gui/` 或安装目录 |
 | `resourceRoot()` | 同 appRoot | `resources/` (extraResources) |
+| `resource/ship-library/` | 项目只读资源 | `resources/resource/ship-library/` |
+| `resource/system_team_plans/` | 项目只读资源 | `resources/resource/system_team_plans/` |
+| `user_team_plans/` | Electron `userData` | Electron `userData` |
 | `plans/` | 项目根 `plans/` | extraResources `plans/` |
 | `python/` | 项目根 `python/` | extraResources `python/` |
 | `adb/` | 项目根 `adb/` | extraResources `adb/` |
@@ -157,6 +173,7 @@ flowchart LR
 | ADB 连接失败 | 模拟器串口不匹配 | 在配置页手动填写 ADB 串口 |
 | 端口冲突 | 8438 端口被占用 | 在配置页更改后端端口 |
 | TypeScript 编译错误 | 类型定义不匹配 | 确认 Node.js 类型版本与 `@types/node` 一致 |
+| 编队舰种合同漂移 | native 0.3 舰种定义有变化 | 运行 `npm run sync:fleet-types`，审查生成差异后再提交 |
 
 ---
 
