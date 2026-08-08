@@ -178,11 +178,6 @@ export class TaskQueue {
     }
   }
 
-  /** 清空队列（不清延迟任务） */
-  clearQueue(): void {
-    this.queue = [];
-  }
-
   // ── 延迟任务管理 ──
 
   /** 将任务放入延迟列表，不消耗 remainingTimes */

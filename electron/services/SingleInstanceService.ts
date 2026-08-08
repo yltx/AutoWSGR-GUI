@@ -42,10 +42,6 @@ export class SingleInstanceService {
     return true;
   }
 
-  isPrimary(): boolean {
-    return this.primary;
-  }
-
   setMainWindowProvider(provider: MainWindowProvider): void {
     this.mainWindowProvider = provider;
   }

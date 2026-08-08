@@ -5,6 +5,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { spawn } from 'child_process';
 import { ShipLibraryService } from './ShipLibraryService';
+import type {
+  ShipNameComparisonResult,
+  ShipNameSyncResult,
+} from './ShipNameSynchronizer';
 
 export interface ShipLibraryUpdateResult {
   success: boolean;
@@ -18,6 +22,7 @@ export interface ShipLibraryUpdateResult {
   downloaded?: number;
   failed?: number;
   failures?: string[];
+  shipnames_sync_error?: string;
   error?: string;
 }
 
@@ -25,6 +30,8 @@ export interface ShipLibraryUpdaterDependencies {
   findPython(): Promise<string | null>;
   appRoot(): string;
   sendProgress(message: string): void;
+  compareShipNames(pythonCmd: string): ShipNameComparisonResult;
+  syncShipNames(pythonCmd: string): ShipNameSyncResult;
   spawnProcess?: typeof spawn;
 }
 
@@ -53,6 +60,50 @@ export class ShipLibraryUpdater {
     }
   }
 
+  /** 只读核对 GUI 船库与当前后端舰名库。 */
+  async getBackendSyncStatus(): Promise<ShipNameComparisonResult> {
+    const pythonCmd = await this.dependencies.findPython();
+    if (!pythonCmd) {
+      throw new Error('找不到可用的 Python 3.12 或 3.13');
+    }
+    return this.dependencies.compareShipNames(pythonCmd);
+  }
+
+  /** 不访问 Wiki，只把当前 GUI 舰名增量同步到后端。 */
+  async syncBackend(): Promise<ShipLibraryUpdateResult> {
+    if (this.running) {
+      return {
+        success: false,
+        error: '舰船资料库正在更新，请稍候',
+      };
+    }
+    this.running = true;
+    try {
+      const pythonCmd = await this.dependencies.findPython();
+      if (!pythonCmd) {
+        return {
+          success: false,
+          error: '找不到可用的 Python 3.12 或 3.13',
+        };
+      }
+      this.dependencies.sendProgress('正在同步后端舰名库…');
+      const syncResult = this.dependencies.syncShipNames(pythonCmd);
+      return {
+        success: true,
+        ship_count: syncResult.totalRecords,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: `后端舰名同步失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      };
+    } finally {
+      this.running = false;
+    }
+  }
+
   /** 启动 Python 更新脚本并解析机器可读输出。 */
   private async run(): Promise<ShipLibraryUpdateResult> {
     const pythonCmd = await this.dependencies.findPython();
@@ -70,7 +121,7 @@ export class ShipLibraryUpdater {
       };
     }
 
-    return new Promise((resolve) => {
+    const updateResult = await new Promise<ShipLibraryUpdateResult>((resolve) => {
       const spawnProcess = this.dependencies.spawnProcess ?? spawn;
       // 便携版 Python 的 ._pth 隔离模式不会自动加入脚本目录。
       const bootstrap = [
@@ -163,5 +214,19 @@ export class ShipLibraryUpdater {
         });
       });
     });
+    if (!updateResult.success) return updateResult;
+
+    this.dependencies.sendProgress('正在同步后端舰名库…');
+    try {
+      this.dependencies.syncShipNames(pythonCmd);
+      return updateResult;
+    } catch (error) {
+      return {
+        ...updateResult,
+        shipnames_sync_error: error instanceof Error
+          ? error.message
+          : String(error),
+      };
+    }
   }
 }

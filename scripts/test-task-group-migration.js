@@ -217,7 +217,7 @@ async function verifyRealLegacyFixtureLifecycle() {
   const model = new TaskGroupModel();
 
   await model.load();
-  const migrated = model.toJSON();
+  const migrated = JSON.parse(state.stored);
   assert.equal(migrated.version, 4);
   assert.equal(state.saves, 1);
 
@@ -284,7 +284,7 @@ async function verifyRealLegacyFixtureLifecycle() {
 
   const reloaded = new TaskGroupModel();
   await reloaded.load();
-  const reloadedItem = reloaded.toJSON().groups[0].items[0];
+  const reloadedItem = reloaded.groups[0].items[0];
   assert.equal(reloadedItem.managedSource, 'user');
   assert.equal(reloadedItem.managedFile, '9-4胖次6SS.yaml');
   assert.equal(state.saves, 2);
@@ -313,7 +313,7 @@ async function verifyActivityAliases() {
   const model = new TaskGroupModel();
 
   await model.load();
-  const migrated = model.toJSON();
+  const migrated = JSON.parse(state.stored);
   assert.equal(migrated.rootExtension.preserved, true);
   assert.equal(migrated.groups[0].groupExtension, 'keep');
   migrated.groups[0].items.forEach((item, index) => {
@@ -349,7 +349,7 @@ async function verifyLegacyWeeklyMapSemantics() {
   const model = new TaskGroupModel();
 
   await model.load();
-  const items = model.toJSON().groups[0].items;
+  const items = model.groups[0].items;
   legacyWeeklyPlans.forEach((
     [legacyFile, managedFile, chapter, map],
     index,
@@ -434,13 +434,14 @@ async function verifyInterimVersion() {
   const model = new TaskGroupModel();
 
   await model.load();
-  assert.equal(model.toJSON().version, 4);
+  const migrated = JSON.parse(state.stored);
+  assert.equal(migrated.version, 4);
   assert.equal(
-    model.toJSON().groups[0].items[0].managedFile,
+    model.groups[0].items[0].managedFile,
     'bettle-E1炸鱼.yaml',
   );
   assert.equal(
-    model.toJSON().groups[0].items[0].managedSource,
+    model.groups[0].items[0].managedSource,
     'user',
   );
   assert.equal(

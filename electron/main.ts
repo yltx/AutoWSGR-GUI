@@ -7,6 +7,7 @@ import {
   initPythonEnv, clearPythonCache,
   isAllowedPythonVersion, findPython, checkEnvironment,
   installDependencies, installPortablePython,
+  resolvePythonEnvironment,
 } from './pythonEnv';
 import { detectEmulator } from './emulatorDetect';
 import {
@@ -23,7 +24,14 @@ import { SafePathService } from './services/SafePathService';
 import { SecureFileService } from './services/SecureFileService';
 import { WindowService } from './services/WindowService';
 import { SingleInstanceService } from './services/SingleInstanceService';
-import { UserDataMigrationService } from './services/UserDataMigrationService';
+import {
+  DEFAULT_LEGACY_MIGRATION_SELECTION,
+  UserDataMigrationService,
+  type LegacyMigrationSelection,
+} from './services/UserDataMigrationService';
+import {
+  LegacyMigrationPrompt,
+} from './services/LegacyMigrationPrompt';
 import { MigrationStateStore } from './services/MigrationStateStore';
 import {
   LEGACY_PLAN_MIGRATION_STAGE,
@@ -54,6 +62,7 @@ import { TaskPresetCodec } from '../src/shared/taskPreset';
 import { DailyPlanService } from './services/DailyPlanService';
 import { ShipLibraryService } from './services/ShipLibraryService';
 import { ShipLibraryUpdater } from './services/ShipLibraryUpdater';
+import { ShipNameSynchronizer } from './services/ShipNameSynchronizer';
 import { AdbService } from './services/AdbService';
 import { CudaEnvironmentService } from './services/CudaEnvironmentService';
 import { GuiConfigurationService } from './services/GuiConfigurationService';
@@ -105,9 +114,10 @@ const migrationConflictService = new MigrationConflictService(
   appPaths,
   atomicFileStore,
 );
-const legacyUserDataMigration = isPrimaryInstance
-  ? userDataMigrationService.migrateLegacyUserDataFiles()
-  : emptyLegacyMigrationSummary();
+let legacyUserDataMigration = emptyLegacyMigrationSummary();
+const legacyMigrationPrompt = new LegacyMigrationPrompt({
+  createWindow: options => new BrowserWindow(options),
+});
 const guiSettingsStore = new GuiSettingsStore(
   () => path.join(appPaths.userDataRoot(), 'gui_settings.json'),
   atomicFileStore,
@@ -167,7 +177,23 @@ const planExportService = new PlanExportService(
 const shipLibraryService = new ShipLibraryService(appPaths, {
   processId: process.pid,
 });
+const shipNameSynchronizer = new ShipNameSynchronizer(atomicFileStore);
 const adbService = new AdbService(appPaths);
+
+/** 关闭 GUI 管理的后端与 ADB server，释放安装目录中的可执行文件。 */
+async function stopRuntimeResources(): Promise<void> {
+  await stopBackend();
+  try {
+    await adbService.stopServer();
+    console.log('[ADB] server 已停止');
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : String(error);
+    console.warn(`[ADB] server 停止失败，将继续退出: ${message}`);
+  }
+}
+
 const cudaEnvironmentService = new CudaEnvironmentService(
   CudaEnvironmentService.createDependencies(findPython),
 );
@@ -217,12 +243,36 @@ const shipLibraryUpdater = new ShipLibraryUpdater(
         { message },
       );
     },
+    compareShipNames: pythonCmd => {
+      return shipNameSynchronizer.compare(
+        backendShipNamesPath(pythonCmd),
+        shipLibraryService.getManifest().ships,
+      );
+    },
+    syncShipNames: pythonCmd => {
+      return shipNameSynchronizer.sync(
+        backendShipNamesPath(pythonCmd),
+        shipLibraryService.getManifest().ships,
+      );
+    },
   },
 );
 
 /** 返回开发项目根目录或打包后的 exe 目录。 */
 function appRoot(): string {
   return appPaths.appRoot();
+}
+
+/** 返回当前 managed 或 external 后端实际使用的舰名库路径。 */
+function backendShipNamesPath(pythonCmd: string): string {
+  const environment = resolvePythonEnvironment(pythonCmd);
+  const backendRoot = environment.backendRoot ?? environment.localSite;
+  return path.join(
+    backendRoot,
+    'autowsgr',
+    'data',
+    'shipnames.yaml',
+  );
 }
 
 /** 返回包含 resource 和 setup.bat 的 extraResources 目录。 */
@@ -279,6 +329,34 @@ registerCombatPlanIpc(ipcMain, {
 registerShipLibraryIpc(ipcMain, {
   library: shipLibraryService,
   updater: shipLibraryUpdater,
+  getStatus: async () => {
+    const status = shipLibraryService.getStatus();
+    if (
+      !status.exists
+      || status.error
+      || status.shipCount <= 0
+      || status.missingAssets > 0
+    ) {
+      return status;
+    }
+    try {
+      const backend = await shipLibraryUpdater.getBackendSyncStatus();
+      return {
+        ...status,
+        backendSynchronized: backend.synchronized,
+        backendMissingRecords: backend.missingRecords,
+        backendMissingAliases: backend.missingAliases,
+      };
+    } catch (error) {
+      return {
+        ...status,
+        backendSynchronized: false,
+        backendError: error instanceof Error
+          ? error.message
+          : String(error),
+      };
+    }
+  },
 });
 registerBackendIpc(ipcMain, {
   getBackendProcess,
@@ -335,7 +413,24 @@ function sendProgress(msg: string): void {
 if (isPrimaryInstance) initializeApplicationLifecycle();
 
 function initializeApplicationLifecycle(): void {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    let migrationSelection: LegacyMigrationSelection = {
+      ...DEFAULT_LEGACY_MIGRATION_SELECTION,
+    };
+    if (userDataMigrationService.shouldMigrateLegacyInstallation()) {
+      const selected = await legacyMigrationPrompt.show();
+      if (!selected) {
+        app.quit();
+        return;
+      }
+      migrationSelection = selected;
+      legacyUserDataMigration = (
+        userDataMigrationService.migrateLegacyUserDataFiles(
+          migrationSelection,
+        )
+      );
+    }
+
     initPythonEnv({
       appRoot,
       sendProgress,
@@ -366,7 +461,9 @@ function initializeApplicationLifecycle(): void {
     const presetInventoryResult = (
       userDataMigrationService.migratePresetInventory()
     );
-    const legacyPlanResult = legacyPlanMigration.migrate();
+    const legacyPlanResult = legacyPlanMigration.migrate(
+      migrationSelection,
+    );
     const legacyMigrationResult = mergeLegacyMigrationSummaries(
       legacyUserDataMigration,
       legacyPlanResult,
@@ -391,7 +488,8 @@ function initializeApplicationLifecycle(): void {
         windowService.sendToRenderer(channel, ...args)
       ),
       getAppVersion: () => app.getVersion(),
-      stopBackend,
+      getUpdateMode: () => guiConfigurationService.updateMode(),
+      stopBackend: stopRuntimeResources,
     });
     windowService.createWindow();
     const migrationNotice = buildLegacyMigrationNotice(
@@ -409,30 +507,32 @@ function initializeApplicationLifecycle(): void {
     });
   });
 
-  let backendShutdownInProgress = false;
+  let runtimeShutdownInProgress = false;
+  let runtimeShutdownComplete = false;
 
   app.on('before-quit', (event) => {
     windowService.captureWindowBounds();
     windowService.persistWindowBounds();
-    if (backendShutdownInProgress) return;
-    if (getBackendProcess()) {
-      backendShutdownInProgress = true;
-      event.preventDefault();
-      void stopBackend().then(() => {
-        backendShutdownInProgress = false;
-        app.quit();
-      }).catch(error => {
-        backendShutdownInProgress = false;
-        const message = error instanceof Error
-          ? error.message
-          : String(error);
-        console.error('[Backend] 无法安全退出:', message);
-        dialog.showErrorBox(
-          '无法安全退出',
-          `后端进程仍在运行，应用没有退出：${message}`,
-        );
-      });
-    }
+    if (runtimeShutdownComplete) return;
+    event.preventDefault();
+    if (runtimeShutdownInProgress) return;
+
+    runtimeShutdownInProgress = true;
+    void stopRuntimeResources().then(() => {
+      runtimeShutdownComplete = true;
+      runtimeShutdownInProgress = false;
+      app.quit();
+    }).catch(error => {
+      runtimeShutdownInProgress = false;
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      console.error('[Backend] 无法安全退出:', message);
+      dialog.showErrorBox(
+        '无法安全退出',
+        `后端进程仍在运行，应用没有退出：${message}`,
+      );
+    });
   });
 
   app.on('window-all-closed', () => {

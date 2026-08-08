@@ -48,8 +48,9 @@ export async function checkAndPrepareEnv(
   const installResult = await bridge.installDeps();
 
   if (!installResult.success) {
-    Logger.error('依赖安装失败');
-    Logger.error(installResult.output.slice(-200));
+    Logger.error('依赖安装失败，请检查日志');
+    // 原始 pip 输出仅写入日志文件，不推送到 UI 面板（可能含乱码，不适合展示）
+    Logger.logToFile(installResult.output.slice(-200));
     return false;
   }
 
@@ -113,8 +114,7 @@ function initGuiAutoUpdate(bridge: StartupGateway): void {
           Logger.warn(`发现 GUI 新版本 v${status.version}，当前为手动更新模式，请点击「立即检查更新」后手动下载`);
           break;
         }
-        Logger.info(`发现 GUI 新版本 v${status.version}，正在自动下载增量更新…`);
-        bridge.downloadGuiUpdate?.();
+        Logger.info(`发现 GUI 新版本 v${status.version}，主进程已开始自动下载增量更新…`);
         break;
       case 'downloading':
         if (status.percent != null && status.percent % 25 === 0) {

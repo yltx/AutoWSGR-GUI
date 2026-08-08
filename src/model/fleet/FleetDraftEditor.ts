@@ -231,6 +231,10 @@ function insertFormationShip(
   if (target !== targetPosition) {
     return assignFormationShip(draft, ship, target);
   }
+  const targetSlot = draft.slots[target];
+  if (targetSlot && !targetSlot.primary && !isFleetSlotEmpty(targetSlot)) {
+    return assignFormationShip(draft, ship, target);
+  }
   const inserted = createFleetSlotDraft();
   inserted.primary = ship;
   applyDefaultShipType(inserted, ship);
@@ -305,17 +309,20 @@ function moveBackupToFormation(
   sourcePosition: number,
   sourceIndex: number,
   targetPosition: number,
-  selection: FleetEditorSelection,
 ): FleetDraftEditResult {
-  const focused = draft.slots[selection.position];
   const source = draft.slots[sourcePosition];
-  const target = draft.slots[targetPosition];
+  const requestedTarget = draft.slots[targetPosition];
   const candidate = source?.candidates[sourceIndex];
-  if (!candidate?.ship || !target || !focused) return unchanged();
+  if (!candidate?.ship || !requestedTarget) return unchanged();
+  const destinationPosition = isFleetSlotEmpty(requestedTarget)
+    ? resolveGalleryFormationDropTarget(draft.slots, targetPosition)
+    : targetPosition;
+  const target = draft.slots[destinationPosition];
+  if (!target) return unchanged();
   if (hasOtherPrimaryShip(
     draft.slots,
     candidate.ship.search_name,
-    targetPosition,
+    destinationPosition,
   )) {
     return {
       changed: false,
@@ -334,12 +341,9 @@ function moveBackupToFormation(
     compactCandidates(source.candidates);
     if (isFleetSlotEmpty(source)) compactFleetDraftSlots(draft.slots);
   }
-  const position = resolveFleetSlotPosition(
-    draft.slots,
-    focused,
-    selection.position,
-  );
-  return changed(selectionAt(selection, position));
+  return changed(formationSelection(
+    Math.max(0, draft.slots.indexOf(target)),
+  ));
 }
 
 function moveFormationToBackup(
@@ -434,7 +438,6 @@ function dropOnFormation(
       source.position,
       source.candidateIndex,
       intent.targetPosition,
-      selection,
     );
   }
 
@@ -566,6 +569,7 @@ function updateRule(
   }
   if (update.minLevel !== undefined) target.minLevel = update.minLevel;
   if (update.maxLevel !== undefined) target.maxLevel = update.maxLevel;
+  if (update.relaxed !== undefined) target.relaxed = update.relaxed;
   return changed();
 }
 

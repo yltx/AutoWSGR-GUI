@@ -12,7 +12,11 @@ const { testTeamPlanServices } = require('./main-services/test-team-plan');
 const { testCombatPlanServices } = require('./main-services/test-combat-plan');
 const { testPlanExportService } = require('./main-services/test-plan-export');
 const { testPythonEnvironmentService, testAdbService, testCudaEnvironmentService } = require('./main-services/test-environment-and-device');
-const { testShipLibraryService, testShipLibraryUpdater } = require('./main-services/test-ship-library');
+const {
+  testShipLibraryService,
+  testShipNameSynchronizer,
+  testShipLibraryUpdater,
+} = require('./main-services/test-ship-library');
 const { testUpdaterAndBackendShutdown } = require('./main-services/test-updater-and-shutdown');
 const { testSingleInstanceService } = require('./main-services/test-single-instance');
 
@@ -32,6 +36,7 @@ async function main() {
   await testAdbService();
   await testCudaEnvironmentService();
   testShipLibraryService();
+  testShipNameSynchronizer();
   await testShipLibraryUpdater();
   await testUpdaterAndBackendShutdown();
   console.log('main services tests passed');

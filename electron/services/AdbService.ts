@@ -65,6 +65,19 @@ export class AdbService {
     return fs.existsSync(bundledAdb) ? bundledAdb : 'adb';
   }
 
+  /** 停止 ADB server，避免 GUI 退出后 adb.exe 继续占用安装目录。 */
+  async stopServer(): Promise<void> {
+    await this.dependencies.execute(
+      this.executable(),
+      ['kill-server'],
+      {
+        windowsHide: true,
+        timeout: 5000,
+        encoding: 'utf8',
+      },
+    );
+  }
+
   /** 读取并解析 adb devices 的当前设备列表。 */
   async listDevices(): Promise<AdbDevice[]> {
     const { stdout } = await this.dependencies.execute(

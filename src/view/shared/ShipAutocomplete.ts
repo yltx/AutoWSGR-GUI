@@ -2,10 +2,6 @@
 /**
  * 舰船名称自动补全组件（共享）。
  * 使用事件委托，对指定容器内匹配选择器的 input 提供下拉补全。
- *
- * 用法：
- *   const ac = new ShipAutocomplete(container, '.fleet-ship');
- *   // container 移除前调用 ac.destroy() 解除全局监听（若容器自身即被移除则可省略）
  */
 import { ALL_SHIPS } from '../../shared/shipCatalog';
 import { shipTypeLabel } from '../../shared/fleetShipTypes';
@@ -30,14 +26,6 @@ export class ShipAutocomplete {
     (this.container as HTMLElement).addEventListener('focusin', this.onFocusIn);
     (this.container as HTMLElement).addEventListener('focusout', this.onFocusOut);
     (this.container as HTMLElement).addEventListener('keydown', this.onKeyDown);
-  }
-
-  destroy(): void {
-    (this.container as HTMLElement).removeEventListener('input', this.onInput);
-    (this.container as HTMLElement).removeEventListener('focusin', this.onFocusIn);
-    (this.container as HTMLElement).removeEventListener('focusout', this.onFocusOut);
-    (this.container as HTMLElement).removeEventListener('keydown', this.onKeyDown);
-    this.hide();
   }
 
   // ── 事件委托 ────────────────────────────────

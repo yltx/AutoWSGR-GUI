@@ -59,7 +59,7 @@ const cronConfig = {
   lootPlanId: 'bettle-周常-9-2.yaml', lootStopCount: 0,
 };
 const cron = new cronModule.CronScheduler(cronConfig, storage);
-cron.markBattleCompleted();
+cron.markBattleHandled();
 const restoredCron = new cronModule.CronScheduler(cronConfig, storage);
 restoredCron.start();
 restoredCron.stop();
@@ -479,6 +479,8 @@ assert.deepEqual(automaticLootCall.slice(0, 6), [
     gap: 4,
     plan: {
       selected_nodes: ['A', '0'],
+      node_defaults: {},
+      node_args: {},
       fleet_id: 3,
     },
   },

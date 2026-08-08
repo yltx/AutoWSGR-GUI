@@ -199,16 +199,6 @@ export class CronScheduler {
     this.log('info', '演习任务已取消，本刷新时段不再重复触发');
   }
 
-  /** Controller 在战役任务成功完成后调用 */
-  markBattleCompleted(): void {
-    this.lastBattleRun = this.dateKey(new Date());
-    this.battlePending = false;
-    try {
-      this.storage.set(LS_KEY_LAST_BATTLE_RUN, this.lastBattleRun);
-    } catch { /* ignore */ }
-    this.log('info', '战役任务完成，已记录运行时间');
-  }
-
   /**
    * Controller 在战役任务结束（成功或失败）后调用。
    *
@@ -234,16 +224,6 @@ export class CronScheduler {
     this.battlePending = false;
   }
 
-  /** Controller 在常规出击任务全部完成后调用 */
-  markNormalFightCompleted(): void {
-    this.lastNormalFightRun = this.dateKey(new Date());
-    this.normalFightPending = false;
-    try {
-      this.storage.set(LS_KEY_LAST_NORMAL_FIGHT_RUN, this.lastNormalFightRun);
-    } catch { /* ignore */ }
-    this.log('info', '自动常规出击完成，已记录运行时间');
-  }
-
   /** 常规出击任务已处理（成功或失败），今日不再重复 */
   markNormalFightHandled(): void {
     this.lastNormalFightRun = this.dateKey(new Date());
@@ -256,16 +236,6 @@ export class CronScheduler {
   /** 常规出击失败 — 清除 pending，下次 tick 重试 */
   clearNormalFightPending(): void {
     this.normalFightPending = false;
-  }
-
-  /** 自动决战成功完成，记录今日执行状态。 */
-  markDecisiveCompleted(): void {
-    this.lastDecisiveRun = this.dateKey(new Date());
-    this.decisivePending = false;
-    try {
-      this.storage.set(LS_KEY_LAST_DECISIVE_RUN, this.lastDecisiveRun);
-    } catch { /* ignore */ }
-    this.log('info', '自动决战完成，已记录运行时间');
   }
 
   /**
@@ -284,16 +254,6 @@ export class CronScheduler {
   /** 决战任务尚未入队时清除 pending，允许下次 tick 重试。 */
   clearDecisivePending(): void {
     this.decisivePending = false;
-  }
-
-  /** Controller 在战利品任务完成后调用 */
-  markLootCompleted(): void {
-    this.lastLootRun = this.dateKey(new Date());
-    this.lootPending = false;
-    try {
-      this.storage.set(LS_KEY_LAST_LOOT_RUN, this.lastLootRun);
-    } catch { /* ignore */ }
-    this.log('info', '自动战利品任务完成，已记录运行时间');
   }
 
   /** 战利品任务已处理（成功或失败），今日不再重复 */
@@ -327,30 +287,16 @@ export class CronScheduler {
     } catch { /* ignore */ }
   }
 
-  /** 注册一个定时方案任务 */
+  /** 当前没有生产调用方引用，保留给 scheduled_time 后续接入。 */
   registerScheduledTask(key: string, time: string): void {
     // 去重
     if (this.scheduledTasks.some(t => t.key === key)) return;
     this.scheduledTasks.push({ key, time, firedToday: false });
   }
 
-  /** 移除定时方案任务 */
+  /** 当前没有生产调用方引用，保留给 scheduled_time 后续接入。 */
   unregisterScheduledTask(key: string): void {
     this.scheduledTasks = this.scheduledTasks.filter(t => t.key !== key);
-  }
-
-  /** 获取下一个演习时间点 (供 UI 显示) */
-  getNextExerciseTime(): Date | null {
-    if (!this.config.autoExercise) return null;
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    for (const h of EXERCISE_REFRESH_HOURS) {
-      const t = new Date(today.getTime() + h * 3600_000);
-      if (t > now) return t;
-    }
-    // 下一个是明天 0 点
-    return new Date(today.getTime() + 24 * 3600_000);
   }
 
   // ── 核心 tick ──

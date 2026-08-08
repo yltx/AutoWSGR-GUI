@@ -1,19 +1,4 @@
-/* ═══ 非战斗节点信息面板 ═══ */
-.node-info {
-  padding: 24px;
-}
-.node-info-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-.node-info-header h3 {
-  margin: 0;
-  font-size: 16px;
-}
-.node-info-header .btn {
-  margin-left: auto;
-}
+/* ═══ 节点类型徽标 ═══ */
 .node-info-badge {
   display: flex;
   align-items: center;
@@ -36,21 +21,6 @@
 .node-info-badge.node-type-suppress { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
 .node-info-badge.node-type-aerial { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
 .node-info-badge.node-type-hard { background: rgba(220, 38, 38, 0.15); color: #dc2626; }
-.node-info-type {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-.node-info-desc {
-  margin: 16px 0 8px;
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.7;
-}
-.node-info-note {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
-}
 
 .plan-header {
   padding: 8px 14px;
@@ -246,10 +216,6 @@
 .plan-node-info-area .node-editor-placeholder h3,
 .plan-node-info-area .node-editor-placeholder p {
   margin: 0;
-}
-
-.plan-node-info-area .node-info {
-  padding: 14px;
 }
 
 .plan-node-info-area .node-editor {

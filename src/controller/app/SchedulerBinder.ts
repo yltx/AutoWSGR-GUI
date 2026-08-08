@@ -59,6 +59,10 @@ export class SchedulerBinder {
     this.runtime.reset();
   }
 
+  /**
+   * 解绑运行状态监听。
+   * 当前没有生产调用方，保留为正式生命周期清理接口。
+   */
   dispose(): void {
     this.runtime.dispose();
   }

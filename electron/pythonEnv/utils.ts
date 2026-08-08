@@ -34,13 +34,6 @@ export function localSitePackages(): string {
   return path.join(getCtx().appRoot(), 'python', 'site-packages');
 }
 
-/** 生成向 sys.path 插入 site-packages 的 Python 代码。 */
-export function sysPathInsert(): string {
-  // 嵌入式 Python 会忽略 PYTHONPATH，直接写入 sys.path 更可靠。
-  const sp = localSitePackages().replace(/\\/g, '\\\\');
-  return `import sys; sys.path.insert(0, r'${sp}'); `;
-}
-
 /** 构造优先使用项目包目录的 pip 环境。 */
 export function pipEnv(): NodeJS.ProcessEnv {
   const localSite = localSitePackages();

@@ -33,6 +33,7 @@ def _selector_contract(selector: Any) -> dict[str, Any] | None:
         'ship_type': [value.value for value in selector.ship_types],
         'min_level': selector.min_level,
         'max_level': selector.max_level,
+        'relaxed': selector.relaxed_constraints,
     }
 
 

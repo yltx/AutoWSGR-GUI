@@ -95,7 +95,14 @@ export class PlanController {
     return this.battlePlanLoader.pick('task-list');
   }
 
-  pickManagedBattlePlanForQueue(): Promise<ManagedBattlePlanSelection | null> {
+  async pickManagedBattlePlanForQueue(): Promise<ManagedBattlePlanSelection | null> {
+    if (this.hasUnsavedPlanChanges()) {
+      const confirmed = await showConfirm(
+        '未保存修改',
+        '当前出征规划存在未保存修改，是否先保存再选择加入队列？',
+      );
+      if (!confirmed || !await this.savePlan()) return null;
+    }
     return this.battlePlanLoader.pick('queue');
   }
 
@@ -264,6 +271,7 @@ export class PlanController {
                 : undefined,
               min_level: slot.min_level,
               max_level: slot.max_level,
+              relaxed: slot.relaxed,
             }
       )),
     }));
@@ -406,16 +414,16 @@ export class PlanController {
       .slice(0, 100);
   }
 
-  private async savePlan(): Promise<void> {
-    if (!this.currentPlan) return;
+  private async savePlan(): Promise<boolean> {
+    if (!this.currentPlan) return false;
     if (!this.managedPlans?.saveManagedCombatPlan) {
       await showAlert('保存失败', '当前环境不支持保存出征规划');
-      return;
+      return false;
     }
     const name = this.normalizePlanName(this.planView.getPresetName());
     if (!name) {
       await showAlert('保存失败', '请先填写预设名称');
-      return;
+      return false;
     }
 
     try {
@@ -438,7 +446,7 @@ export class PlanController {
           '覆盖配置',
           `存在同名配置，是否覆盖？${conflictDetails}`,
         );
-        if (!overwrite) return;
+        if (!overwrite) return false;
         result = await this.managedPlans.saveManagedCombatPlan(
           name,
           content,
@@ -462,11 +470,13 @@ export class PlanController {
           ? `出征规划「${name}」已保存为用户配置`
           : `出征规划「${name}」保存成功`,
       );
+      return true;
     } catch (error) {
       await showAlert(
         '保存失败',
         error instanceof Error ? error.message : String(error),
       );
+      return false;
     }
   }
 

@@ -26,30 +26,12 @@ jobs:
             $pkg = Get-Content package.json | ConvertFrom-Json
             $ver = $pkg.version
           }
-          if ($ver -match '^\d+\.\d+\.\d+$') {
-            $channel = 'latest'
-            $stage = 'stable'
-            $prerelease = 'false'
-          } elseif ($ver -match '^\d+\.\d+\.\d+-alpha(?:\.\d+)?$') {
-            $channel = 'alpha'
-            $stage = 'prerelease'
-            $prerelease = 'true'
-          } elseif ($ver -match '^\d+\.\d+\.\d+-beta\.\d+$') {
-            $channel = 'beta'
-            $stage = 'prerelease'
-            $prerelease = 'true'
-          } elseif ($ver -match '^\d+\.\d+\.\d+-dev(?:\.\d+)?$') {
-            $channel = 'dev'
-            $stage = 'development'
-            $prerelease = 'true'
-          } else {
-            throw "版本 $ver 不符合 X.Y.Z、X.Y.Z-alpha、X.Y.Z-alpha.N、X.Y.Z-beta.N、X.Y.Z-dev 或 X.Y.Z-dev.N"
+          if ($ver -notmatch '^\d+\.\d+\.\d+-alpha(?:\.\d+)?$') {
+            throw "版本 $ver 不符合 X.Y.Z-alpha 或 X.Y.Z-alpha.N"
           }
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
-          echo "CHANNEL=$channel" >> $env:GITHUB_OUTPUT
-          echo "STAGE=$stage" >> $env:GITHUB_OUTPUT
-          echo "PRERELEASE=$prerelease" >> $env:GITHUB_OUTPUT
-          echo "Resolved version: $ver ($stage/$channel)"
+          echo "CHANNEL=alpha" >> $env:GITHUB_OUTPUT
+          echo "Resolved Alpha version: $ver"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -65,11 +47,36 @@ jobs:
         run: |
           $pkg = Get-Content package.json | ConvertFrom-Json
           $pkg.version = "${{ steps.version.outputs.VERSION }}"
+          $pkg.build.publish.owner = "ShiinaKuroko"
+          $pkg.build.publish.repo = "AutoWSGR-GUI"
           $pkg.build.publish | Add-Member `
             -NotePropertyName channel `
             -NotePropertyValue "${{ steps.version.outputs.CHANNEL }}" `
             -Force
           $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json -Encoding UTF8
+
+      - name: Pin latest Alpha backend
+        shell: pwsh
+        run: |
+          $backendRepository = "ShiinaKuroko/AutoWSGR"
+          $backendRef = "ShiinaKuroko"
+          $remote = git ls-remote `
+            "https://github.com/$backendRepository.git" `
+            "refs/heads/$backendRef"
+          $backendCommit = ($remote -split '\s+')[0]
+          if ($backendCommit -notmatch '^[0-9a-f]{40}$') {
+            throw "无法解析 $backendRepository@$backendRef 的提交"
+          }
+          $manifest = Get-Content build/backend-distribution.json |
+            ConvertFrom-Json
+          $manifest.id = "alpha"
+          $manifest.repository = $backendRepository
+          $manifest.ref = $backendRef
+          $manifest.commit = $backendCommit
+          $manifest.forceUpdateOnInstall = $true
+          $manifest | ConvertTo-Json -Depth 10 |
+            Set-Content build/backend-distribution.json -Encoding UTF8
+          echo "Pinned backend: $backendRepository@$backendCommit"
 
       - name: Build & Package
         run: npm run dist
@@ -86,15 +93,14 @@ jobs:
       - name: Verify update channel metadata
         shell: pwsh
         run: |
-          $channel = "${{ steps.version.outputs.CHANNEL }}"
-          $expected = Join-Path release "$channel.yml"
+          $alphaRelease = Join-Path release "alpha"
+          $expected = Join-Path $alphaRelease "alpha.yml"
           if (-not (Test-Path $expected)) {
-            throw "缺少 $channel 频道更新清单: $expected"
+            throw "缺少 Alpha 更新清单: $expected"
           }
-          @('latest', 'alpha', 'beta', 'dev') |
-            Where-Object { $_ -ne $channel } |
+          @('latest', 'beta', 'dev') |
             ForEach-Object {
-              $unexpected = Join-Path release "$_.yml"
+              $unexpected = Join-Path $alphaRelease "$_.yml"
               if (Test-Path $unexpected) {
                 throw "发布产物混入其他频道清单: $unexpected"
               }
@@ -105,17 +111,17 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
-          prerelease: ${{ steps.version.outputs.PRERELEASE == 'true' }}
+          prerelease: true
           generate_release_notes: true
           files: |
-            release/*-Setup-*.exe
-            release/*.exe.blockmap
-            release/${{ steps.version.outputs.CHANNEL }}.yml
+            release/alpha/AutoWSGR-GUI-Setup-*.exe
+            release/alpha/*.exe.blockmap
+            release/alpha/alpha.yml
           body: |
             ## AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
 
             ### 使用方法
-            1. 下载 `AutoWSGR-GUI-Setup-*.exe`（安装版）
+            1. 下载 `AutoWSGR-GUI-Setup-*.exe`
             2. 软件已内置 Python 3.12，无需单独安装
             3. 首次运行时程序会自动安装 Python 依赖（需联网）
             4. 已安装用户将自动收到增量更新提示

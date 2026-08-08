@@ -33,10 +33,10 @@ export class SafePathService {
     if (/^[\\/]{2}/.test(raw)) throw new Error('不允许使用 UNC 路径');
 
     const hasDrivePrefix = /^[a-zA-Z]:/.test(raw);
+    const windowsAbsolute = path.win32.isAbsolute(raw);
     const nativeAbsolute = path.isAbsolute(raw);
-    const portableAbsolute = path.win32.isAbsolute(raw)
-      || path.posix.isAbsolute(raw);
-    if (hasDrivePrefix && !nativeAbsolute) {
+    const portableAbsolute = windowsAbsolute || path.posix.isAbsolute(raw);
+    if (hasDrivePrefix && !windowsAbsolute) {
       throw new Error('不允许使用盘符相对路径');
     }
     if (portableAbsolute && !nativeAbsolute) {

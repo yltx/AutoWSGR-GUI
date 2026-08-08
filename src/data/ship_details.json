@@ -1905,7 +1905,7 @@
     },
     {
         "id": 273,
-        "name": "塞尔弗里奇",
+        "name": "赛尔弗里吉",
         "nation": "美国",
         "ship_type": "dd",
         "is_retrofit": false
@@ -5699,7 +5699,7 @@
     },
     {
         "id": 1273,
-        "name": "塞尔弗里奇·改",
+        "name": "赛尔弗里吉·改",
         "nation": "美国",
         "ship_type": "dd",
         "is_retrofit": true

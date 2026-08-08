@@ -456,11 +456,6 @@ export class PlanPreviewView {
     this.nodeEditor.show(nodeId, nodeType, args, mapNight);
   }
 
-  showNodeInfo(nodeId: string, nodeType: MapNodeType): void {
-    this.fleetPresetView.hideSelector();
-    this.nodeEditor.showInfo(nodeId, nodeType, () => this.hideNodeEditor());
-  }
-
   hideNodeEditor(): void {
     this.nodeEditor.hide();
     this.mapView.clearSelection();
@@ -482,6 +477,7 @@ export class PlanPreviewView {
     this.fleetPresetView.render(viewObject);
   }
 
+  /** 当前没有生产入口引用，保留给泡澡维修配置后续接入。 */
   getBathRepairConfig(): BathRepairConfig | undefined {
     return this.fleetPresetView.getBathRepairConfig();
   }

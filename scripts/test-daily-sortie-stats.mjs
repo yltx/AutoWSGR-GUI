@@ -73,9 +73,15 @@ assert.deepEqual(snapshot.dropNotice, {
   dailyIndex: 28,
   visibleUntil: now + 60_000,
 });
+const firstQuincyNotice = snapshot.dropNotice;
 
 now += 2_000;
 stats.consume('[Combat] 获得舰船: 海伦娜', now);
+assert.deepEqual(
+  stats.getSnapshot(now).dropNotice,
+  firstQuincyNotice,
+  '其他舰船不得触发或延长昆西彩蛋',
+);
 now += 2_000;
 stats.consume('[Combat] 获得舰船: 昆西', now);
 const latestDropAt = now;
@@ -132,5 +138,18 @@ assert.equal(nextDaySnapshot.lootCount, 0);
 assert.equal(nextDaySnapshot.shipCount, 0);
 assert.equal(nextDaySnapshot.expeditionCount, 0);
 assert.deepEqual(nextDaySnapshot.shipDrops, []);
+
+// 非昆西掉落正常计数，但不得单独触发 LED 彩蛋。
+const nonQuincyDropAt = nextDay + 100;
+assert.equal(
+  restored.consume('[Combat] 获得舰船: 海伦娜', nonQuincyDropAt),
+  true,
+);
+const nonQuincySnapshot = restored.getSnapshot(nonQuincyDropAt);
+assert.equal(nonQuincySnapshot.shipCount, 1);
+assert.deepEqual(nonQuincySnapshot.shipDrops, [
+  { name: '海伦娜', count: 1 },
+]);
+assert.equal(nonQuincySnapshot.dropNotice, null);
 
 console.log('daily sortie stats tests passed');

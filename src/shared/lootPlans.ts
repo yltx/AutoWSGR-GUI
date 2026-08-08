@@ -101,11 +101,6 @@ export function migrateLootPlanId(value: unknown): LootPlanId | null {
     : null;
 }
 
-/** 只接受当前内置资源中明确支持的稳定计划标识。 */
-export function normalizeLootPlanId(value: unknown): LootPlanId {
-  return migrateLootPlanId(value) ?? DEFAULT_LOOT_PLAN_ID;
-}
-
 /** 生成来源与文件名共同组成的稳定选择值。 */
 export function lootAutomationPlanKey(
   plan: Pick<LootAutomationPlan, 'source' | 'file'>,

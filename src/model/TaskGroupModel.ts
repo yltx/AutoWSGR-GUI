@@ -299,9 +299,4 @@ export class TaskGroupModel {
       return false;
     }
   }
-
-  /** 序列化 (用于调试) */
-  toJSON(): TaskGroupsData {
-    return structuredClone(this.data);
-  }
 }

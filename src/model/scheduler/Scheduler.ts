@@ -156,6 +156,17 @@ export class Scheduler {
       ?? null;
   }
 
+  /** 执行一次远征检查（系统启动时与远征任务消费时共用） */
+  private async checkExpedition(): Promise<void> {
+    this.emitLog('info', '正在检查远征...');
+    try {
+      await this.api.expeditionCheck();
+      this.emitLog('info', '远征检查完成');
+    } catch {
+      this.emitLog('debug', '远征检查跳过');
+    }
+  }
+
   /** 启动系统 (连接模拟器 + 启动游戏) */
   async start(configPath?: string): Promise<boolean> {
     const resp = await this.api.systemStart(configPath, 300_000);
@@ -168,13 +179,7 @@ export class Scheduler {
 
     if (this.autoExpedition) {
       // 系统启动后立即检查远征，确保远征页面不会阻碍后续任务
-      this.emitLog('info', '正在检查远征...');
-      try {
-        await this.api.expeditionCheck();
-        this.emitLog('info', '远征检查完成');
-      } catch {
-        this.emitLog('debug', '远征检查跳过');
-      }
+      await this.checkExpedition();
       this.expeditionTimer.start();
     }
     return true;
@@ -202,7 +207,10 @@ export class Scheduler {
     if (this.autoExpedition) this.expeditionTimer.start();
   }
 
-  /** 停止系统 */
+  /**
+   * 停止系统并释放调度资源。
+   * 当前没有生产调用方，保留为正式生命周期清理接口。
+   */
   async stop(): Promise<void> {
     const hadRunningTask = this.currentTask !== null;
     const canceledLogicalIds = this.collectLogicalIds([
@@ -243,7 +251,10 @@ export class Scheduler {
     }
   }
 
-  /** 添加任务到队列 */
+  /**
+   * 添加任务到队列。
+   * 当前没有生产调用方传入 bathRepairConfig，保留给泡澡维修后续接入。
+   */
   addTask(
     name: string,
     type: SchedulerTaskType,
@@ -304,14 +315,6 @@ export class Scheduler {
     }
     this.notifyQueueChange();
     return true;
-  }
-
-  /** 请求停止当前正在运行的任务 */
-  async stopCurrentTask(): Promise<boolean> {
-    if (!this.currentTask) return false;
-    this.setStatus('stopping');
-    const resp = await this.api.taskStop();
-    return resp.success;
   }
 
   /**
@@ -450,11 +453,6 @@ export class Scheduler {
     this.notifyQueueChange();
   }
 
-  /** 获取延迟任务列表（只读） */
-  get deferredTaskList(): ReadonlyArray<SchedulerTask> {
-    return this._taskQueue.deferredItems;
-  }
-
   // ── 内部: 消费循环 ──
 
   private async consumeNext(): Promise<void> {
@@ -483,13 +481,7 @@ export class Scheduler {
 
     // 远征任务: 直接调用远征 API，不走 taskStart 流程
     if (task.type === 'expedition') {
-      try {
-        this.emitLog('info', '正在检查远征...');
-        await this.api.expeditionCheck();
-        this.emitLog('info', '远征检查完成');
-      } catch {
-        this.emitLog('debug', '远征检查跳过');
-      }
+      await this.checkExpedition();
 
       if (!this.systemActive || this.currentTask?.id !== task.id) return;
       await this.handlePostExpedition();

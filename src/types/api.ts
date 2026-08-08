@@ -158,6 +158,7 @@ export interface FleetShipRuleReq {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export interface FleetRuleReq extends Omit<FleetShipRuleReq, 'name'> {

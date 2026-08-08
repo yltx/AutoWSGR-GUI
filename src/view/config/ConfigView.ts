@@ -3,6 +3,7 @@
  * ConfigView —— 设置页纯渲染组件。
  * 接收 ConfigViewObject 填充表单，用户修改后由 Controller 收集。
  */
+import type { GuiUpdateStatus } from '../../types/ipc.js';
 import type { NormalFightTaskConfig } from '../../types/model.js';
 import type { ConfigViewObject } from '../../types/view.js';
 import {
@@ -62,6 +63,11 @@ export class ConfigView {
   private emuSerial = element<HTMLInputElement>('cfg-emu-serial');
   private gameApp = element<HTMLSelectElement>('cfg-game-app');
   private updateMode = element<HTMLSelectElement>('cfg-update-mode');
+  private guiUpdateProgress = element<HTMLElement>('gui-update-progress');
+  private guiUpdateStatus = element<HTMLElement>('gui-update-status');
+  private guiUpdatePercent = element<HTMLElement>('gui-update-percent');
+  private guiUpdateProgressTrack = element<HTMLElement>('gui-update-progress-track');
+  private guiUpdateProgressFill = element<HTMLElement>('gui-update-progress-fill');
   private autoExpedition = element<HTMLInputElement>('cfg-auto-expedition');
   private expeditionInterval = element<HTMLInputElement>('cfg-expedition-interval');
   private autoBattle = element<HTMLInputElement>('cfg-auto-battle');
@@ -90,6 +96,7 @@ export class ConfigView {
   private ocrGpuMode = element<HTMLSelectElement>('cfg-ocr-gpu-mode');
   private ocrGpu = element<HTMLInputElement>('cfg-ocr-gpu');
   private ocrMirror = element<HTMLSelectElement>('cfg-ocr-mirror');
+  private enhancedShipOcr = element<HTMLInputElement>('cfg-enhanced-ship-ocr');
   private ocrConfidence = element<HTMLInputElement>('cfg-ocr-confidence');
   private ocrConfidenceRange = element<HTMLInputElement>('cfg-ocr-confidence-range');
   private shipNameAliases = element<HTMLTextAreaElement>('cfg-ship-name-aliases');
@@ -106,6 +113,7 @@ export class ConfigView {
   private validatePythonBtn = document.getElementById('btn-validate-python') as HTMLButtonElement | null;
   private shipLibraryStatus = document.getElementById('ship-library-status');
   private updateShipLibraryBtn = document.getElementById('btn-update-ship-library') as HTMLButtonElement | null;
+  private shipLibraryUpdateLabel = '更新舰船数据库';
   private defaultWindowWidth = element<HTMLInputElement>('cfg-window-width');
   private defaultWindowHeight = element<HTMLInputElement>('cfg-window-height');
   private rememberWindowBounds = element<HTMLInputElement>('cfg-remember-window-bounds');
@@ -234,6 +242,7 @@ export class ConfigView {
     this.ocrGpuMode.value = vo.ocrGpuMode;
     this.ocrGpu.checked = vo.ocrGpu;
     this.ocrMirror.value = vo.ocrMirror;
+    this.enhancedShipOcr.checked = vo.enhancedShipOcr;
     this.setRangeValue(this.ocrConfidenceRange, this.ocrConfidence, vo.ocrConfidence);
     this.shipNameAliases.value = vo.shipNameAliasesText;
     this.shipNameCorrections.value = vo.shipNameCorrectionsText;
@@ -302,7 +311,7 @@ export class ConfigView {
       lootPlans: structuredClone(this.lootPlans),
       lootStopCount: Math.trunc(this.clamp(this.lootStopCount.value, 1, 50, 50)),
       logLevel: this.logLevel.value as ConfigViewObject['logLevel'],
-      logRoot: this.logRoot.value.trim() || 'log',
+      logRoot: this.logRoot.value.trim() || 'logs',
       themeMode: this.themeMode.value as ConfigViewObject['themeMode'],
       accentColor: this.accentColor.value,
       debugMode: this.debugMode.checked,
@@ -312,6 +321,7 @@ export class ConfigView {
       ocrGpuMode: this.ocrGpuMode.value as ConfigViewObject['ocrGpuMode'],
       ocrGpu: this.ocrGpu.checked,
       ocrMirror: this.ocrMirror.value as ConfigViewObject['ocrMirror'],
+      enhancedShipOcr: this.enhancedShipOcr.checked,
       ocrConfidence: this.clamp(this.ocrConfidence.value, 0, 1, 0.65),
       shipNameAliasesText: this.shipNameAliases.value,
       shipNameCorrectionsText: this.shipNameCorrections.value,
@@ -545,6 +555,12 @@ export class ConfigView {
   setPythonStatus(text: string, status: StatusKind): void { this.setStatus(this.pythonStatus, text, status); }
   setBackendStatus(text: string, status: StatusKind): void { this.setStatus(this.backendStatus, text, status); }
   setShipLibraryStatus(text: string, status: StatusKind): void { this.setStatus(this.shipLibraryStatus, text, status); }
+  setShipLibraryUpdateLabel(label: string): void {
+    this.shipLibraryUpdateLabel = label;
+    if (this.updateShipLibraryBtn && !this.updateShipLibraryBtn.disabled) {
+      this.updateShipLibraryBtn.textContent = label;
+    }
+  }
   setAdbStatus(text: string, status: 'online' | 'offline' | 'unknown'): void {
     if (!this.adbStatus) return;
     this.adbStatus.title = text;
@@ -573,7 +589,11 @@ export class ConfigView {
   setShipLibraryUpdateLoading(loading: boolean): void {
     if (!this.updateShipLibraryBtn) return;
     this.updateShipLibraryBtn.disabled = loading;
-    this.updateShipLibraryBtn.textContent = loading ? '正在更新…' : '更新舰船数据库';
+    this.updateShipLibraryBtn.textContent = loading
+      ? this.shipLibraryUpdateLabel === '同步后端'
+        ? '正在同步…'
+        : '正在检查…'
+      : this.shipLibraryUpdateLabel;
   }
 
   setBackendCheckLoading(loading: boolean): void {
@@ -608,6 +628,67 @@ export class ConfigView {
       '检查中…',
       '立即检查',
     );
+  }
+
+  setGuiUpdateStatus(status: GuiUpdateStatus): void {
+    let text: string;
+    let percent: number | null = 0;
+    let state: 'active' | 'complete' | 'error' = 'active';
+    let percentText: string | null = null;
+
+    switch (status.status) {
+      case 'checking':
+        text = '正在检查更新…';
+        percent = null;
+        percentText = '检查中';
+        break;
+      case 'available':
+        text = `发现 v${status.version}，等待下载`;
+        break;
+      case 'up-to-date':
+        text = '当前已是最新版本';
+        percent = 100;
+        state = 'complete';
+        break;
+      case 'downloading':
+        percent = Math.max(0, Math.min(100, Math.round(status.percent)));
+        text = '正在下载更新…';
+        break;
+      case 'downloaded':
+        text = `v${status.version} 已下载，退出时自动安装`;
+        percent = 100;
+        state = 'complete';
+        break;
+      case 'installing':
+        text = status.message;
+        percent = 100;
+        break;
+      case 'error':
+        text = `更新失败：${status.message}`;
+        percentText = '失败';
+        state = 'error';
+        break;
+    }
+
+    this.guiUpdateProgress.hidden = false;
+    this.guiUpdateProgress.dataset['state'] = state;
+    this.guiUpdateProgress.title = text;
+    this.guiUpdateStatus.textContent = text;
+    this.guiUpdatePercent.textContent = percentText
+      ?? `${percent ?? 0}%`;
+    this.guiUpdateProgressTrack.classList.toggle(
+      'is-indeterminate',
+      percent === null,
+    );
+    this.guiUpdateProgressFill.style.width = `${percent ?? 0}%`;
+    if (percent === null) {
+      this.guiUpdateProgressTrack.removeAttribute('aria-valuenow');
+    } else {
+      this.guiUpdateProgressTrack.setAttribute(
+        'aria-valuenow',
+        String(percent),
+      );
+    }
   }
 
   private setButtonLoading(

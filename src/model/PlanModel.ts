@@ -431,6 +431,7 @@ export class PlanModel {
       'candidates',
       'min_level',
       'max_level',
+      'relaxed',
     ];
     for (const key of managedKeys) delete output[key];
     Object.assign(output, structuredClone(slot));
@@ -486,6 +487,7 @@ export class PlanModel {
       const shipTypes = PlanModel.parseShipTypes(obj.ship_type);
       if (shipTypes) filter.ship_type = shipTypes;
       PlanModel.assignLevelRange(filter, obj);
+      if (typeof obj.relaxed === 'boolean') filter.relaxed = obj.relaxed;
 
       const rawCandidates = Array.isArray(obj.candidates)
         ? obj.candidates
@@ -537,6 +539,7 @@ export class PlanModel {
     const shipTypes = PlanModel.parseShipTypes(obj.ship_type);
     if (shipTypes) rule.ship_type = shipTypes;
     PlanModel.assignLevelRange(rule, obj);
+    if (typeof obj.relaxed === 'boolean') rule.relaxed = obj.relaxed;
     return rule;
   }
 

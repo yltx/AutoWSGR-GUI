@@ -4,11 +4,10 @@
 
 export { type PythonEnvContext, initPythonEnv, clearPythonCache } from './context';
 
-export { isAllowedPythonVersion, findPython, findPythonSync } from './finder';
+export { isAllowedPythonVersion, findPython } from './finder';
 
 export {
   type EnvCheckResult,
-  sysPathInsert,
   ensurePthFile,
   pipEnv,
   localSitePackages,
@@ -41,7 +40,6 @@ export {
   checkForUpdates,
   buildDependencyInstallPlan,
   installDependencies,
-  pullUpdates,
 } from './installer';
 
 export {

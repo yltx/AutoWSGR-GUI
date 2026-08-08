@@ -76,6 +76,14 @@ export async function showPlanSelector(
   const planPath = paths[idx];
   const planName = planPath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? planPath;
 
+  // 选完方案后直接加入任务列表（无需编队预设选择）的公共步骤
+  const addPlanDirect = (): void => {
+    addPlanToTaskList(tpl, planPath, groupName, taskGroupModel);
+    taskGroupModel.save();
+    renderTaskGroup();
+    Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}）`);
+  };
+
   let parsedPlan: Partial<PlanData> | undefined;
 
   if (repository) {
@@ -95,10 +103,7 @@ export async function showPlanSelector(
         const selectedFleetId = await showNormalFightFleetSelector(tpl.name, planName, defaultFleetId, wizardView);
         if (selectedFleetId === null) return;
         if (selectedFleetId === undefined) {
-          addPlanToTaskList(tpl, planPath, groupName, taskGroupModel);
-          taskGroupModel.save();
-          renderTaskGroup();
-          Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}）`);
+          addPlanDirect();
           return;
         }
 
@@ -117,10 +122,7 @@ export async function showPlanSelector(
     } catch { /* 忽略读取失败 */ }
   }
 
-  addPlanToTaskList(tpl, planPath, groupName, taskGroupModel);
-  taskGroupModel.save();
-  renderTaskGroup();
-  Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}）`);
+  addPlanDirect();
 }
 
 /** 编队预设多选器 */

@@ -1,7 +1,12 @@
 /** 渲染节点属性和敌舰规则编辑对话框。 */
 import type { MapNodeType } from '../../types/view.js';
 import type { BattleResultGrade } from '../../types/model.js';
-import { NODE_TYPE_ICON, NODE_TYPE_ICON_NIGHT, NODE_TYPE_NAME, NON_COMBAT_TYPES, escapeHtml } from './MapView';
+import {
+  NODE_TYPE_ICON,
+  NODE_TYPE_ICON_NIGHT,
+  NODE_TYPE_NAME,
+  NON_COMBAT_TYPES,
+} from './MapView';
 
 export interface NodeEditorValues {
   enabled: boolean;
@@ -35,7 +40,6 @@ export class NodeEditorView {
   private editorEl: HTMLElement;
   private editorIdEl: HTMLElement;
   private placeholderEl: HTMLElement;
-  private infoEl: HTMLElement;
   private drawerEl: HTMLElement;
   private enabledInput: HTMLInputElement;
   private currentNodeId: string | null = null;
@@ -49,7 +53,6 @@ export class NodeEditorView {
     this.editorEl = document.getElementById('node-editor')!;
     this.editorIdEl = document.getElementById('node-editor-id')!;
     this.placeholderEl = document.getElementById('node-editor-placeholder')!;
-    this.infoEl = document.getElementById('node-info')!;
     this.drawerEl = document.getElementById('plan-node-info-drawer')!;
     this.enabledInput = document.getElementById(
       'node-edit-enabled',
@@ -81,7 +84,6 @@ export class NodeEditorView {
     this.cancelResizeAnimation();
     this.rememberDisabledDraft();
     this.currentNodeId = nodeId;
-    this.infoEl.style.display = 'none';
     const isCombatNode = !NON_COMBAT_TYPES.has(nodeType);
     const draft = this.disabledDrafts.get(nodeId);
 
@@ -165,38 +167,6 @@ export class NodeEditorView {
     this.editorEl.style.display = '';
     this.updateEnabledVisibility();
     this.updateEndpointResultVisibility();
-    this.openDrawer();
-  }
-
-  showInfo(nodeId: string, nodeType: MapNodeType, onClose: () => void): void {
-    this.cancelResizeAnimation();
-    this.rememberDisabledDraft();
-    this.currentNodeId = null;
-    this.editorEl.style.display = 'none';
-    this.placeholderEl.style.display = 'none';
-    this.infoEl.style.display = '';
-
-    const icon = NODE_TYPE_ICON[nodeType] || '';
-    const name = NODE_TYPE_NAME[nodeType];
-    const typeCls = `node-type-${nodeType.toLowerCase()}`;
-
-    let desc = '';
-    switch (nodeType) {
-      case 'Start': desc = '舰队从此处出击，无战斗或设置。'; break;
-      case 'Resource': desc = '经过此点可获取资源，无需战斗。'; break;
-      case 'Penalty': desc = '经过此点会扣除资源，无需战斗。'; break;
-    }
-
-    this.infoEl.innerHTML =
-      `<div class="node-info-header">` +
-        `<div class="node-info-badge ${typeCls}">${icon}</div>` +
-        `<div><h3>${escapeHtml(nodeId)} 点</h3><span class="node-info-type">${escapeHtml(name)}</span></div>` +
-        `<button class="btn btn-small" id="btn-node-info-close">✕</button>` +
-      `</div>` +
-      `<p class="node-info-desc">${escapeHtml(desc)}</p>` +
-      `<p class="node-info-note">此类型节点没有可配置的战斗设置。</p>`;
-
-    this.infoEl.querySelector('#btn-node-info-close')?.addEventListener('click', onClose);
     this.openDrawer();
   }
 

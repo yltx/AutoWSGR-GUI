@@ -278,7 +278,7 @@ export class AppController {
             const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
             this.mainView.appendLog({ time, level, channel, message });
           },
-          logDir: `${this.configDir}/log`,
+          logDir: `${this.configDir}/logs`,
         });
       },
       loadConfigAndSync: async () => {

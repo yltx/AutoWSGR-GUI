@@ -8,7 +8,7 @@ import {
   type StartupGateway,
 } from '../../adapter/IpcAdapter.js';
 import { Logger } from '../../utils/Logger';
-import { checkAndPrepareEnv, runSetupScript, checkForUpdates } from './envAndUpdates';
+import { checkAndPrepareEnv, checkForUpdates } from './envAndUpdates';
 import { waitForBackendAndConnect } from './connection';
 import type { StartupHost } from '../contracts.js';
 
@@ -81,18 +81,6 @@ export class StartupController {
       return;
     }
     waitForBackendAndConnect(this.host);
-  }
-
-  /** 代理: 环境检查 */
-  async checkAndPrepareEnv(
-    bridge: StartupGateway,
-  ): Promise<boolean> {
-    return checkAndPrepareEnv(bridge);
-  }
-
-  /** 代理: 运行 setup.bat */
-  async runSetupScript(bridge: StartupGateway): Promise<boolean> {
-    return runSetupScript(bridge);
   }
 
   /** 代理: 等待后端并连接 */

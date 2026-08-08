@@ -184,8 +184,8 @@ export class TemplateController {
     }
     if (added > 0) {
       this.wizardView.renderPlanList(this.wizardPlanPathsRef.value);
+      Logger.info(`扫描到 ${files.length} 个方案文件，新增 ${added} 个`);
     }
-    Logger.info(`扫描到 ${files.length} 个方案文件，新增 ${added} 个`);
   }
 
   // ════════════════════════════════════════

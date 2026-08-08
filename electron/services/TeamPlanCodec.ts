@@ -20,6 +20,7 @@ export interface UserTeamShipRule {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export interface UserTeamPlanSlot {
@@ -28,6 +29,7 @@ export interface UserTeamPlanSlot {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
   candidates?: UserTeamShipRule[];
 }
 
@@ -99,6 +101,7 @@ export class TeamPlanCodec {
         'ship_type',
         'min_level',
         'max_level',
+        'relaxed',
         'candidates',
         'priority',
       ]);
@@ -108,14 +111,9 @@ export class TeamPlanCodec {
             !knownSlotKeys.has(key) && value !== undefined
           ),
         );
-      const anonymousEntries = Object.entries(slot)
-        .filter(
-          ([key, value]) => (
-            key !== 'candidates'
-            && key !== 'priority'
-            && value !== undefined
-          ),
-        );
+      const anonymousEntries = Object.entries(
+        this.serializableAnonymousSlot(slot),
+      );
       if (slot.name !== undefined) {
         lines.push(`  - name: ${this.inlineYaml(slot.name)}`);
         if (slot.search_name !== undefined) {
@@ -133,6 +131,9 @@ export class TeamPlanCodec {
         }
         if (slot.max_level !== undefined) {
           lines.push(`    max_level: ${slot.max_level}`);
+        }
+        if (slot.relaxed === true) {
+          lines.push('    relaxed: true');
         }
       }
       if (candidateOnly && anonymousEntries.length > 0) {
@@ -153,7 +154,9 @@ export class TeamPlanCodec {
             : '    candidates:',
         );
         for (const candidate of slot.candidates) {
-          lines.push(`      - ${this.inlineYaml(candidate)}`);
+          lines.push(
+            `      - ${this.inlineYaml(this.serializableShipRule(candidate))}`,
+          );
         }
       }
     }
@@ -247,6 +250,10 @@ export class TeamPlanCodec {
         raw.max_level,
         '无固定舰名位置.max_level',
       );
+      const relaxed = this.optionalBoolean(
+        raw.relaxed,
+        '无固定舰名位置.relaxed',
+      );
       if (
         minLevel !== undefined
         && maxLevel !== undefined
@@ -269,6 +276,7 @@ export class TeamPlanCodec {
         ...(shipTypes === undefined ? {} : { ship_type: shipTypes }),
         ...(minLevel === undefined ? {} : { min_level: minLevel }),
         ...(maxLevel === undefined ? {} : { max_level: maxLevel }),
+        ...(relaxed === undefined ? {} : { relaxed }),
         candidates,
       };
     }
@@ -325,8 +333,10 @@ export class TeamPlanCodec {
       raw.max_level,
       `${field}.max_level`,
     );
+    const relaxed = this.optionalBoolean(raw.relaxed, `${field}.relaxed`);
     if (minLevel !== undefined) result.min_level = minLevel;
     if (maxLevel !== undefined) result.max_level = maxLevel;
+    if (relaxed !== undefined) result.relaxed = relaxed;
     if (
       minLevel !== undefined
       && maxLevel !== undefined
@@ -387,6 +397,67 @@ export class TeamPlanCodec {
       throw new Error(`${field} 必须是大于或等于 1 的整数`);
     }
     return Number(value);
+  }
+
+  private optionalBoolean(
+    value: unknown,
+    field: string,
+  ): boolean | undefined {
+    if (value === undefined) return undefined;
+    if (typeof value !== 'boolean') {
+      throw new Error(`${field} 必须是布尔值`);
+    }
+    return value;
+  }
+
+  /** 固定舰船规则字段顺序；false 使用后端缺省值，不写入 YAML。 */
+  private serializableShipRule(
+    rule: UserTeamShipRule,
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = { name: rule.name };
+    if (rule.search_name !== undefined) result.search_name = rule.search_name;
+    if (rule.ship_type !== undefined) result.ship_type = rule.ship_type;
+    if (rule.min_level !== undefined) result.min_level = rule.min_level;
+    if (rule.max_level !== undefined) result.max_level = rule.max_level;
+    if (rule.relaxed === true) result.relaxed = true;
+    const knownKeys = new Set([
+      'name',
+      'search_name',
+      'ship_type',
+      'min_level',
+      'max_level',
+      'relaxed',
+    ]);
+    for (const [key, value] of Object.entries(rule)) {
+      if (!knownKeys.has(key) && value !== undefined) result[key] = value;
+    }
+    return result;
+  }
+
+  /** 无主选位置同样使用固定字段顺序，但不继承候选规则。 */
+  private serializableAnonymousSlot(
+    slot: UserTeamPlanSlot,
+  ): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    if (slot.search_name !== undefined) result.search_name = slot.search_name;
+    if (slot.ship_type !== undefined) result.ship_type = slot.ship_type;
+    if (slot.min_level !== undefined) result.min_level = slot.min_level;
+    if (slot.max_level !== undefined) result.max_level = slot.max_level;
+    if (slot.relaxed === true) result.relaxed = true;
+    const knownKeys = new Set([
+      'name',
+      'search_name',
+      'ship_type',
+      'min_level',
+      'max_level',
+      'relaxed',
+      'candidates',
+      'priority',
+    ]);
+    for (const [key, value] of Object.entries(slot)) {
+      if (!knownKeys.has(key) && value !== undefined) result[key] = value;
+    }
+    return result;
   }
 
   private inlineYaml(value: unknown): string {

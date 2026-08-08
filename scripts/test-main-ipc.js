@@ -114,6 +114,10 @@ const updaterSource = fs.readFileSync(
   path.join(projectRoot, 'electron', 'ipc', 'UpdaterIpc.ts'),
   'utf8',
 );
+const mainSource = fs.readFileSync(
+  path.join(projectRoot, 'electron', 'main.ts'),
+  'utf8',
+);
 
 const preloadInvoke = new Set(sourceChannels(
   preloadSource,
@@ -152,6 +156,26 @@ assert.deepEqual(
   difference(mainHandles, preloadInvoke),
   [],
   '主进程存在 preload 未暴露的异步通道',
+);
+assert.match(
+  updaterSource,
+  /autoUpdater\.autoDownload\s*=\s*context\.getUpdateMode\(\)\s*===\s*['"]auto['"]/,
+  'GUI 更新检查必须由主进程根据当前模式控制自动下载',
+);
+assert.match(
+  updaterSource,
+  /autoUpdater\.on\(\s*['"]checking-for-update['"]/,
+  'GUI 更新检查必须向渲染进程发送检查中状态',
+);
+assert.match(
+  mainSource,
+  /async function stopRuntimeResources[\s\S]*await stopBackend\(\)[\s\S]*await adbService\.stopServer\(\)/,
+  'GUI 退出流程必须依次停止后端和 ADB server',
+);
+assert.match(
+  mainSource,
+  /app\.on\('before-quit'[\s\S]*stopRuntimeResources\(\)/,
+  '无论后端是否仍在运行，GUI 退出前都必须清理运行资源',
 );
 
 /** 验证本地计划导入取消、冲突拒绝和确认覆盖流程。 */

@@ -26,8 +26,10 @@ import type {
   NormalFightReq,
 } from '../../types/api.js';
 import { Logger } from '../../utils/Logger';
-import { normalizeSelectedNodesForBackend } from '../plan/selectedNodes';
-import { buildPlanQueueRequest } from '../taskGroup/queueLoader';
+import {
+  applyPlanNodeOverrides,
+  buildPlanQueueRequest,
+} from '../taskGroup/queueLoader';
 import {
   buildAutomaticDecisivePlanRequest,
   buildAutomaticDecisivePresetRequest,
@@ -212,14 +214,9 @@ export class ScheduledTaskLoader {
           times: 1,
           gap: plan.data.gap ?? 0,
         };
-    if (plan.data.selected_nodes.length > 0) {
-      request.plan = request.plan ?? {};
-      request.plan.selected_nodes = normalizeSelectedNodesForBackend(
-        plan.data.selected_nodes,
-      );
-      if (plan.data.fleet_id != null) {
-        request.plan.fleet_id = plan.data.fleet_id;
-      }
+    applyPlanNodeOverrides(request, plan);
+    if (plan.data.fleet_id != null) {
+      request.plan!.fleet_id = plan.data.fleet_id;
     }
 
     const taskId = this.host.scheduler.addTask(

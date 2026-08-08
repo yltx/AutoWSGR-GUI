@@ -124,9 +124,206 @@ function testMigrationStateStore() {
   });
 }
 
+/** 验证分类选择、异常退出重问和明确跳过的完成边界。 */
+function testMigrationSelection() {
+  const root = path.join(temporaryDirectory, 'migration-selection');
+  const projectRoot = path.join(root, 'project');
+  const userData = path.join(root, 'user-data');
+  const appPaths = new AppPaths({
+    moduleDirectory: path.join(projectRoot, 'dist', 'electron'),
+    isPackaged: () => false,
+    getPath: name => name === 'exe'
+      ? path.join(projectRoot, 'AutoWSGR.exe')
+      : userData,
+    getResourcesPath: () => path.join(projectRoot, 'resources'),
+  });
+  const atomicFiles = new AtomicFileStore();
+
+  fs.rmSync(root, { recursive: true, force: true });
+  fs.mkdirSync(path.join(projectRoot, 'plans'), { recursive: true });
+  fs.mkdirSync(path.join(projectRoot, 'templates'), { recursive: true });
+  fs.mkdirSync(
+    path.join(projectRoot, 'resource', 'user_team_plans'),
+    { recursive: true },
+  );
+  fs.writeFileSync(
+    path.join(projectRoot, 'usersettings.yaml'),
+    'legacy_setting: true\n',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectRoot, 'task_groups.json'),
+    JSON.stringify({ version: 4, groups: [] }),
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectRoot, 'templates', 'legacy.json'),
+    '{"legacy":true}',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectRoot, 'plans', 'daily.yaml'),
+    'task_type: exercise\nfleet_id: 1\n',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(projectRoot, 'plans', 'battle.yaml'),
+    'chapter: 1\nmap: 1\nfleet_presets: []\n',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(
+      projectRoot,
+      'resource',
+      'user_team_plans',
+      'team-selection.yaml',
+    ),
+    'name: Selection Team\nships:\n  - name: 吹雪\n',
+    'utf8',
+  );
+
+  const dailySelection = {
+    dailyPlans: true,
+    taskQueue: false,
+    taskYamls: false,
+  };
+  const firstMigration = new UserDataMigrationService(
+    appPaths,
+    atomicFiles,
+  );
+  firstMigration.migrateLegacyUserDataFiles(dailySelection);
+  firstMigration.migratePresetInventory();
+  createLegacyPlanMigration(
+    appPaths,
+    atomicFiles,
+    firstMigration,
+  ).migrate(dailySelection);
+
+  assert.equal(
+    fs.existsSync(path.join(
+      appPaths.userDailyPlansDir(),
+      'exercise-队伍1演习.yaml',
+    )),
+    true,
+  );
+  assert.equal(fs.existsSync(
+    path.join(userData, 'task_groups.json'),
+  ), false);
+  assert.equal(fs.existsSync(
+    path.join(appPaths.userBattlePlansDir(), 'bettle-battle.yaml'),
+  ), false);
+  assert.equal(fs.existsSync(
+    path.join(appPaths.userTeamPlansDir(), 'team-Selection Team.yaml'),
+  ), false);
+
+  // 模拟计划阶段完成后、旧来源最终封存前异常退出。
+  const resumedMigration = new UserDataMigrationService(
+    appPaths,
+    atomicFiles,
+  );
+  assert.equal(
+    resumedMigration.shouldMigrateLegacyInstallation(),
+    true,
+  );
+  const remainingSelection = {
+    dailyPlans: false,
+    taskQueue: true,
+    taskYamls: true,
+  };
+  fs.mkdirSync(appPaths.userBattlePlansDir(), { recursive: true });
+  fs.mkdirSync(appPaths.userTeamPlansDir(), { recursive: true });
+  resumedMigration.migrateLegacyUserDataFiles(remainingSelection);
+  resumedMigration.migratePresetInventory();
+  const resumedResult = createLegacyPlanMigration(
+    appPaths,
+    atomicFiles,
+    resumedMigration,
+  ).migrate(remainingSelection);
+  assert.equal(resumedResult.failed, 0);
+  resumedMigration.completeLegacySourceMigration();
+
+  assert.equal(fs.existsSync(
+    path.join(userData, 'task_groups.json'),
+  ), true);
+  assert.equal(fs.existsSync(
+    path.join(userData, 'templates', 'legacy.json'),
+  ), true);
+  assert.equal(fs.existsSync(
+    path.join(appPaths.userBattlePlansDir(), 'bettle-battle.yaml'),
+  ), true);
+  assert.equal(
+    fs.readdirSync(appPaths.userTeamPlansDir()).length,
+    1,
+  );
+  const completedMigration = new UserDataMigrationService(
+    appPaths,
+    atomicFiles,
+  );
+  assert.equal(
+    completedMigration.shouldMigrateLegacyInstallation(),
+    false,
+  );
+
+  const skipRoot = path.join(temporaryDirectory, 'migration-skip');
+  const skipProject = path.join(skipRoot, 'project');
+  const skipUserData = path.join(skipRoot, 'user-data');
+  const skipPaths = new AppPaths({
+    moduleDirectory: path.join(skipProject, 'dist', 'electron'),
+    isPackaged: () => false,
+    getPath: name => name === 'exe'
+      ? path.join(skipProject, 'AutoWSGR.exe')
+      : skipUserData,
+    getResourcesPath: () => path.join(skipProject, 'resources'),
+  });
+  fs.mkdirSync(skipProject, { recursive: true });
+  fs.writeFileSync(
+    path.join(skipProject, 'usersettings.yaml'),
+    'always_migrate: true\n',
+    'utf8',
+  );
+  fs.writeFileSync(
+    path.join(skipProject, 'task_groups.json'),
+    JSON.stringify({ version: 4, groups: [] }),
+    'utf8',
+  );
+  const skippedMigration = new UserDataMigrationService(
+    skipPaths,
+    atomicFiles,
+  );
+  const skipSelection = {
+    dailyPlans: false,
+    taskQueue: false,
+    taskYamls: false,
+  };
+  skippedMigration.migrateLegacyUserDataFiles(skipSelection);
+  skippedMigration.migratePresetInventory();
+  createLegacyPlanMigration(
+    skipPaths,
+    atomicFiles,
+    skippedMigration,
+  ).migrate(skipSelection);
+  skippedMigration.completeLegacySourceMigration();
+  assert.equal(
+    fs.existsSync(path.join(skipUserData, 'usersettings.yaml')),
+    true,
+  );
+  assert.equal(
+    fs.existsSync(path.join(skipUserData, 'task_groups.json')),
+    false,
+  );
+  assert.equal(
+    new UserDataMigrationService(
+      skipPaths,
+      atomicFiles,
+    ).shouldMigrateLegacyInstallation(),
+    false,
+  );
+}
+
 /** 验证旧配置、旧计划和任务组引用迁移保持幂等。 */
 function testUserDataMigration() {
   testMigrationStateStore();
+  testMigrationSelection();
   const migrationRoot = path.join(temporaryDirectory, 'migration');
   const projectRoot = path.join(migrationRoot, 'project');
   const moduleDirectory = path.join(projectRoot, 'dist', 'electron');

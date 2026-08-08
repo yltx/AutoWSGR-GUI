@@ -52,7 +52,7 @@ fleet_presets:
         search_name: 克劳塞维茨
         ship_type: [bc]
         min_level: 100
-      - name: 塞尔弗里奇·改
+      - name: 赛尔弗里吉·改
         candidates:
           - {name: Z1·改, search_name: Z1, ship_type: [dd], min_level: 100}
           - {name: Z16·改, search_name: Z16, ship_type: [dd], min_level: 100}
@@ -60,7 +60,7 @@ fleet_presets:
           - {name: Z22·改, search_name: Z22, ship_type: [dd], min_level: 100}
           - {name: Z46·改, search_name: Z46, ship_type: [dd], min_level: 100}
           - {name: Z31·改, search_name: Z31, ship_type: [dd], min_level: 100}
-        search_name: 塞尔弗里奇
+        search_name: 赛尔弗里吉
         ship_type: [dd]
         min_level: 100
       - name: 85工程

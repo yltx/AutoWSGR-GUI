@@ -18,6 +18,7 @@ import type {
   GuiSettingsCommitRequest,
   GuiSettingsCommitResult,
   GuiUpdateStatus,
+  ShipLibraryUpdateTarget,
 } from '../src/types/ipc';
 
 const electronBridge = {
@@ -150,8 +151,8 @@ const electronBridge = {
     return ipcRenderer.invoke('get-ship-library-manifest');
   },
 
-  updateShipLibrary: () => {
-    return ipcRenderer.invoke('update-ship-library');
+  updateShipLibrary: (target: ShipLibraryUpdateTarget = 'wiki') => {
+    return ipcRenderer.invoke('update-ship-library', target);
   },
 
   onShipLibraryUpdateProgress: (callback: (progress: { message: string }) => void) => {

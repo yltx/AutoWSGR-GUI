@@ -15,6 +15,7 @@ const STORAGE_KEY = 'daily_sortie_stats_v1';
 const STORAGE_VERSION = 1;
 const LOG_DEDUP_WINDOW_MS = 1_200;
 const DROP_NOTICE_DURATION_MS = 60_000;
+const QUINCY_SHIP_NAME = '昆西';
 const DEFAULT_LOOT_LIMIT = 50;
 const DEFAULT_SHIP_LIMIT = 500;
 
@@ -239,11 +240,13 @@ export class DailySortieStats {
         this.state.shipCount += 1;
         this.state.shipDrops[event.shipName] =
           (this.state.shipDrops[event.shipName] ?? 0) + 1;
-        this.dropNotice = {
-          shipName: event.shipName,
-          dailyIndex: this.state.shipCount,
-          visibleUntil: timestamp + DROP_NOTICE_DURATION_MS,
-        };
+        if (event.shipName === QUINCY_SHIP_NAME) {
+          this.dropNotice = {
+            shipName: event.shipName,
+            dailyIndex: this.state.shipCount,
+            visibleUntil: timestamp + DROP_NOTICE_DURATION_MS,
+          };
+        }
         break;
       case 'expedition':
         this.state.expeditionCount += safeCount(event.count);

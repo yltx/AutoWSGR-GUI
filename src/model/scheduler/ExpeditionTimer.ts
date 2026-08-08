@@ -25,8 +25,6 @@ export class ExpeditionTimer {
     this.callbacks = callbacks;
   }
 
-  get intervalMs(): number { return this._intervalMs; }
-
   /** 更新间隔（毫秒），如果正在运行则自动重启 */
   setInterval(ms: number): void {
     this._intervalMs = ms;

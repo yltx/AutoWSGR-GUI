@@ -8,7 +8,6 @@ import type {
 import type {
   EventMapCatalogEntry,
   NormalFightTaskConfig,
-  ShipSlot,
 } from './model.js';
 import type { DailySortieStatsSnapshot } from './statistics.js';
 import type {
@@ -52,6 +51,7 @@ export interface ConfigViewObject {
   ocrGpuMode: 'auto' | 'cpu' | 'cuda';
   ocrGpu: boolean;
   ocrMirror: 'origin' | 'github' | 'tencent' | 'modelscope';
+  enhancedShipOcr: boolean;
   ocrConfidence: number;
   shipNameAliasesText: string;
   shipNameCorrectionsText: string;
@@ -137,6 +137,7 @@ export interface FleetRuleDraftViewObject {
   readonly levelEnabled: boolean;
   readonly minLevel: number | null;
   readonly maxLevel: number | null;
+  readonly relaxed: boolean;
 }
 
 export interface FleetCandidateDraftViewObject
@@ -266,11 +267,6 @@ export interface PlanPreviewViewObject {
   gap?: number;
   lootCountGe?: number;
   shipCountGe?: number;
-}
-
-export interface FleetPresetVO {
-  name: string;
-  ships: ShipSlot[];
 }
 
 export type FleetPresetCatalogStatus = 'loading' | 'ready' | 'error';

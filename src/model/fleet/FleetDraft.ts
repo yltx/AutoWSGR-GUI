@@ -22,6 +22,7 @@ export interface FleetRuleDraft {
   levelEnabled: boolean;
   minLevel: number | null;
   maxLevel: number | null;
+  relaxed: boolean;
 }
 
 export interface FleetCandidateDraft extends FleetRuleDraft {
@@ -264,7 +265,8 @@ export function insertFleetCandidate(
 }
 
 /**
- * 移动编队卡片。位置模式拖动纯备选卡时交换完整位置。
+ * 移动顶层集合卡片。
+ * 单主选可以接管备选合集，其余已占用集合按跟随模式交换。
  */
 export function moveFleetPrimary(
   slots: FleetSlotDraft[],
@@ -277,26 +279,17 @@ export function moveFleetPrimary(
   if (!source || !target || isFleetSlotEmpty(source)) return null;
   if (sourcePosition === targetPosition) return source;
 
-  if (!source.primary) {
-    if (mode !== 'position') return null;
-    if (!isFleetSlotEmpty(target)) {
-      [slots[sourcePosition], slots[targetPosition]] = [
-        target,
-        source,
-      ];
-      return source;
-    }
-
-    slots.splice(sourcePosition, 1);
-    const firstEmpty = slots.findIndex(isFleetSlotEmpty);
-    slots.splice(firstEmpty < 0 ? slots.length : firstEmpty, 0, source);
-    return source;
-  }
-
-  if (
-    mode === 'position'
-    && !target.primary
+  const targetIsCandidateCollection = (
+    !target.primary
     && !isFleetSlotEmpty(target)
+  );
+  const sourceHasCandidates = source.candidates.some(candidate => (
+    candidate.ship !== null
+  ));
+  if (
+    source.primary
+    && !sourceHasCandidates
+    && targetIsCandidateCollection
   ) {
     target.primary = source.primary;
     copyFleetRule(target, source);
@@ -304,6 +297,25 @@ export function moveFleetPrimary(
     copyFleetRule(source, createFleetRuleDraft());
     if (isFleetSlotEmpty(source)) compactFleetDraftSlots(slots);
     return target;
+  }
+
+  if (
+    source.primary
+    && mode === 'position'
+    && isFleetSlotEmpty(target)
+  ) {
+    const destinationPosition = resolveGalleryFormationDropTarget(
+      slots,
+      targetPosition,
+    );
+    const destination = slots[destinationPosition];
+    if (!destination || !isFleetSlotEmpty(destination)) return null;
+    destination.primary = source.primary;
+    copyFleetRule(destination, source);
+    source.primary = null;
+    copyFleetRule(source, createFleetRuleDraft());
+    if (isFleetSlotEmpty(source)) compactFleetDraftSlots(slots);
+    return destination;
   }
 
   return reorderFleetSlots(slots, mode, () => {
@@ -328,6 +340,7 @@ export function createFleetRuleDraft(): FleetRuleDraft {
     levelEnabled: false,
     minLevel: null,
     maxLevel: null,
+    relaxed: false,
   };
 }
 
@@ -369,6 +382,7 @@ export function cloneFleetRule(source: FleetRuleDraft): FleetRuleDraft {
     levelEnabled: source.levelEnabled,
     minLevel: source.minLevel,
     maxLevel: source.maxLevel,
+    relaxed: source.relaxed,
   };
 }
 
@@ -380,6 +394,7 @@ export function copyFleetRule(
   target.levelEnabled = source.levelEnabled;
   target.minLevel = source.minLevel;
   target.maxLevel = source.maxLevel;
+  target.relaxed = source.relaxed;
 }
 
 export function fleetDraftSnapshot(draft: FleetDraft): string {
@@ -388,6 +403,7 @@ export function fleetDraftSnapshot(draft: FleetDraft): string {
     levelEnabled: rule.levelEnabled,
     minLevel: rule.minLevel,
     maxLevel: rule.maxLevel,
+    relaxed: rule.relaxed,
   });
   return JSON.stringify({
     name: draft.name,
@@ -451,6 +467,7 @@ function teamRuleConstraintsFromDraft(
   if (rule.levelEnabled && rule.maxLevel !== null) {
     result.max_level = rule.maxLevel;
   }
+  if (rule.relaxed) result.relaxed = true;
   return result;
 }
 
@@ -539,6 +556,7 @@ function fleetCandidateFromTeamRule(
     ),
     minLevel: rule.min_level ?? null,
     maxLevel: rule.max_level ?? null,
+    relaxed: rule.relaxed === true,
   };
 }
 
@@ -573,6 +591,7 @@ function fleetSlotFromTeamPlan(
     ),
     minLevel: slot.min_level ?? null,
     maxLevel: slot.max_level ?? null,
+    relaxed: slot.relaxed === true,
   };
 }
 

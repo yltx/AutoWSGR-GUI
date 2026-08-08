@@ -7,7 +7,7 @@ import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { getCtx, setCachedPythonCmd } from './context';
 import { findPython } from './finder';
-import { ensurePthFile, localSitePackages, pipEnv, ensurePip, ensureSslCertForPython } from './utils';
+import { ensurePthFile, pipEnv, ensurePip, ensureSslCertForPython } from './utils';
 import { ENV_READY_MARKER } from './envCheck';
 import {
   buildPythonProcessEnv,
@@ -15,7 +15,10 @@ import {
   type PythonEnvironment,
   resolvePythonEnvironment,
 } from './environment';
-import { SHIP_LIBRARY_REQUIREMENTS } from './dependencies';
+import {
+  BACKEND_RUNTIME_REQUIREMENTS,
+  SHIP_LIBRARY_REQUIREMENTS,
+} from './dependencies';
 import { MANAGED_AUTOWSGR_REQUIREMENT } from './backendRequirement';
 
 const execAsync = promisify(exec);
@@ -194,6 +197,7 @@ export function buildDependencyInstallPlan(
       '--upgrade',
       ...targetArgs,
       ...SHIP_LIBRARY_REQUIREMENTS,
+      ...BACKEND_RUNTIME_REQUIREMENTS,
     ],
     backendArgs: [
       '-m', 'pip', 'install',
@@ -274,7 +278,7 @@ export async function installDependencies(pythonCmd: string): Promise<{ success:
     return { success: false, output: buildDeps.output.slice(-500) };
   }
 
-  ctx.sendProgress('正在安装舰船资料库更新依赖…');
+  ctx.sendProgress('正在安装工具与后端运行依赖…');
   const toolDeps = await runPip(installPlan.toolArgs);
   if (toolDeps.code !== 0) {
     ctx.sendProgress('ERROR 舰船资料库更新依赖安装失败');
@@ -289,65 +293,4 @@ export async function installDependencies(pythonCmd: string): Promise<{ success:
   if (install.code === 0) ctx.sendProgress('后端依赖安装完成 ✓');
   else ctx.sendProgress('ERROR 依赖安装失败');
   return { success: install.code === 0, output: install.output.slice(-500) };
-}
-
-/** 更新 autowsgr 本体且不级联重装依赖。 */
-export async function pullUpdates(): Promise<{ success: boolean; output: string }> {
-  const ctx = getCtx();
-  // 更新后清除环境标记。
-  try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* 忽略清理失败。 */ }
-  const pythonCmd = await findPython();
-  if (!pythonCmd) return { success: false, output: '找不到 Python' };
-
-  const certFile = await ensureSslCertForPython(pythonCmd);
-  if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
-  else ctx.sendProgress('WARNING 未检测到 TLS 根证书，后续联网操作可能失败');
-
-  try {
-    await execAsync(
-      `"${pythonCmd}" -m pip install --upgrade --target "${localSitePackages()}" hatchling hatch-vcs`,
-      { cwd: ctx.appRoot(), windowsHide: true, timeout: 120000, env: pipEnv() },
-    );
-  } catch (e) {
-    const output = e instanceof Error ? e.message : String(e);
-    return { success: false, output: `活动热修复构建依赖安装失败: ${output}` };
-  }
-
-  return new Promise((resolve) => {
-    const targetDir = localSitePackages();
-    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-
-    // 先删除旧版，再安装且不级联更新依赖。
-    try {
-      for (const entry of fs.readdirSync(targetDir)) {
-        if (entry === 'autowsgr' || entry.startsWith('autowsgr-')) {
-          fs.rmSync(path.join(targetDir, entry), { recursive: true, force: true });
-        }
-      }
-    } catch { /* 忽略清理失败。 */ }
-
-    const proc = spawn(pythonCmd, [
-      '-m', 'pip', 'install',
-      '--target', targetDir,
-      '--no-build-isolation',
-      '--no-deps',
-      '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
-      '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
-      MANAGED_AUTOWSGR_REQUIREMENT,
-    ], {
-      cwd: ctx.appRoot(),
-      windowsHide: true,
-      stdio: 'pipe',
-      env: pipEnv(),
-    });
-    let output = '';
-    proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
-    proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
-    proc.on('close', (code) => {
-      resolve({ success: code === 0, output: output.slice(-500) });
-    });
-    proc.on('error', (err) => {
-      resolve({ success: false, output: err.message });
-    });
-  });
 }

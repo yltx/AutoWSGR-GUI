@@ -5,6 +5,9 @@
  */
 const context = require('./test-context');
 const {
+  createDirectories,
+} = require('../test-support/directories');
+const {
   assert,
   EventEmitter,
   fs,
@@ -55,7 +58,7 @@ function testTeamPlanServices() {
     codec,
   );
   const service = new TeamPlanService(codec, repository);
-  repository.initializeSystemDirectory();
+  createDirectories(appPaths.systemTeamPlansDir());
   repository.initializeUserDirectory();
 
   const candidateOnly = codec.normalize({
@@ -85,6 +88,93 @@ function testTeamPlanServices() {
   assert.equal(
     serializedObject.ships[0].candidates[0].customCandidate,
     true,
+  );
+  const relaxedRules = codec.normalize({
+    name: '宽泛校验',
+    ships: [{
+      name: '重庆',
+      relaxed: true,
+      candidates: [
+        '长春',
+        { name: '昆西', relaxed: true },
+      ],
+    }],
+  });
+  assert.equal(relaxedRules.ships[0].relaxed, true);
+  assert.equal(relaxedRules.ships[0].candidates[0].relaxed, undefined);
+  assert.equal(relaxedRules.ships[0].candidates[1].relaxed, true);
+  const serializedRelaxedRule = yaml.load(
+    codec.serialize(relaxedRules),
+  ).ships[0];
+  assert.equal(serializedRelaxedRule.relaxed, true);
+  assert.equal(
+    Object.hasOwn(serializedRelaxedRule.candidates[0], 'relaxed'),
+    false,
+  );
+  assert.equal(serializedRelaxedRule.candidates[1].relaxed, true);
+  const orderedRelaxedContent = codec.serialize(codec.normalize({
+    name: '宽泛字段顺序',
+    ships: [{
+      relaxed: true,
+      max_level: 90,
+      min_level: 20,
+      ship_type: ['CL'],
+      name: '重庆',
+      candidates: [{
+        relaxed: true,
+        max_level: 80,
+        min_level: 30,
+        ship_type: ['DD'],
+        name: '昆西',
+      }],
+    }],
+  }));
+  assert.equal(orderedRelaxedContent, [
+    'name: 宽泛字段顺序',
+    'ships:',
+    '  - name: 重庆',
+    '    ship_type: [cl]',
+    '    min_level: 20',
+    '    max_level: 90',
+    '    relaxed: true',
+    '    candidates:',
+    '      - {name: 昆西, ship_type: [dd], min_level: 30, max_level: 80, relaxed: true}',
+    '',
+  ].join('\n'));
+  const disabledRelaxedContent = codec.serialize(codec.normalize({
+    name: '关闭宽泛校验',
+    ships: [{
+      name: '重庆',
+      relaxed: false,
+      candidates: [{ name: '昆西', relaxed: false }],
+    }],
+  }));
+  assert.doesNotMatch(disabledRelaxedContent, /relaxed/);
+  const loadedRelaxedPath = path.join(
+    appPaths.userTeamPlansDir(),
+    'team-加载宽泛校验.yaml',
+  );
+  repository.write(loadedRelaxedPath, orderedRelaxedContent);
+  const loadedRelaxedPlan = repository.read(loadedRelaxedPath);
+  assert.equal(loadedRelaxedPlan.ships[0].relaxed, true);
+  assert.equal(loadedRelaxedPlan.ships[0].candidates[0].relaxed, true);
+  repository.remove(loadedRelaxedPath);
+  assert.throws(
+    () => codec.normalize({
+      name: '非法宽泛校验',
+      ships: [{ name: '重庆', relaxed: 'true' }],
+    }),
+    /relaxed 必须是布尔值/,
+  );
+  assert.throws(
+    () => codec.normalize({
+      name: '非法备选宽泛校验',
+      ships: [{
+        name: '重庆',
+        candidates: [{ name: '昆西', relaxed: 1 }],
+      }],
+    }),
+    /relaxed 必须是布尔值/,
   );
   const legacyCandidateOnly = codec.normalize({
     name: '旧版纯候选',

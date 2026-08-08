@@ -23,6 +23,18 @@ import { readTaskGroupItemFile } from './managedPlanReader';
 import { parseYamlRecord } from '../../adapter';
 import { getTaskGroupRepository } from '../../adapter/IpcAdapter';
 
+export function applyPlanNodeOverrides(
+  req: NormalFightReq | EventFightReq,
+  plan: PlanModel,
+): void {
+  req.plan = req.plan ?? {};
+  req.plan.selected_nodes = normalizeSelectedNodesForBackend(
+    plan.data.selected_nodes,
+  );
+  req.plan.node_defaults = structuredClone(plan.data.node_defaults ?? {});
+  req.plan.node_args = structuredClone(plan.data.node_args ?? {});
+}
+
 export function buildPlanQueueRequest(
   item: TaskGroupItem,
   plan: PlanModel,
@@ -38,12 +50,7 @@ export function buildPlanQueueRequest(
     times: 1,
     gap: plan.data.gap ?? 0,
   };
-  if (plan.data.selected_nodes.length > 0) {
-    req.plan = req.plan ?? {};
-    req.plan.selected_nodes = normalizeSelectedNodesForBackend(
-      plan.data.selected_nodes,
-    );
-  }
+  applyPlanNodeOverrides(req, plan);
 
   const selectedFleetId = item.fleet_id ?? plan.data.fleet_id;
   if (selectedFleetId != null) {

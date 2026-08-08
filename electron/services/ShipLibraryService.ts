@@ -24,6 +24,10 @@ export interface ShipLibraryStatus {
   shipCount: number;
   assetCount: number;
   missingAssets: number;
+  backendSynchronized?: boolean;
+  backendMissingRecords?: number;
+  backendMissingAliases?: number;
+  backendError?: string;
   error?: string;
 }
 

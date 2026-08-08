@@ -23,6 +23,7 @@ export interface FleetRuleUpdate {
   readonly levelEnabled?: boolean;
   readonly minLevel?: number | null;
   readonly maxLevel?: number | null;
+  readonly relaxed?: boolean;
 }
 
 export type FleetDraftEditIntent =

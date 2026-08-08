@@ -89,18 +89,18 @@ export class ConfigController {
   async loadConfig(): Promise<void> {
     const bridge = this.gateway;
     if (!bridge) return;
+
+    let yamlStr = '';
     try {
-      const yamlStr = await bridge.readFile('usersettings.yaml');
-      if (!yamlStr.trim()) {
-        Logger.debug('usersettings.yaml 未找到，自动创建默认配置');
-        const defaultYaml = this.host.configModel.toYaml();
-        await bridge.saveFile('usersettings.yaml', defaultYaml);
-        Logger.info(`已创建默认配置文件: ${this.host.configDir}\\usersettings.yaml`);
-      } else {
-        this.host.configModel.loadFromYaml(yamlStr);
-        Logger.debug('usersettings.yaml 已加载');
-      }
+      yamlStr = await bridge.readFile('usersettings.yaml');
     } catch {
+      // 读取异常（文件缺失/损坏）与内容为空同等处理：创建默认配置
+      yamlStr = '';
+    }
+    if (yamlStr.trim()) {
+      this.host.configModel.loadFromYaml(yamlStr);
+      Logger.debug('usersettings.yaml 已加载');
+    } else {
       Logger.debug('usersettings.yaml 未找到，自动创建默认配置');
       const defaultYaml = this.host.configModel.toYaml();
       await bridge.saveFile('usersettings.yaml', defaultYaml);
@@ -171,9 +171,6 @@ export class ConfigController {
         if (hasLegacyGuiAutomation) {
           this.host.configModel.markLegacyGuiAutomationMigrated();
           guiAutomationMigrated = true;
-          Logger.info(
-            '已按字段优先级将旧版 GUI 调度字段迁移到 gui_settings.json',
-          );
         }
       }
     }
@@ -184,6 +181,7 @@ export class ConfigController {
       || decisiveMigrated
     ) {
       await bridge.saveFile('usersettings.yaml', this.host.configModel.toYaml());
+      Logger.info('已将旧版配置迁移到 gui_settings.json');
     }
   }
 
@@ -255,7 +253,6 @@ export class ConfigController {
       this.host.configModel.markLegacyDecisiveAutomationMigrated(
         settings,
       );
-      Logger.info('已将旧版决战自动化原值迁移到 gui_settings.json');
       return true;
     } catch (error) {
       Logger.warn(
@@ -340,6 +337,7 @@ export class ConfigController {
       ocrGpuMode: this.gateway?.getOcrGpuMode() ?? 'auto',
       ocrGpu: cfg.ocr.gpu,
       ocrMirror: cfg.ocr.mirror,
+      enhancedShipOcr: cfg.ocr.enhanced_ship_ocr,
       ocrConfidence: cfg.ocr.ship_name_match_confidence,
       shipNameAliasesText: formatStringMap(
         cfg.ocr.ship_name_aliases,
@@ -510,6 +508,7 @@ export class ConfigController {
         ...model.current.ocr,
         gpu: collected.ocrGpu,
         mirror: collected.ocrMirror,
+        enhanced_ship_ocr: collected.enhancedShipOcr,
         ship_name_match_confidence: collected.ocrConfidence,
         ship_name_aliases: shipNameAliases,
         ship_name_corrections: shipNameCorrections,

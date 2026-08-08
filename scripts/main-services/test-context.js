@@ -71,6 +71,9 @@ const {
   ShipLibraryUpdater,
 } = require('../../dist/electron/services/ShipLibraryUpdater.js');
 const {
+  ShipNameSynchronizer,
+} = require('../../dist/electron/services/ShipNameSynchronizer.js');
+const {
   AdbService,
 } = require('../../dist/electron/services/AdbService.js');
 const {
@@ -115,6 +118,7 @@ module.exports = {
   TaskPresetCodec,
   ShipLibraryService,
   ShipLibraryUpdater,
+  ShipNameSynchronizer,
   AdbService,
   CudaEnvironmentService,
   GuiConfigurationService,

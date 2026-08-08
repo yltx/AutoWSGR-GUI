@@ -1,6 +1,9 @@
 /** 编排设置页的环境检测、设备连接、资料库更新和主题交互。 */
 import type { ConfigView } from '../../view/config/ConfigView';
-import type { ManagedBattlePlanSelection } from '../../types/ipc.js';
+import type {
+  ManagedBattlePlanSelection,
+  ShipLibraryUpdateTarget,
+} from '../../types/ipc.js';
 import type { LootAutomationPlan } from '../../shared/lootPlans.js';
 import { ApiClient } from '../../model/ApiClient';
 import { Logger } from '../../utils/Logger';
@@ -24,6 +27,7 @@ export interface SettingsControllerHost {
 
 export class SettingsController {
   private shipLibraryUpdating = false;
+  private shipLibraryUpdateTarget: ShipLibraryUpdateTarget = 'wiki';
 
   constructor(
     private readonly host: SettingsControllerHost,
@@ -37,6 +41,9 @@ export class SettingsController {
       if (this.shipLibraryUpdating) {
         configView.setShipLibraryStatus(progress.message, 'unknown');
       }
+    });
+    this.gateway?.onUpdateStatus((status) => {
+      configView.setGuiUpdateStatus(status);
     });
 
     configView.bindActions({
@@ -121,24 +128,40 @@ export class SettingsController {
     }
   }
 
-  async refreshShipLibraryStatus(): Promise<void> {
-    if (this.shipLibraryUpdating) return;
+  async refreshShipLibraryStatus(ignoreUpdating = false): Promise<void> {
+    if (this.shipLibraryUpdating && !ignoreUpdating) return;
     if (!this.gateway) return;
     try {
       const status = await this.gateway.getShipLibraryStatus();
       if (status.error) {
+        this.setShipLibraryUpdateAction('wiki', '更新舰船数据库');
         this.host.configView.setShipLibraryStatus(status.error, 'error');
-      } else if (!status.exists) {
+      } else if (!status.exists || status.shipCount <= 0) {
+        this.setShipLibraryUpdateAction('wiki', '更新舰船数据库');
         this.host.configView.setShipLibraryStatus(
-          '尚未建立本地资料库',
-          'unknown',
+          'Wiki 船库尚未同步',
+          'error',
         );
       } else if (status.missingAssets > 0) {
+        this.setShipLibraryUpdateAction('wiki', '更新舰船数据库');
         this.host.configView.setShipLibraryStatus(
-          `已收录 ${status.shipCount} 艘，缺少 ${status.missingAssets} 个资源`,
+          `Wiki 船库未同步完整，缺少 ${status.missingAssets} 个资源`,
+          'error',
+        );
+      } else if (status.backendSynchronized !== true) {
+        this.setShipLibraryUpdateAction('backend', '同步后端');
+        const missingRecords = status.backendMissingRecords ?? 0;
+        const missingAliases = status.backendMissingAliases ?? 0;
+        const missing = missingRecords + missingAliases;
+        const detail = status.backendError
+          ? `后端核对失败：${status.backendError}`
+          : `后端缺少 ${missing} 条舰名`;
+        this.host.configView.setShipLibraryStatus(
+          `Wiki 与 GUI 已同步，${detail}`,
           'error',
         );
       } else {
+        this.setShipLibraryUpdateAction('wiki', '检查更新');
         const updatedAt = status.generatedAt
           ? new Date(status.generatedAt).toLocaleString(
             'zh-CN',
@@ -146,7 +169,7 @@ export class SettingsController {
           )
           : '时间未知';
         this.host.configView.setShipLibraryStatus(
-          `已收录 ${status.shipCount} 艘 · ${updatedAt}`,
+          `Wiki、GUI、后端已同步 · ${status.shipCount} 艘 · ${updatedAt}`,
           'ok',
         );
       }
@@ -157,6 +180,14 @@ export class SettingsController {
         'error',
       );
     }
+  }
+
+  private setShipLibraryUpdateAction(
+    target: ShipLibraryUpdateTarget,
+    label: string,
+  ): void {
+    this.shipLibraryUpdateTarget = target;
+    this.host.configView.setShipLibraryUpdateLabel(label);
   }
 
   private async browseDirectory(
@@ -396,14 +427,17 @@ export class SettingsController {
 
   private async updateShipLibrary(): Promise<void> {
     if (!this.gateway || this.shipLibraryUpdating) return;
+    const updateTarget = this.shipLibraryUpdateTarget;
     this.shipLibraryUpdating = true;
     this.host.configView.setShipLibraryUpdateLoading(true);
     this.host.configView.setShipLibraryStatus(
-      '正在准备更新…',
+      updateTarget === 'backend'
+        ? '正在同步后端舰名库…'
+        : '正在检查 Wiki 更新…',
       'unknown',
     );
     try {
-      const result = await this.gateway.updateShipLibrary();
+      const result = await this.gateway.updateShipLibrary(updateTarget);
       if (!result.success) {
         const message = result.error || result.failures?.[0] || '未知错误';
         this.host.configView.setShipLibraryStatus(
@@ -413,25 +447,25 @@ export class SettingsController {
         Logger.error(`舰船资料库更新失败: ${message}`);
         return;
       }
-      const summary = [
-        `${result.ship_count ?? 0} 艘`,
-        `新增 ${result.added ?? 0}`,
-        `变化 ${result.updated ?? 0}`,
-        `下载 ${result.downloaded ?? 0}`,
-      ].join('，');
-      this.host.configView.setShipLibraryStatus(
-        `更新完成：${summary}`,
-        'ok',
+      if (updateTarget === 'wiki') await this.host.reloadShipLibrary();
+      if (result.shipnames_sync_error) {
+        Logger.error(
+          `舰船资料库已更新，但后端舰名同步失败: ${result.shipnames_sync_error}`,
+        );
+      }
+      Logger.info(
+        updateTarget === 'backend'
+          ? '后端舰名库同步完成'
+          : 'Wiki 舰船资料库检查完成',
       );
-      Logger.info(`舰船资料库更新完成：${summary}`);
-      await this.host.reloadShipLibrary();
+      await this.refreshShipLibraryStatus(true);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.host.configView.setShipLibraryStatus(
         `更新失败: ${message}`,
         'error',
       );
-      Logger.error(`舰船资料库更新异常: ${message}`);
+      Logger.error(`舰船资料库更新失败: ${message}`);
     } finally {
       this.shipLibraryUpdating = false;
       this.host.configView.setShipLibraryUpdateLoading(false);
@@ -451,35 +485,32 @@ export class SettingsController {
           Logger.warn(`GUI 更新检查失败: ${guiUpdate.message}`);
           return;
         }
-        if (updateMode === 'auto') {
-          if (guiUpdate.status === 'available') {
-            Logger.info(
-              `检测到 GUI 新版本 v${guiUpdate.version}，自动模式下将自动下载`,
-            );
-          } else {
-            Logger.info('GUI 已是最新版本');
-          }
+        // 无新版本：auto 与 manual 模式统一提示
+        if (guiUpdate.status !== 'available') {
+          Logger.info('GUI 已是最新版本');
           return;
         }
-        if (guiUpdate.status === 'available') {
-          const confirmed = await showConfirm(
-            'GUI 更新',
-            `发现 GUI 新版本 v${guiUpdate.version}，是否立即下载？`,
+        if (updateMode === 'auto') {
+          Logger.info(
+            `检测到 GUI 新版本 v${guiUpdate.version}，自动模式下将自动下载`,
           );
-          if (confirmed) {
-            const result = await this.gateway.downloadGuiUpdate();
-            if (result.success) {
-              Logger.info(`GUI 更新下载开始: v${guiUpdate.version}`);
-            } else {
-              Logger.warn(
-                `GUI 更新下载失败: ${result?.message || '未知错误'}`,
-              );
-            }
+          return;
+        }
+        const confirmed = await showConfirm(
+          'GUI 更新',
+          `发现 GUI 新版本 v${guiUpdate.version}，是否立即下载？`,
+        );
+        if (confirmed) {
+          const result = await this.gateway.downloadGuiUpdate();
+          if (result.success) {
+            Logger.info(`GUI 更新下载开始: v${guiUpdate.version}`);
           } else {
-            Logger.info('已取消 GUI 更新下载');
+            Logger.warn(
+              `GUI 更新下载失败: ${result?.message || '未知错误'}`,
+            );
           }
         } else {
-          Logger.info('GUI 已是最新版本');
+          Logger.info('已取消 GUI 更新下载');
         }
       } catch {
         Logger.warn('GUI 更新检查失败');

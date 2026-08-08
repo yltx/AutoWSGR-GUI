@@ -225,16 +225,6 @@ export class RepairManager {
     return -1;
   }
 
-  /** 是否有舰船正在泡澡 */
-  get hasBathingShips(): boolean {
-    return this.bathingShips.size > 0;
-  }
-
-  /** 获取正在泡澡的舰船列表 */
-  get bathingShipNames(): string[] {
-    return Array.from(this.bathingShips.keys());
-  }
-
   /** 获取泡澡中舰船列表（只读引用，供 TaskQueue 计算动态延迟） */
   getBathingShips(): ReadonlyMap<string, BathingShip> {
     return this.bathingShips;

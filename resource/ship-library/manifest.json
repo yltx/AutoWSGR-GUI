@@ -4448,8 +4448,8 @@
     },
     {
       "id": 273,
-      "name": "塞尔弗里奇",
-      "search_name": "塞尔弗里奇",
+      "name": "赛尔弗里吉",
+      "search_name": "赛尔弗里吉",
       "variant": "normal",
       "rarity": 3,
       "ship_type": "dd",
@@ -13360,8 +13360,8 @@
     },
     {
       "id": 1273,
-      "name": "塞尔弗里奇·改",
-      "search_name": "塞尔弗里奇",
+      "name": "赛尔弗里吉·改",
+      "search_name": "赛尔弗里吉",
       "variant": "refit",
       "rarity": 4,
       "ship_type": "dd",

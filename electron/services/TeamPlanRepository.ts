@@ -34,11 +34,6 @@ export class TeamPlanRepository {
     fs.mkdirSync(this.appPaths.userTeamPlansDir(), { recursive: true });
   }
 
-  /** 初始化系统编队目录。 */
-  initializeSystemDirectory(): void {
-    fs.mkdirSync(this.appPaths.systemTeamPlansDir(), { recursive: true });
-  }
-
   /** 返回指定来源的权威编队目录。 */
   directory(source: PlanPresetSource): string {
     return source === 'system'

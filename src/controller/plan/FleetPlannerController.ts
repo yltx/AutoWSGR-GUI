@@ -168,6 +168,7 @@ export class FleetPlannerController {
       levelEnabled: rule.levelEnabled,
       minLevel: rule.minLevel,
       maxLevel: rule.maxLevel,
+      relaxed: rule.relaxed,
     };
   }
 

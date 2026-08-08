@@ -244,7 +244,7 @@
         <div class="fleet-planner-layout">
           <section class="fleet-planner-fleet card">
             <div class="fleet-formation-heading fleet-planner-toolbar">
-              <h3 class="fleet-formation-tag fleet-queue-badge is-primary">舰队编队</h3>
+              <h3 class="fleet-formation-tag fleet-queue-badge is-primary">主选队列</h3>
               <label class="fleet-preset-name-field">
                 <span>预设名称</span>
                 <input
@@ -262,21 +262,31 @@
                 <button class="btn btn-small" id="btn-clear-fleet" type="button">清空</button>
               </div>
               <div class="fleet-toolbar-level">
-                <label class="config-switch fleet-level-switch">
-                  <input type="checkbox" id="fleet-level-enabled">
-                  <span class="config-switch-track" aria-hidden="true"></span>
-                  <span>等级限制</span>
-                </label>
-                <div class="fleet-level-fields" id="fleet-level-fields" hidden>
-                  <label>
-                    <span>最小</span>
-                    <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                <div class="fleet-primary-rule-controls">
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-relaxed-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>宽泛校验</span>
                   </label>
-                  <label>
-                    <span>最大</span>
-                    <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-level-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>等级限制</span>
                   </label>
+                  <div class="fleet-level-fields" id="fleet-level-fields" hidden>
+                    <label>
+                      <span>最小</span>
+                      <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                    </label>
+                    <label>
+                      <span>最大</span>
+                      <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                    </label>
+                  </div>
                 </div>
+                <p class="fleet-validation-note">
+                  宽泛校验：指在编队识别时仅要求名称一致，等级和舰船类型会校验但不做强制性要求
+                </p>
               </div>
             </div>
             <section class="fleet-formation-section">
@@ -291,6 +301,11 @@
                 <button class="btn btn-small" id="btn-backup-follow-mode" type="button" aria-pressed="false">舰船跟随</button>
                 <button class="btn btn-small btn-primary" id="btn-add-fleet-backup" type="button">增加备选</button>
                 <button class="btn btn-small" id="btn-copy-fleet-backup" type="button">复制备选</button>
+                <label class="config-switch fleet-level-switch">
+                  <input type="checkbox" id="fleet-backup-relaxed-enabled">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>宽泛校验</span>
+                </label>
                 <label class="config-switch fleet-level-switch">
                   <input type="checkbox" id="fleet-backup-level-enabled">
                   <span class="config-switch-track" aria-hidden="true"></span>
@@ -670,7 +685,6 @@
                     <h3>节点信息</h3>
                     <p>点击地图上的节点查看和编辑</p>
                   </div>
-                  <div id="node-info" class="node-info" style="display:none"></div>
                   <div id="node-editor" class="node-editor" style="display:none">
                 <div class="node-editor-header">
                   <div class="node-info-badge"></div>
@@ -1205,7 +1219,7 @@
                 </div>
                 <div class="config-setting-control">
                   <div class="input-row config-compact-path-row">
-                    <input type="text" id="cfg-log-root" class="input" placeholder="log">
+                    <input type="text" id="cfg-log-root" class="input" placeholder="logs">
                     <button class="btn btn-small" id="btn-browse-log-root" type="button">选择</button>
                   </div>
                 </div>
@@ -1318,7 +1332,7 @@
                   <strong>更新模式</strong>
                   <span>自动模式会在启动时检查更新，手动模式仅在点击按钮时检查。</span>
                 </div>
-                <div class="config-setting-control">
+                <div class="config-setting-control config-setting-control-stack">
                   <div class="input-row config-update-controls">
                     <select id="cfg-update-mode" class="input">
                       <option value="auto">自动更新</option>
@@ -1326,12 +1340,29 @@
                     </select>
                     <button class="btn btn-small" id="btn-check-updates">立即检查</button>
                   </div>
+                  <div id="gui-update-progress" class="config-update-progress" hidden>
+                    <div class="config-update-progress-copy">
+                      <span id="gui-update-status">准备检查更新</span>
+                      <span id="gui-update-percent">0%</span>
+                    </div>
+                    <div
+                      id="gui-update-progress-track"
+                      class="config-update-progress-track"
+                      role="progressbar"
+                      aria-label="GUI 更新进度"
+                      aria-valuemin="0"
+                      aria-valuemax="100"
+                      aria-valuenow="0"
+                    >
+                      <span id="gui-update-progress-fill"></span>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div class="config-setting-row">
                 <div class="config-setting-copy">
                   <strong>更新舰船数据库</strong>
-                  <span>从舰R百科获取最新舰船资料，只下载新增、变化或缺失的立绘、背景和分类数据。</span>
+                  <span>从舰R百科获取最新舰船资料，只下载新增、变化或缺失的数据；点击“同步后端”会把 GUI 新增舰名增量写入本地后端船库。</span>
                 </div>
                 <div class="config-setting-control">
                   <div class="input-row ship-library-update-control">
@@ -1668,6 +1699,19 @@
                     <input type="checkbox" id="cfg-ocr-gpu">
                     <span class="config-switch-track" aria-hidden="true"></span>
                     <span>使用 GPU</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>增强船只识别</strong>
+                  <span>开启后将提升选船识别率。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-enhanced-ship-ocr">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用 FastOCR</span>
                   </label>
                 </div>
               </div>

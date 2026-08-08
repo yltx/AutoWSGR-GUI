@@ -101,11 +101,6 @@ export class FleetPlannerView {
     this.editorView.render();
   }
 
-  /** 首次进入页面时加载资料库；更新资料库后可强制刷新。 */
-  load(force = false): Promise<void> {
-    return this.host.loadShipLibrary(force);
-  }
-
   private bindActions(): void {
     this.presetNameInput.addEventListener('input', () => {
       this.host.setDraftName(this.presetNameInput.value);

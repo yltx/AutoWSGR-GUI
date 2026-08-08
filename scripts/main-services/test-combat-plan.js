@@ -5,6 +5,9 @@
  */
 const context = require('./test-context');
 const {
+  createDirectories,
+} = require('../test-support/directories');
+const {
   assert,
   EventEmitter,
   fs,
@@ -87,9 +90,11 @@ function testCombatPlanServices() {
     settings,
     new TaskPresetCodec(),
   );
-  combatRepository.initializeSystemDirectory();
+  createDirectories(
+    appPaths.systemBattlePlansDir(),
+    appPaths.systemTeamPlansDir(),
+  );
   combatRepository.initializeUserDirectory();
-  teamRepository.initializeSystemDirectory();
   teamRepository.initializeUserDirectory();
 
   const split = combatCodec.normalizeFleetPresets({
@@ -148,8 +153,16 @@ function testCombatPlanServices() {
     '  - name: 测试舰队',
     '    ships:',
     '      - name: 重庆',
+    '        ship_type: [CL]',
+    '        min_level: 20',
+    '        max_level: 90',
+    '        relaxed: true',
     '        candidates:',
     '          - name: U-47',
+    '            ship_type: [SS]',
+    '            min_level: 30',
+    '            max_level: 80',
+    '            relaxed: true',
     '',
   ].join('\n');
   const saved = management.saveManaged(
@@ -165,6 +178,30 @@ function testCombatPlanServices() {
   assert.deepEqual(yaml.load(savedMap).fleet_presets, [{
     name: '测试舰队',
   }]);
+  const savedTeamContent = fs.readFileSync(path.join(
+    appPaths.userTeamPlansDir(),
+    'team-测试舰队.yaml',
+  ), 'utf8');
+  const savedTeam = yaml.load(savedTeamContent);
+  assert.equal(savedTeamContent.includes([
+    '  - name: 重庆',
+    '    ship_type: [cl]',
+    '    min_level: 20',
+    '    max_level: 90',
+    '    relaxed: true',
+  ].join('\n')), true);
+  assert.equal(savedTeamContent.includes([
+    '{name: U-47, ship_type: [ss], min_level: 30,',
+    'max_level: 80, relaxed: true}',
+  ].join(' ')), true);
+  assert.deepEqual(savedTeam.ships[0].ship_type, ['cl']);
+  assert.equal(savedTeam.ships[0].min_level, 20);
+  assert.equal(savedTeam.ships[0].max_level, 90);
+  assert.equal(savedTeam.ships[0].relaxed, true);
+  assert.deepEqual(savedTeam.ships[0].candidates[0].ship_type, ['ss']);
+  assert.equal(savedTeam.ships[0].candidates[0].min_level, 30);
+  assert.equal(savedTeam.ships[0].candidates[0].max_level, 80);
+  assert.equal(savedTeam.ships[0].candidates[0].relaxed, true);
 
   // 旧 renderer 即使继续多传 system，也只能保存为用户计划。
   const readonlyBoundary = management.saveManaged(
@@ -205,10 +242,17 @@ function testCombatPlanServices() {
     prepared.runtimePath,
     /测试计划-123456-1\.yaml$/,
   );
-  assert.equal(
-    yaml.load(prepared.content).fleet_presets[0].ships[0].name,
-    '重庆',
-  );
+  const preparedPlan = yaml.load(prepared.content);
+  const preparedSlot = preparedPlan.fleet_presets[0].ships[0];
+  assert.equal(preparedSlot.name, '重庆');
+  assert.deepEqual(preparedSlot.ship_type, ['cl']);
+  assert.equal(preparedSlot.min_level, 20);
+  assert.equal(preparedSlot.max_level, 90);
+  assert.equal(preparedSlot.relaxed, true);
+  assert.deepEqual(preparedSlot.candidates[0].ship_type, ['ss']);
+  assert.equal(preparedSlot.candidates[0].min_level, 30);
+  assert.equal(preparedSlot.candidates[0].max_level, 80);
+  assert.equal(preparedSlot.candidates[0].relaxed, true);
 
   const duplicate = management.saveManaged(
     '测试计划',

@@ -18,7 +18,7 @@ Python 环境管理位于 `electron/pythonEnv/` 子目录，采用依赖注入�
 
 | 文件 | 职责 |
 |------|------|
-| `backendRequirement.ts` | 固定 managed 模式使用的 AutoWSGR 来源，安装和自动更新共用同一契约 |
+| `backendRequirement.ts` | 读取包内后端发行清单，安装和自动更新共用同一契约 |
 | `backendContractProbe.ts` | 在隔离检查进程中验证外部后端是否支持 GUI 所需的正式运行时契约 |
 | `context.ts` | 共享上下文与缓存状态（`PythonEnvContext` 接口、缓存变量） |
 | `dependencies.ts` | 集中声明 GUI 运行时和舰船资料库工具所需的 Python 依赖 |
@@ -152,12 +152,15 @@ AutoWSGR 是否具备 GUI 所需的运行时接口和活动资源：
 
 1. 单次隔离检查读取本地版本、活动资源和正式运行契约。
 2. 已兼容时保留当前后端，不做无意义重装。
-3. 不兼容时安装 `backendRequirement.ts` 固定的 AutoWSGR 提交。
+3. 不兼容时安装包内 `backend-distribution.json` 固定的 AutoWSGR 提交。
 4. 安装后重新验证运行契约、活动资源、FastAPI 和 Uvicorn。
 
-该流程只在 managed + 自动更新模式执行。external 模式始终使用用户选择的
-本地仓库，手动更新模式也不会在启动时改动后端。固定提交提高了 GUI 与后端的
-可复现性，但首次安装或修复不兼容环境时仍需要联网。
+Alpha 包清单固定到 `ShiinaKuroko/AutoWSGR` 的 `ShiinaKuroko` 分支提交；
+发布工作流会在打包时自动读取该分支的最新提交；
+安装脚本会删除 `.env_ready`，使安装后的首次完整检查使用
+`--force-reinstall` 强制更新。
+强制更新成功后重新写入标记，后续启动恢复普通兼容检查；失败时不写标记，下次
+启动继续重试。external 模式始终使用用户选择的本地仓库。
 
 ---
 

@@ -12,8 +12,10 @@ import {
   type LegacyMigrationSummary,
 } from './LegacyMigrationSummary';
 import {
+  DEFAULT_LEGACY_MIGRATION_SELECTION,
   PRESET_INVENTORY_MIGRATION_STAGE,
   UserDataMigrationService,
+  type LegacyMigrationSelection,
   type LegacyPlanReferenceTarget,
 } from './UserDataMigrationService';
 import { MigrationStateStore } from './MigrationStateStore';
@@ -78,8 +80,12 @@ export class LegacyPlanMigration<TTeam> {
     private readonly dependencies: LegacyPlanMigrationDependencies<TTeam>,
   ) {}
 
-  /** 扫描旧安装中的有效 YAML，并返回本次实际迁移结果。 */
-  migrate(): LegacyMigrationSummary {
+  /** 按用户选择扫描旧安装中的有效 YAML。 */
+  migrate(
+    selection: LegacyMigrationSelection = (
+      DEFAULT_LEGACY_MIGRATION_SELECTION
+    ),
+  ): LegacyMigrationSummary {
     const legacyDetected = (
       this.userDataMigration.shouldMigrateLegacyInstallation()
     );
@@ -103,6 +109,7 @@ export class LegacyPlanMigration<TTeam> {
       this.migrationState.isStageComplete(
         LEGACY_PLAN_MIGRATION_STAGE,
       )
+      && !legacyDetected
     ) {
       return summary;
     }
@@ -117,14 +124,19 @@ export class LegacyPlanMigration<TTeam> {
     const state = this.migrationState.read();
     const completed = new Set(state.completed);
     const fileMap = new Map<string, LegacyPlanReferenceTarget>();
-    const decisiveFailed = legacyDetected
+    const decisiveFailed = legacyDetected && selection.dailyPlans
       ? this.migrateLegacyDecisiveSettings(completed, summary)
       : false;
-    const teamsFailed = legacyDetected
+    const teamsFailed = legacyDetected && selection.taskYamls
       ? this.migrateLegacyTeams(completed, summary)
       : false;
     const plansFailed = legacyDetected
-      ? this.migrateLegacyPlans(completed, fileMap, summary)
+      ? this.migrateLegacyPlans(
+        completed,
+        fileMap,
+        summary,
+        selection,
+      )
       : false;
     const misplacedFailed = this.migrateMisplacedDailyPlans(
       misplacedDailyPlans,
@@ -133,10 +145,17 @@ export class LegacyPlanMigration<TTeam> {
       summary,
     );
     const additionalFailed = legacyDetected
-      ? this.migrateAdditionalYaml(completed, fileMap, summary)
+      ? this.migrateAdditionalYaml(
+        completed,
+        fileMap,
+        summary,
+        selection,
+      )
       : false;
 
-    this.userDataMigration.migrateLegacyTaskGroupPlanPaths(fileMap);
+    if (selection.taskQueue) {
+      this.userDataMigration.migrateLegacyTaskGroupPlanPaths(fileMap);
+    }
     const failed = (
       decisiveFailed
       || teamsFailed
@@ -204,6 +223,7 @@ export class LegacyPlanMigration<TTeam> {
     completed: Set<string>,
     fileMap: Map<string, LegacyPlanReferenceTarget>,
     summary: LegacyMigrationSummary,
+    selection: LegacyMigrationSelection,
   ): boolean {
     const targetDirectory = this.appPaths.userBattlePlansDir();
     let failed = false;
@@ -217,6 +237,7 @@ export class LegacyPlanMigration<TTeam> {
       ]
     ) {
       for (const source of this.legacyYamlFiles(legacyDirectory)) {
+        if (!selection.dailyPlans && !selection.taskYamls) continue;
         const file = path.basename(source);
         const content = fs.readFileSync(source, 'utf-8');
         const key = this.migrationKey('plan', source, content);
@@ -228,7 +249,6 @@ export class LegacyPlanMigration<TTeam> {
           );
           continue;
         }
-        summary.total += 1;
         try {
           const parsed = yaml.load(content);
           if (!this.isPlainObject(parsed)) {
@@ -237,6 +257,12 @@ export class LegacyPlanMigration<TTeam> {
           const standalone = (
             this.dependencies.isStandaloneTaskPreset?.(parsed) === true
           );
+          if (
+            !this.shouldMigratePlan(parsed, standalone, selection)
+          ) {
+            continue;
+          }
+          summary.total += 1;
           const target = standalone
             ? this.migrateTaskPreset(file, content, parsed)
             : this.migrateCombatPlan(
@@ -376,6 +402,7 @@ export class LegacyPlanMigration<TTeam> {
     completed: Set<string>,
     fileMap: Map<string, LegacyPlanReferenceTarget>,
     summary: LegacyMigrationSummary,
+    selection: LegacyMigrationSelection,
   ): boolean {
     let failed = false;
     for (const source of this.recursiveLegacyYamlFiles()) {
@@ -399,6 +426,13 @@ export class LegacyPlanMigration<TTeam> {
       );
       const isPlan = 'chapter' in parsed && 'map' in parsed;
       if (!isTeam && !isPreset && !isPlan) continue;
+      if (
+        isTeam
+          ? !selection.taskYamls
+          : !this.shouldMigratePlan(parsed, isPreset, selection)
+      ) {
+        continue;
+      }
 
       const kind = isTeam ? 'team' : 'plan';
       const key = this.migrationKey(kind, source, content);
@@ -438,6 +472,18 @@ export class LegacyPlanMigration<TTeam> {
       }
     }
     return failed;
+  }
+
+  /** 将独立日常 YAML 与普通任务 YAML 映射到各自勾选项。 */
+  private shouldMigratePlan(
+    raw: Record<string, unknown>,
+    standalone: boolean,
+    selection: LegacyMigrationSelection,
+  ): boolean {
+    if (!standalone) return selection.taskYamls;
+    return this.isDailyTaskType(raw.task_type)
+      ? selection.dailyPlans
+      : selection.taskYamls;
   }
 
   private migrateAdditionalTeam(raw: Record<string, unknown>): void {

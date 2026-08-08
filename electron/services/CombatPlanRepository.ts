@@ -19,16 +19,6 @@ export class CombatPlanRepository {
     fs.mkdirSync(this.appPaths.userBattlePlansDir(), { recursive: true });
   }
 
-  /** 初始化系统出征计划目录。 */
-  initializeSystemDirectory(): void {
-    fs.mkdirSync(this.appPaths.systemBattlePlansDir(), { recursive: true });
-  }
-
-  /** 初始化指定来源的出征计划目录。 */
-  initializeDirectory(source: PlanPresetSource): void {
-    fs.mkdirSync(this.directory(source), { recursive: true });
-  }
-
   /** 返回指定来源的权威出征计划目录。 */
   directory(source: PlanPresetSource): string {
     return source === 'system'

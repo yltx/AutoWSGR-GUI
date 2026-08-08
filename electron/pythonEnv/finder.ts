@@ -3,7 +3,7 @@
  */
 import * as path from 'path';
 import * as fs from 'fs';
-import { exec, execSync } from 'child_process';
+import { exec } from 'child_process';
 import { promisify } from 'util';
 import { getCtx, getCachedPythonCmd, setCachedPythonCmd } from './context';
 
@@ -71,48 +71,4 @@ export async function findPython(): Promise<string | null> {
 
   setCachedPythonCmd(found);
   return found;
-}
-
-/** 同步判断 Python 版本是否兼容。 */
-function isAllowedPythonVersionSync(pythonCmd: string): boolean {
-  try {
-    const output = execSync(
-      `"${pythonCmd}" --version 2>&1`,
-      { encoding: 'utf-8', windowsHide: true, shell: 'cmd.exe' },
-    );
-    return isAllowedPythonVersion(output);
-  } catch {
-    return false;
-  }
-}
-
-/** 为同步调用方查找并缓存 Python。 */
-export function findPythonSync(): string | null {
-  if (getCachedPythonCmd() !== undefined) return getCachedPythonCmd()!;
-  const ctx = getCtx();
-  // 优先使用用户配置的 Python。
-  const configured = ctx.getConfiguredPythonPath();
-  if (configured && fs.existsSync(configured) && isAllowedPythonVersionSync(configured)) {
-    setCachedPythonCmd(configured);
-    return configured;
-  }
-  const localPython = path.join(ctx.appRoot(), 'python', 'python.exe');
-  if (fs.existsSync(localPython) && isAllowedPythonVersionSync(localPython)) {
-    setCachedPythonCmd(localPython);
-    return localPython;
-  }
-  for (const cmd of ['python', 'python3']) {
-    try {
-      if (!isAllowedPythonVersionSync(cmd)) continue;
-      // 解析 pyenv 或 .bat shim 指向的真实路径。
-      const resolved = execSync(
-        `${cmd} -c "import sys; print(sys.executable)"`,
-        { windowsHide: true, encoding: 'utf-8' },
-      ).trim();
-      const result = (resolved && fs.existsSync(resolved)) ? resolved : cmd;
-      setCachedPythonCmd(result);
-      return result;
-    } catch { /* 当前命令不可用时继续查找。 */ }
-  }
-  return null;
 }

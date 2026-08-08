@@ -71,10 +71,6 @@ export class MigrationConflictView {
     this.dialog.style.display = 'none';
   }
 
-  totalCount(): number {
-    return this.conflicts.length;
-  }
-
   deleteCount(): number {
     return this.conflicts.length - this.keepIds.size;
   }

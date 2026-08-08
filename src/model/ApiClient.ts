@@ -81,6 +81,7 @@ export class ApiClient {
     return this.request('GET', '/api/system/status');
   }
 
+  /** 当前没有生产调用方引用，保留给模拟器设备选择功能。 */
   async emulatorDevices(): Promise<ApiResponse<{ serial: string; status: string }[]>> {
     return this.request('GET', '/api/system/emulator/devices', undefined, 15000);
   }
@@ -191,6 +192,7 @@ export class ApiClient {
     return this.request('POST', '/api/build/collect');
   }
 
+  /** 当前没有生产调用方引用，保留给建造启动功能。 */
   async buildStart(fuel = 30, ammo = 30, steel = 30, bauxite = 30): Promise<ApiResponse> {
     return this.request('POST', '/api/build/start', { fuel, ammo, steel, bauxite });
   }
@@ -214,6 +216,7 @@ export class ApiClient {
     return this.request('POST', '/api/repair/ship', { ship_name: shipName });
   }
 
+  /** 当前没有生产调用方引用，保留给批量解体功能。 */
   async destroy(shipTypes?: string[], removeEquipment = true): Promise<ApiResponse> {
     return this.request('POST', '/api/destroy', { ship_types: shipTypes ?? null, remove_equipment: removeEquipment });
   }

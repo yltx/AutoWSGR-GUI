@@ -259,6 +259,18 @@ async function testAdbService() {
       message: 'stderr details',
     },
   );
+
+  responses.push({ stdout: '', stderr: '' });
+  await service.stopServer();
+  assert.deepEqual(calls.at(-1), {
+    executable: bundledAdb,
+    args: ['kill-server'],
+    options: {
+      windowsHide: true,
+      timeout: 5000,
+      encoding: 'utf8',
+    },
+  });
 }
 
 /** 验证 CUDA 路径说明和实际 PyTorch 检测保持既有语义。 */

@@ -181,6 +181,36 @@ assert.deepEqual(aliasPlanRequest.plan.fleet_rules[0], {
   search_name: '契卡洛夫',
 });
 
+const nodeFormationPlan = PlanModel.fromYaml([
+  'chapter: 7',
+  'map: 4',
+  'selected_nodes: [A, B]',
+  'node_defaults:',
+  '  formation: 2',
+  '  night: false',
+  'node_args:',
+  '  B:',
+  '    formation: 4',
+  '    night: true',
+  '',
+].join('\n'), 'node-formation.yaml');
+const { req: nodeFormationRequest } = buildPlanQueueRequest(
+  {},
+  nodeFormationPlan,
+  'node-formation.yaml',
+);
+assert.deepEqual(nodeFormationRequest.plan.selected_nodes, ['A', 'B', '0']);
+assert.deepEqual(JSON.parse(JSON.stringify(nodeFormationRequest.plan.node_defaults)), {
+  formation: 2,
+  night: false,
+});
+assert.deepEqual(JSON.parse(JSON.stringify(nodeFormationRequest.plan.node_args)), {
+  B: {
+    formation: 4,
+    night: true,
+  },
+});
+
 const rotatedAliasRequest = {
   type: 'normal_fight',
   times: 1,
@@ -297,6 +327,23 @@ const crossRepoCases = [
     '            max_level: 90',
     '',
   ].join('\n')),
+  buildFleetContractCase('relaxed-primary-and-candidate', [
+    'chapter: 1',
+    'map: 1',
+    'fleet_presets:',
+    '  - name: 宽泛规则',
+    '    ships:',
+    '      - name: 重庆',
+    '        search_name: 重庆',
+    '        ship_type: [kp]',
+    '        relaxed: true',
+    '        candidates:',
+    '          - 长春',
+    '          - name: 昆西',
+    '            ship_type: [cl]',
+    '            relaxed: true',
+    '',
+  ].join('\n')),
 ];
 
 const legacyApiRules = crossRepoCases[1].request.plan.fleet_rules;
@@ -396,4 +443,11 @@ assert.deepEqual(
   backendContracts[1].api[2].candidates.map(rule => rule.name),
   ['胡德'],
 );
+const relaxedApiRule = crossRepoCases[4].request.plan.fleet_rules[0];
+assert.equal(relaxedApiRule.relaxed, true);
+assert.equal(relaxedApiRule.candidates[0].relaxed, undefined);
+assert.equal(relaxedApiRule.candidates[1].relaxed, true);
+assert.equal(backendContracts[4].api[0].primary.relaxed, true);
+assert.equal(backendContracts[4].api[0].candidates[0].relaxed, false);
+assert.equal(backendContracts[4].api[0].candidates[1].relaxed, true);
 console.log('GUI/AutoWSGR API contract tests passed');

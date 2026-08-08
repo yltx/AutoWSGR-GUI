@@ -37,8 +37,8 @@ ships:
     search_name: 克劳塞维茨
     ship_type: [bc]
     min_level: 100
-  - name: 塞尔弗里奇·改
-    search_name: 塞尔弗里奇
+  - name: 赛尔弗里吉·改
+    search_name: 赛尔弗里吉
     ship_type: [dd]
     min_level: 100
     candidates:

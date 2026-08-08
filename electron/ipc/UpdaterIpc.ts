@@ -16,6 +16,7 @@ import {
 export interface UpdaterContext {
   sendToRenderer(channel: string, ...args: unknown[]): boolean;
   getAppVersion(): string;
+  getUpdateMode(): 'auto' | 'manual';
   stopBackend(): Promise<void>;
 }
 
@@ -40,6 +41,11 @@ export function registerUpdaterIpc(
     });
   };
 
+  autoUpdater.on('checking-for-update', () => {
+    context.sendToRenderer('update-status', {
+      status: 'checking',
+    });
+  });
   autoUpdater.on('update-available', (info: UpdateInfo) => {
     const mismatch = validateGuiUpdateCandidate(
       releasePolicy,
@@ -98,6 +104,8 @@ export function registerUpdaterIpc(
 
   ipc.handle('check-gui-updates', async () => {
     try {
+      // 自动下载由主进程直接控制，避免依赖渲染进程收到事件后再次发起 IPC。
+      autoUpdater.autoDownload = context.getUpdateMode() === 'auto';
       const result = await autoUpdater.checkForUpdates();
       const classified = classifyGuiUpdateCheck(
         releasePolicy,
@@ -109,11 +117,13 @@ export function registerUpdaterIpc(
       return classified;
     } catch (error) {
       approvedUpdateVersion = null;
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      reportError(message);
       return {
         status: 'error',
-        message: error instanceof Error
-          ? error.message
-          : String(error),
+        message,
       };
     }
   });
@@ -129,11 +139,13 @@ export function registerUpdaterIpc(
       await autoUpdater.downloadUpdate();
       return { success: true };
     } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      reportError(message);
       return {
         success: false,
-        message: error instanceof Error
-          ? error.message
-          : String(error),
+        message,
       };
     }
   });

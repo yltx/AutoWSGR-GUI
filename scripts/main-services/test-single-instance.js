@@ -28,8 +28,9 @@ function testSingleInstanceService() {
       listeners.set(event, listener);
     },
   });
-  assert.equal(primary.acquire(), true);
-  if (primary.isPrimary()) primaryStarts += 1;
+  const primaryAcquired = primary.acquire();
+  assert.equal(primaryAcquired, true);
+  if (primaryAcquired) primaryStarts += 1;
 
   const secondary = new SingleInstanceService({
     requestSingleInstanceLock() {
@@ -42,8 +43,9 @@ function testSingleInstanceService() {
       throw new Error('次实例不应注册生命周期事件');
     },
   });
-  assert.equal(secondary.acquire(), false);
-  if (secondary.isPrimary()) secondaryStarts += 1;
+  const secondaryAcquired = secondary.acquire();
+  assert.equal(secondaryAcquired, false);
+  if (secondaryAcquired) secondaryStarts += 1;
 
   assert.equal(primaryStarts, 1);
   assert.equal(secondaryStarts, 0);

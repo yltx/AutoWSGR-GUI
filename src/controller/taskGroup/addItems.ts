@@ -10,7 +10,6 @@ import type {
   ManagedBattlePlan,
 } from '../../types/ipc.js';
 import { Logger } from '../../utils/Logger';
-import { yamlCodec } from '../../adapter';
 import {
   getTaskGroupRepository,
   type TaskGroupRepository,
@@ -111,46 +110,6 @@ export async function addCurrentPlanToGroup(
   taskGroupModel.save();
   render();
   Logger.info(`已将「${label} ×${times}」加入任务组「${group.name}」`);
-}
-
-/** 从文件选择器添加方案/预设文件到任务组 */
-export async function addFileToGroup(
-  taskGroupModel: TaskGroupModel,
-  plansDir: string,
-  render: () => void,
-  repository: TaskGroupRepository | undefined =
-    getTaskGroupRepository(),
-): Promise<void> {
-  if (!repository) return;
-  const group = ensureActiveGroup(taskGroupModel);
-
-  const result = await repository.openFileDialog!([
-    { name: 'YAML 方案/预设', extensions: ['yaml', 'yml'] },
-  ], plansDir || undefined);
-  if (!result) return;
-
-  const parsed = yamlCodec.parse<Record<string, unknown>>(result.content);
-  let itemKind: 'plan' | 'preset' = 'plan';
-  if (
-    parsed
-    && typeof parsed === 'object'
-    && 'task_type' in parsed
-    && !('map' in parsed)
-  ) {
-    itemKind = 'preset';
-  }
-
-  const label = result.path.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? result.path;
-  const parsedTimes = Number(parsed?.times);
-  taskGroupModel.addItem(group.name, {
-    path: result.path,
-    kind: itemKind,
-    times: Number.isFinite(parsedTimes) && parsedTimes > 0 ? parsedTimes : 1,
-    label,
-  });
-  taskGroupModel.save();
-  render();
-  Logger.info(`已添加「${label}」到任务组「${group.name}」`);
 }
 
 /** 将当前任务预设添加到任务组 */

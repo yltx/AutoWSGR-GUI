@@ -68,6 +68,9 @@ export interface CudaValidationResult {
 
 export type GuiUpdateStatus =
   | {
+      status: 'checking';
+    }
+  | {
       status: 'available';
       version: string;
       releaseNotes?: string;
@@ -99,6 +102,7 @@ export interface UserTeamShipRule {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
 }
 
 export interface UserTeamPlanSlot {
@@ -107,6 +111,7 @@ export interface UserTeamPlanSlot {
   ship_type?: string[];
   min_level?: number;
   max_level?: number;
+  relaxed?: boolean;
   candidates?: UserTeamShipRule[];
 }
 
@@ -257,8 +262,14 @@ export interface ShipLibraryStatus {
   shipCount: number;
   assetCount: number;
   missingAssets: number;
+  backendSynchronized?: boolean;
+  backendMissingRecords?: number;
+  backendMissingAliases?: number;
+  backendError?: string;
   error?: string;
 }
+
+export type ShipLibraryUpdateTarget = 'wiki' | 'backend';
 
 export interface ShipLibraryUpdateResult {
   success: boolean;
@@ -272,6 +283,7 @@ export interface ShipLibraryUpdateResult {
   downloaded?: number;
   failed?: number;
   failures?: string[];
+  shipnames_sync_error?: string;
   error?: string;
 }
 
@@ -416,7 +428,9 @@ export interface ElectronBridge {
   setUpdateMode: (mode: 'auto' | 'manual') => Promise<void>;
   getShipLibraryStatus: () => Promise<ShipLibraryStatus>;
   getShipLibraryManifest: () => Promise<ShipLibraryManifest>;
-  updateShipLibrary: () => Promise<ShipLibraryUpdateResult>;
+  updateShipLibrary: (
+    target?: ShipLibraryUpdateTarget,
+  ) => Promise<ShipLibraryUpdateResult>;
   onShipLibraryUpdateProgress: (
     callback: (progress: { message: string }) => void,
   ) => void;

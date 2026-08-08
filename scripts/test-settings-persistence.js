@@ -157,6 +157,7 @@ async function runRendererTest(root, tempDirectory) {
     ocrGpuMode: 'cuda',
     ocrGpu: true,
     ocrMirror: 'github',
+    enhancedShipOcr: true,
     ocrConfidence: 0.73,
     shipNameAliasesText: '测试别名:U-47',
     shipNameCorrectionsText: '测试错字:U-81',
@@ -219,6 +220,36 @@ async function runRendererTest(root, tempDirectory) {
   );
 
   const view = new ConfigView();
+  const updateProgress = document.getElementById('gui-update-progress');
+  const updateProgressTrack = document.getElementById(
+    'gui-update-progress-track',
+  );
+  const updateProgressFill = document.getElementById(
+    'gui-update-progress-fill',
+  );
+  const updateStatus = document.getElementById('gui-update-status');
+  const updatePercent = document.getElementById('gui-update-percent');
+  rendererAssert.equal(updateProgress.hidden, true);
+  view.setGuiUpdateStatus({ status: 'checking' });
+  rendererAssert.equal(updateProgress.hidden, false);
+  rendererAssert.equal(updatePercent.textContent, '检查中');
+  rendererAssert.equal(
+    updateProgressTrack.classList.contains('is-indeterminate'),
+    true,
+  );
+  view.setGuiUpdateStatus({
+    status: 'downloading',
+    percent: 42.4,
+    transferred: 42,
+    total: 100,
+  });
+  rendererAssert.equal(updateStatus.textContent, '正在下载更新…');
+  rendererAssert.equal(updatePercent.textContent, '42%');
+  rendererAssert.equal(updateProgressFill.style.width, '42%');
+  view.setGuiUpdateStatus({ status: 'downloaded', version: '2.0.5-alpha' });
+  rendererAssert.equal(updateProgress.dataset.state, 'complete');
+  rendererAssert.equal(updatePercent.textContent, '100%');
+
   const decisiveOptions = Array.from(
     document.getElementById('cfg-decisive-template').options,
   ).map(option => [option.value, option.textContent]);
@@ -775,6 +806,11 @@ async function runRendererTest(root, tempDirectory) {
   view.render(sample);
 
   const model = new ConfigModel();
+  rendererAssert.equal(
+    model.current.log.root,
+    'logs',
+    '新建配置的默认日志目录必须为 logs',
+  );
   model.loadFromYaml([
     'emulator:',
     '  type: 雷电',
@@ -821,6 +857,11 @@ async function runRendererTest(root, tempDirectory) {
     '  keep: true',
     '',
   ].join('\n'));
+  rendererAssert.equal(
+    model.current.ocr.enhanced_ship_ocr,
+    false,
+    '旧配置缺少 enhanced_ship_ocr 时必须保持默认关闭',
+  );
   rendererAssert.equal(
     model.migratedGuiAutomation.lootPlanId,
     'bettle-old-8-5AI六潜胖次.yaml',
@@ -1255,6 +1296,7 @@ async function runRendererTest(root, tempDirectory) {
   rendererAssert.deepStrictEqual(savedYaml.ocr, {
     gpu: sample.ocrGpu,
     mirror: sample.ocrMirror,
+    enhanced_ship_ocr: sample.enhancedShipOcr,
     ship_name_match_confidence: sample.ocrConfidence,
     ship_name_corrections: {
       ...shipNameCorrections,
@@ -1542,6 +1584,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-ocr-gpu-mode',
     'cfg-cuda-path',
     'cfg-ocr-gpu',
+    'cfg-enhanced-ship-ocr',
     'cfg-ocr-confidence-range',
     'cfg-ocr-confidence',
     'cfg-ship-name-aliases',

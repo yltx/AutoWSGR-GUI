@@ -141,8 +141,6 @@ export class FleetPresetView {
     });
   }
 
-  showSection(): void { this.fleetPresetSection.style.display = ''; }
-  hideSection(): void { this.fleetPresetSection.style.display = 'none'; }
   showSelector(): void {
     this.nodeRoutePanel.hidden = true;
     this.selectorPanel.hidden = false;
@@ -298,6 +296,7 @@ export class FleetPresetView {
     restoreScrollPosition(this.fleetPresetListEl, scrollPosition);
   }
 
+  /** 当前没有生产入口引用，保留给泡澡维修配置后续接入。 */
   getBathRepairConfig(): BathRepairConfig | undefined {
     const method = document.getElementById(
       'plan-edit-repair-method',

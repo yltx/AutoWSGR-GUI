@@ -132,13 +132,16 @@ function testGuiUpdatePolicy() {
     'utf8',
   );
   assert.ok(yaml.load(workflow).jobs.build);
-  assert.match(workflow, /X\.Y\.Z-beta\.N/);
   assert.match(workflow, /X\.Y\.Z-alpha/);
-  assert.match(workflow, /X\.Y\.Z-dev\.N/);
   assert.match(
     workflow,
-    /release\/\$\{\{ steps\.version\.outputs\.CHANNEL \}\}\.yml/,
+    /release\/alpha\/alpha\.yml/,
   );
+  assert.match(workflow, /AutoWSGR-GUI-Setup-/);
+  assert.match(workflow, /Pin latest Alpha backend/);
+  assert.match(workflow, /ShiinaKuroko\/AutoWSGR/);
+  assert.doesNotMatch(workflow, /X\.Y\.Z-beta\.N/);
+  assert.doesNotMatch(workflow, /X\.Y\.Z-dev\.N/);
   assert.doesNotMatch(workflow, /^\s+release\/latest\.yml\s*$/m);
 }
 
