@@ -25,6 +25,30 @@ export function parseUiCount(msg: string, label: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
+/** Split repeatable backend requests into scheduler-owned single-round tasks. */
+export function normalizeRoundTask(
+  type: SchedulerTaskType,
+  request: TaskRequest,
+  times: number,
+): { request: TaskRequest; times: number } {
+  const schedulerTimes = Number.isFinite(times) ? Math.max(1, Math.trunc(times)) : 1;
+  const isRoundBased = type === 'normal_fight' || type === 'event_fight' || type === 'campaign';
+  const hasRoundRequest = request.type === 'normal_fight'
+    || request.type === 'event_fight'
+    || request.type === 'campaign';
+  if (!isRoundBased || !hasRoundRequest) {
+    return { request, times: schedulerTimes };
+  }
+
+  const requestTimes = Number.isFinite(request.times)
+    ? Math.max(1, Math.trunc(request.times ?? 1))
+    : 1;
+  return {
+    request: { ...request, times: 1 },
+    times: Math.max(schedulerTimes, requestTimes),
+  };
+}
+
 // ════════════════════════════════════════
 // TaskQueue 实现
 // ════════════════════════════════════════
@@ -108,14 +132,15 @@ export class TaskQueue {
     sortKey?: number,
   ): string {
     const id = generateTaskId();
+    const normalized = normalizeRoundTask(type, request, times);
     const task: SchedulerTask = {
       id,
       name,
       type,
       priority,
-      request,
-      remainingTimes: times,
-      totalTimes: times,
+      request: normalized.request,
+      remainingTimes: normalized.times,
+      totalTimes: normalized.times,
       stopCondition,
       maxRetries: 2,
       retryCount: 0,

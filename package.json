@@ -1,6 +1,6 @@
 {
   "name": "wsgrgui",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "AutoWSGR 图形界面 — MVP",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -8,7 +8,7 @@
     "clean": "node -e \"fs.rmSync('dist/src',{recursive:true,force:true});fs.rmSync('dist/electron',{recursive:true,force:true});console.log('dist cleaned')\" ",
     "build": "npm run clean && npm run build:css && tsc && node scripts/bundle.js",
     "typecheck": "tsc --noEmit",
-    "test": "npm run build && node scripts/test-ship-library-contract.js",
+    "test": "npm run build && node scripts/test-ship-library-contract.js && node scripts/test-scheduler-round-boundary.js",
     "start": "chcp 65001 >nul && npm run build && electron .",
     "dev": "chcp 65001 >nul && npm run clean && npm run build:css && tsc && node scripts/bundle.js && electron .",
     "prepare-python": "node scripts/prepare-python.js",
