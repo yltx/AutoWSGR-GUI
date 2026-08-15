@@ -174,6 +174,8 @@ function testGuiUpdatePolicy() {
     fs.readFileSync(path.join(root, 'package.json'), 'utf8'),
   );
   const packagePolicy = resolveGuiReleasePolicy(packageJson.version);
+  assert.equal(packageJson.build.publish.owner, 'yltx');
+  assert.equal(packageJson.build.publish.repo, 'AutoWSGR-GUI');
   assert.equal(
     require(path.join(root, 'build', 'electron-builder.release.cjs'))
       .publish.channel,
@@ -211,18 +213,12 @@ function testGuiUpdatePolicy() {
   assert.match(workflow, /Verify pinned stable backend/);
   assert.match(workflow, /manifest\.id -ne "stable"/);
   assert.match(workflow, /PRERELEASE/);
-  assert.match(workflow, /LEGACY_RELEASE_TOKEN/);
-  assert.match(workflow, /yltx\/AutoWSGR-GUI/);
   assert.match(workflow, /Preflight release destinations/);
-  assert.match(workflow, /旧更新源已存在/);
-  assert.match(workflow, /同版本线 Alpha 桥接版/);
-  assert.match(workflow, /Download Alpha compatibility bridge/);
-  assert.match(workflow, /release\/alpha-compat\/\*/);
-  assert.match(workflow, /Stage stable release on legacy updater feed/);
-  assert.match(workflow, /Publish verified Stable releases/);
+  assert.match(workflow, /Publish verified Stable release/);
   assert.match(workflow, /draft: true/);
-  assert.match(workflow, /2\.1\.0-alpha\.1/);
-  assert.match(workflow, /v2\.0\.16-alpha/);
+  assert.doesNotMatch(workflow, /LEGACY_RELEASE_TOKEN/);
+  assert.doesNotMatch(workflow, /release\/alpha-compat/);
+  assert.doesNotMatch(workflow, /ShiinaKuroko\/AutoWSGR-GUI/);
   assert.match(workflow, /Create GitHub Releases after all gates pass/);
   assert.match(workflow, /github\.event_name != 'workflow_dispatch'/);
   assert.doesNotMatch(workflow, /git ls-remote/);

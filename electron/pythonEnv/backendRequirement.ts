@@ -19,7 +19,7 @@ const DEFAULT_DISTRIBUTION: BackendDistribution = {
   id: 'stable',
   repository: 'ShiinaKuroko/AutoWSGR',
   ref: 'ShiinaKuroko',
-  commit: '35eda39ebe06c7550da384bb404e1212c9ba2da5',
+  commit: '77f34b7b30d18f7b86cf736bdd5cf17ae35d5f78',
   forceUpdateOnInstall: true,
 };
 

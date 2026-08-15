@@ -83,46 +83,11 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LEGACY_RELEASE_TOKEN: ${{ secrets.LEGACY_RELEASE_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          $channel = "${{ steps.version.outputs.CHANNEL }}"
           gh release view "v$version" --repo "${{ github.repository }}" *> $null
           if ($LASTEXITCODE -eq 0) {
             throw "当前仓库已存在 v$version Release"
-          }
-          if ($channel -eq 'latest') {
-            $alphaRelease = gh release list `
-              --repo "${{ github.repository }}" `
-              --limit 100 `
-              --json tagName,isPrerelease `
-              --jq ".[] | select(.isPrerelease == true and (.tagName | startswith(\"v$version-alpha\"))) | .tagName" |
-              Select-Object -First 1
-            if (-not $alphaRelease) {
-              throw "Stable v$version 发布前必须先发布同版本线 Alpha 桥接版"
-            }
-            if (-not $env:LEGACY_RELEASE_TOKEN) {
-              throw "缺少 LEGACY_RELEASE_TOKEN，不能安全发布 Stable"
-            }
-            $env:GH_TOKEN = $env:LEGACY_RELEASE_TOKEN
-            gh release view "v$version" --repo yltx/AutoWSGR-GUI *> $null
-            if ($LASTEXITCODE -eq 0) {
-              throw "旧更新源已存在 v$version Release"
-            }
-            gh api repos/yltx/AutoWSGR-GUI --jq .full_name *> $null
-            if ($LASTEXITCODE -ne 0) {
-              throw "LEGACY_RELEASE_TOKEN 无法访问旧更新源"
-            }
-          } elseif ($version -eq '2.1.0-alpha.1') {
-            $latestAlpha = gh release list `
-              --repo "${{ github.repository }}" `
-              --limit 100 `
-              --json tagName,isPrerelease `
-              --jq '.[] | select(.isPrerelease == true) | .tagName' |
-              Select-Object -First 1
-            if ($latestAlpha -ne 'v2.0.16-alpha') {
-              throw "2.1 桥接基线变化，必须重新审查版本序列: $latestAlpha"
-            }
           }
 
       - name: Verify pinned stable backend
@@ -221,61 +186,6 @@ jobs:
               }
             }
 
-      - name: Download Alpha compatibility bridge
-        if: >-
-          steps.version.outputs.CHANNEL == 'latest'
-          && (github.event_name != 'workflow_dispatch' || inputs.publish)
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          $bridgeTag = gh release list `
-            --repo "${{ github.repository }}" `
-            --limit 100 `
-            --json tagName,isPrerelease `
-            --jq ".[] | select(.isPrerelease == true and (.tagName | startswith(\"v$version-alpha\"))) | .tagName" |
-            Select-Object -First 1
-          if (-not $bridgeTag) {
-            throw "找不到 Stable v$version 对应的 Alpha 桥接版"
-          }
-          $compat = Join-Path release "alpha-compat"
-          New-Item -ItemType Directory -Path $compat -Force | Out-Null
-          gh release download $bridgeTag `
-            --repo "${{ github.repository }}" `
-            --dir $compat `
-            --pattern 'alpha.yml' `
-            --pattern 'AutoWSGR-GUI-Setup-*.exe' `
-            --pattern 'AutoWSGR-GUI-Setup-*.exe.blockmap'
-          if (-not (Test-Path (Join-Path $compat 'alpha.yml'))) {
-            throw "Alpha 桥接资产不完整"
-          }
-
-      - name: Stage stable release on legacy updater feed
-        if: >-
-          steps.version.outputs.CHANNEL == 'latest'
-          && (github.event_name != 'workflow_dispatch' || inputs.publish)
-        shell: pwsh
-        env:
-          GH_TOKEN: ${{ secrets.LEGACY_RELEASE_TOKEN }}
-        run: |
-          $version = "${{ steps.version.outputs.VERSION }}"
-          $root = Join-Path release "latest"
-          $assets = @(
-            "$root/AutoWSGR-GUI-Setup-$version.exe"
-            "$root/AutoWSGR-GUI-Setup-$version.exe.blockmap"
-            "$root/latest.yml"
-          ) + @(
-            Get-ChildItem -LiteralPath "release/alpha-compat" -File |
-              ForEach-Object { $_.FullName }
-          )
-          gh release create "v$version" `
-            --repo yltx/AutoWSGR-GUI `
-            --title "AutoWSGR-GUI v$version" `
-            --notes "Compatibility release for installed AutoWSGR-GUI 1.4.x clients. Artifacts were built from ${{ github.repository }}@${{ github.sha }}." `
-            --draft `
-            @assets
-
       - name: Create Alpha Release
         if: >-
           steps.version.outputs.CHANNEL == 'alpha'
@@ -315,7 +225,6 @@ jobs:
             release/latest/AutoWSGR-GUI-Setup-*.exe
             release/latest/*.exe.blockmap
             release/latest/latest.yml
-            release/alpha-compat/*
           body: |
             ## AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
 
@@ -347,22 +256,15 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish verified Stable releases
+      - name: Publish verified Stable release
         if: >-
           steps.version.outputs.CHANNEL == 'latest'
           && (github.event_name != 'workflow_dispatch' || inputs.publish)
         shell: pwsh
         env:
-          PRIMARY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LEGACY_TOKEN: ${{ secrets.LEGACY_RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          $env:GH_TOKEN = $env:LEGACY_TOKEN
-          gh release edit "v$version" `
-            --repo yltx/AutoWSGR-GUI `
-            --draft=false `
-            --latest
-          $env:GH_TOKEN = $env:PRIMARY_TOKEN
           gh release edit "v$version" `
             --repo "${{ github.repository }}" `
             --draft=false `
