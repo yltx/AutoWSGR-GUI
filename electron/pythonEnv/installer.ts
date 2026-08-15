@@ -19,7 +19,10 @@ import {
   BACKEND_RUNTIME_REQUIREMENTS,
   SHIP_LIBRARY_REQUIREMENTS,
 } from './dependencies';
-import { MANAGED_AUTOWSGR_REQUIREMENT } from './backendRequirement';
+import {
+  buildManagedAutowsgrRequirement,
+  resolveBackendDistribution,
+} from './backendRequirement';
 
 const execAsync = promisify(exec);
 
@@ -222,7 +225,9 @@ export async function installDependencies(pythonCmd: string): Promise<{ success:
     };
   }
   const backendRequirement = environment.backendRoot
-    ?? MANAGED_AUTOWSGR_REQUIREMENT;
+    ?? buildManagedAutowsgrRequirement(
+      resolveBackendDistribution(ctx.allowTestUpdates()),
+    );
   const installPlan = buildDependencyInstallPlan(
     environment,
     backendRequirement,

@@ -172,6 +172,16 @@ assert.match(
   /autoUpdater\.autoInstallOnAppQuit\s*=\s*false/,
   '普通退出不得自动安装 GUI 更新',
 );
+assert.match(
+  updaterSource,
+  /autoUpdater\.channel\s*=\s*updatePolicy\.channel;\s*autoUpdater\.allowDowngrade\s*=\s*false;/,
+  '每次切换更新频道后必须重新禁止降级',
+);
+assert.match(
+  updaterSource,
+  /autoUpdater\.setFeedURL\(\{[\s\S]*owner:\s*updatePolicy\.repository\.owner,[\s\S]*repo:\s*updatePolicy\.repository\.repo,[\s\S]*channel:\s*updatePolicy\.channel,/,
+  '预览版和稳定版频道必须同时切换到各自的 GitHub 更新源',
+);
 assert.doesNotMatch(
   updaterSource,
   /autoUpdater\.autoInstallOnAppQuit\s*=\s*true/,

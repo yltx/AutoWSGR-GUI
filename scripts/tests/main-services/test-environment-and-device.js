@@ -66,6 +66,7 @@ function testBackendShipNamesPath() {
     sendProgress: () => {},
     getConfiguredPythonPath: () => null,
     getUpdateMode: () => 'manual',
+    allowTestUpdates: () => true,
     getBackendStartupMode: () => startupMode,
     getBackendRepoPath: () => externalRoot,
     getTempDir: () => temporaryDirectory,

@@ -68,7 +68,7 @@ export class ConfigView {
   private emuSerial = element<HTMLInputElement>('cfg-emu-serial');
   private gameApp = element<HTMLSelectElement>('cfg-game-app');
   private updateMode = element<HTMLSelectElement>('cfg-update-mode');
-  private allowTestUpdates = element<HTMLInputElement>('cfg-allow-test-updates');
+  private allowTestUpdates = element<HTMLSelectElement>('cfg-allow-test-updates');
   private autoExpedition = element<HTMLInputElement>('cfg-auto-expedition');
   private expeditionInterval = element<HTMLInputElement>('cfg-expedition-interval');
   private autoBattle = element<HTMLInputElement>('cfg-auto-battle');
@@ -218,7 +218,7 @@ export class ConfigView {
     this.emuSerial.value = vo.emulatorSerial;
     this.gameApp.value = vo.gameApp;
     this.updateMode.value = vo.updateMode;
-    this.allowTestUpdates.checked = vo.allowTestUpdates;
+    this.allowTestUpdates.value = vo.allowTestUpdates ? 'alpha' : 'stable';
     this.autoExpedition.checked = vo.autoExpedition;
     this.expeditionInterval.value = String(vo.expeditionInterval);
     this.autoBattle.checked = vo.autoBattle;
@@ -313,7 +313,7 @@ export class ConfigView {
       emulatorSerial: this.emuSerial.value.trim(),
       gameApp: this.gameApp.value,
       updateMode: this.updateMode.value === 'manual' ? 'manual' : 'auto',
-      allowTestUpdates: this.allowTestUpdates.checked,
+      allowTestUpdates: this.allowTestUpdates.value === 'alpha',
       autoExpedition: this.autoExpedition.checked,
       expeditionInterval: this.clamp(this.expeditionInterval.value, 1, 120, 15),
       autoBattle: this.autoBattle.checked,

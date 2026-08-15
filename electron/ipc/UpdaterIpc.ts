@@ -84,7 +84,14 @@ export function registerUpdaterIpc(
       context.getAppVersion(),
       context.allowTestUpdates(),
     );
+    autoUpdater.setFeedURL({
+      provider: 'github',
+      owner: updatePolicy.repository.owner,
+      repo: updatePolicy.repository.repo,
+      channel: updatePolicy.channel,
+    });
     autoUpdater.channel = updatePolicy.channel;
+    autoUpdater.allowDowngrade = false;
     autoUpdater.allowPrerelease = updatePolicy.allowPrerelease;
   };
   applyUpdatePolicy();

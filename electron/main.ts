@@ -579,6 +579,9 @@ function initializeApplicationLifecycle(): void {
         guiConfigurationService.configuredPythonPath()
       ),
       getUpdateMode: () => guiConfigurationService.updateMode(),
+      allowTestUpdates: () => (
+        guiConfigurationService.allowTestUpdates()
+      ),
       getBackendStartupMode: () => (
         guiConfigurationService.backendStartupMode()
       ),

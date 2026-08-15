@@ -128,7 +128,7 @@ export class GuiConfigurationService {
     });
   }
 
-  /** 是否允许 stable 客户端接收更高版本的 alpha 更新。 */
+  /** 是否使用个人 GUI 与后端组成的 Alpha 更新通道。 */
   allowTestUpdates(): boolean {
     const settings = this.store.read();
     if (typeof settings.allow_test_updates === 'boolean') {

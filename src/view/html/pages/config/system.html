@@ -22,15 +22,14 @@
               </div>
               <div class="config-setting-row">
                 <div class="config-setting-copy">
-                  <strong>允许测试版更新</strong>
-                  <span>关闭时只接收稳定版；开启后也可接收版本号更高的 Alpha 测试版。</span>
+                  <strong>更新通道</strong>
+                  <span>Stable 使用主库 GUI 与后端；Alpha 使用个人仓库，可快速预览正在开发的新功能，但可能遇到尚未修复的 BUG。后端将在重启后切换。</span>
                 </div>
                 <div class="config-setting-control">
-                  <label class="config-switch">
-                    <input type="checkbox" id="cfg-allow-test-updates">
-                    <span class="config-switch-track" aria-hidden="true"></span>
-                    <span>允许 Alpha</span>
-                  </label>
+                  <select id="cfg-allow-test-updates" class="input" data-config-select-width="180">
+                    <option value="stable">稳定版（Stable）</option>
+                    <option value="alpha">预览版（Alpha）</option>
+                  </select>
                 </div>
               </div>
               <div class="config-setting-row">

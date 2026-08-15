@@ -37,15 +37,20 @@ IPC 通过 `PythonEnvironmentService` 使用这些能力。
 
 | 模式 | 后端来源 | 依赖位置 |
 |---|---|---|
-| `managed` | `build/backend-distribution.json` 指定的 GUI 受控 AutoWSGR | `{appRoot}/python/site-packages` |
+| `managed` | `build/backend-distribution.json` 按 GUI 更新通道指定的受控 AutoWSGR | `{appRoot}/python/site-packages` |
 | `external` + 内置 Python | 用户指定本地 AutoWSGR 仓库 | GUI `site-packages` + 仓库 |
 | `external` + 外部 Python | 用户指定仓库和解释器 | 解释器自身环境 + 仓库 |
 
 external 仓库无效时直接失败，不能回退 managed，也不能把 GUI site-packages
 偷偷混入外部解释器。
 
-稳定版发布流程按 `build/backend-distribution.json` 将后端固定到明确提交。安装后
-清除 `.env_ready`，首次启动按 `forceUpdateOnInstall` 完成受控更新和复核。
+发行清单同时固定两条后端来源：
+
+- Stable：`OpenWSGR/AutoWSGR@main` 的明确提交。
+- Alpha：`ShiinaKuroko/AutoWSGR@ShiinaKuroko` 的明确提交。
+
+运行时使用与 GUI 相同的 `allow_test_updates` 选择后端。安装后清除
+`.env_ready`，首次启动按 `forceUpdateOnInstall` 完成受控更新和复核。
 
 ## `.env_ready`
 
@@ -53,11 +58,13 @@ external 仓库无效时直接失败，不能回退 managed，也不能把 GUI s
 
 - Python 路径和版本。
 - AutoWSGR 版本/来源。
+- 当前受管后端固定来源（仓库和提交）。
 - managed/external 模式和仓库。
 - 依赖安装目标。
 
-快速路径仍会检查解释器、环境身份和后端契约。配置、安装目标或后端来源变化后
-删除标记；失败时不写完成标记，使下次启动继续检查。
+快速路径仍会检查解释器、环境身份和后端契约。配置、安装目标、GUI 更新通道或
+后端固定来源变化后删除标记；失败时不写完成标记，使下次启动继续检查。
+external 模式始终使用用户指定仓库，不受 GUI 更新通道影响。
 
 ## CUDA 与 OCR
 
@@ -182,9 +189,16 @@ NSIS 从 1.4.x 覆盖升级时，必须在旧卸载器运行前将旧用户数�
 | `X.Y.Z-beta.N` | `beta` |
 | `X.Y.Z-dev[.N]` | `dev` |
 
-用户设置 `allow_test_updates` 决定候选集合：关闭时只接受 Stable，开启时接受
-Stable 与 Alpha。Alpha 构建在该字段缺失时默认开启，Stable 默认关闭；关闭测试版
-后不会自动降级，而是等待更高 Stable。
+用户设置 `allow_test_updates` 同时选择 GUI 与 managed 后端来源：
+
+- Stable 从 `yltx/AutoWSGR-GUI` 读取 `latest`，后端使用
+  `OpenWSGR/AutoWSGR@main` 的固定提交。
+- Alpha 从 `ShiinaKuroko/AutoWSGR-GUI` 读取 `alpha`，后端使用
+  `ShiinaKuroko/AutoWSGR@ShiinaKuroko` 的固定提交。
+
+Alpha 构建在该字段缺失时默认开启，Stable 默认关闭。关闭预览版后不会自动降级，
+而是等待版本号更高的 Stable。频道 setter 可能重新允许降级，因此每次切换后必须
+显式恢复 `allowDowngrade = false`。后端在重启后根据新通道更新。
 
 已有 `2.0.16-alpha` 客户端使用旧的 Alpha-only 策略，因此首个 Stable 版本线必须
 先发布更高的 Alpha 桥，再发布同基础版本 Stable。Stable Release 在迁移窗口内同时

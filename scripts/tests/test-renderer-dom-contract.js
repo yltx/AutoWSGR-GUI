@@ -27,6 +27,25 @@ function collectMatches(content, pattern) {
 }
 
 const html = fs.readFileSync(htmlPath, 'utf8');
+const updateChannelControl = html.match(
+  /<select\b[^>]*\bid=["']cfg-allow-test-updates["'][^>]*>([\s\S]*?)<\/select>/,
+);
+if (!updateChannelControl) {
+  throw new Error('Update channel control must be a select element');
+}
+const updateChannelOptions = collectMatches(
+  updateChannelControl[1],
+  /<option\b[^>]*\bvalue=["']([^"']+)["']/g,
+);
+if (
+  updateChannelOptions.length !== 2
+  || updateChannelOptions[0] !== 'stable'
+  || updateChannelOptions[1] !== 'alpha'
+) {
+  throw new Error(
+    'Update channel control must contain stable and alpha options',
+  );
+}
 const htmlIds = collectMatches(
   html,
   /\bid\s*=\s*["']([^"']+)["']/g,

@@ -19,8 +19,14 @@ export interface GuiReleasePolicy {
   allowPrerelease: boolean;
 }
 
+export interface GuiUpdateRepository {
+  readonly owner: string;
+  readonly repo: string;
+}
+
 export interface GuiUpdateSelectionPolicy extends GuiReleasePolicy {
   acceptedChannels: readonly GuiReleaseChannel[];
+  repository: GuiUpdateRepository;
 }
 
 export type GuiUpdateCheckResult =
@@ -39,6 +45,14 @@ const STABLE_VERSION = /^\d+\.\d+\.\d+$/;
 const ALPHA_VERSION = /^\d+\.\d+\.\d+-alpha(?:\.\d+)?$/;
 const BETA_VERSION = /^\d+\.\d+\.\d+-beta\.\d+$/;
 const DEVELOPMENT_VERSION = /^\d+\.\d+\.\d+-dev(?:\.\d+)?$/;
+const STABLE_UPDATE_REPOSITORY: GuiUpdateRepository = {
+  owner: 'yltx',
+  repo: 'AutoWSGR-GUI',
+};
+const TEST_UPDATE_REPOSITORY: GuiUpdateRepository = {
+  owner: 'ShiinaKuroko',
+  repo: 'AutoWSGR-GUI',
+};
 
 /** 严格解析 GUI 版本，拒绝没有明确频道的版本后缀。 */
 export function resolveGuiReleasePolicy(version: string): GuiReleasePolicy {
@@ -91,6 +105,7 @@ export function resolveGuiUpdateSelectionPolicy(
     return {
       ...releasePolicy,
       acceptedChannels: [releasePolicy.channel],
+      repository: TEST_UPDATE_REPOSITORY,
     };
   }
   if (allowTestUpdates) {
@@ -99,6 +114,7 @@ export function resolveGuiUpdateSelectionPolicy(
       stage: releasePolicy.stage,
       allowPrerelease: true,
       acceptedChannels: ['latest', 'alpha'],
+      repository: TEST_UPDATE_REPOSITORY,
     };
   }
   return {
@@ -106,6 +122,7 @@ export function resolveGuiUpdateSelectionPolicy(
     stage: releasePolicy.stage,
     allowPrerelease: false,
     acceptedChannels: ['latest'],
+    repository: STABLE_UPDATE_REPOSITORY,
   };
 }
 

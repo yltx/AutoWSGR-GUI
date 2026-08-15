@@ -45,8 +45,9 @@ export {
 } from './installer';
 
 export {
-  MANAGED_AUTOWSGR_COMMIT,
-  MANAGED_AUTOWSGR_REQUIREMENT,
+  BACKEND_DISTRIBUTIONS,
+  buildManagedAutowsgrRequirement,
+  resolveBackendDistribution,
 } from './backendRequirement';
 
 export { type AutoUpdateDeps, autoUpdateAutowsgr } from './updater';

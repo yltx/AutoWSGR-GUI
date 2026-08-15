@@ -133,6 +133,10 @@ function testGuiUpdatePolicy() {
   assert.equal(stableOnly.channel, 'latest');
   assert.equal(stableOnly.allowPrerelease, false);
   assert.deepEqual(stableOnly.acceptedChannels, ['latest']);
+  assert.deepEqual(stableOnly.repository, {
+    owner: 'yltx',
+    repo: 'AutoWSGR-GUI',
+  });
   assert.match(
     validateGuiUpdateCandidate(stableOnly, '2.0.2-alpha.1'),
     /只允许 latest 频道/,
@@ -145,6 +149,10 @@ function testGuiUpdatePolicy() {
     stableWithAlpha.acceptedChannels,
     ['latest', 'alpha'],
   );
+  assert.deepEqual(stableWithAlpha.repository, {
+    owner: 'ShiinaKuroko',
+    repo: 'AutoWSGR-GUI',
+  });
   assert.equal(
     validateGuiUpdateCandidate(stableWithAlpha, '2.0.2-alpha.1'),
     null,
@@ -160,6 +168,10 @@ function testGuiUpdatePolicy() {
   );
   assert.equal(alphaStableOnly.channel, 'latest');
   assert.deepEqual(alphaStableOnly.acceptedChannels, ['latest']);
+  assert.deepEqual(alphaStableOnly.repository, {
+    owner: 'yltx',
+    repo: 'AutoWSGR-GUI',
+  });
   assert.equal(
     validateGuiUpdateCandidate(alphaStableOnly, '2.0.2'),
     null,
@@ -210,8 +222,8 @@ function testGuiUpdatePolicy() {
     /steps\.version\.outputs\.CHANNEL/,
   );
   assert.match(workflow, /AutoWSGR-GUI-Setup-/);
-  assert.match(workflow, /Verify pinned stable backend/);
-  assert.match(workflow, /manifest\.id -ne "stable"/);
+  assert.match(workflow, /Verify pinned backend channels/);
+  assert.match(workflow, /foreach \(\$channel in @\("stable", "alpha"\)\)/);
   assert.match(workflow, /PRERELEASE/);
   assert.match(workflow, /Preflight release destinations/);
   assert.match(workflow, /releases\?per_page=100/);

@@ -204,11 +204,19 @@ function assertReleasePackage(distribution) {
     expectedBackendManifest,
     `${label}后端发行清单不一致`,
   );
-  assert.match(
-    packagedBackendManifest.commit,
-    /^[0-9a-f]{40}$/,
-    `${label}后端必须固定到明确提交`,
-  );
+  for (const backendChannel of ['stable', 'alpha']) {
+    const backend = packagedBackendManifest[backendChannel];
+    assert.equal(
+      backend?.id,
+      backendChannel,
+      `${label}${backendChannel} 后端频道不一致`,
+    );
+    assert.match(
+      backend?.commit ?? '',
+      /^[0-9a-f]{40}$/,
+      `${label}${backendChannel} 后端必须固定到明确提交`,
+    );
+  }
 
   const appUpdate = yaml.load(fs.readFileSync(
     path.join(resources, 'app-update.yml'),

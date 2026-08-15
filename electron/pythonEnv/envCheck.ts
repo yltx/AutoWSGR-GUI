@@ -26,7 +26,8 @@ import {
 } from './backendContractProbe';
 import { PYTHON_DEPENDENCY_SPECS } from './dependencies';
 import {
-  FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL,
+  buildManagedAutowsgrRequirement,
+  resolveBackendDistribution,
 } from './backendRequirement';
 
 const execAsync = promisify(exec);
@@ -73,7 +74,15 @@ interface EnvironmentMarker {
   pythonVersion: string;
   autowsgrVersion: string;
   environmentIdentity: string;
+  backendRequirement: string | null;
   environment: PythonEnvironment;
+}
+
+/** 返回当前 GUI 通道固定的 managed 后端来源。 */
+function managedBackendRequirement(): string {
+  return buildManagedAutowsgrRequirement(
+    resolveBackendDistribution(getCtx().allowTestUpdates()),
+  );
 }
 
 /** 读取环境标记；当前模式、解释器或仓库变化时返回 null。 */
@@ -94,6 +103,12 @@ function readEnvMarker(): EnvironmentMarker | null {
       if (configured && configured !== data.pythonCmd) return null;
       const environment = resolvePythonEnvironment(data.pythonCmd);
       if (environment.identity !== data.environmentIdentity) return null;
+      if (
+        environment.startupMode === 'managed'
+        && data.backendRequirement !== managedBackendRequirement()
+      ) {
+        return null;
+      }
       return { ...data, environment };
     }
   } catch { /* 标记缺失或损坏时重新检查。 */ }
@@ -114,6 +129,9 @@ function writeEnvMarker(
         pythonVersion,
         autowsgrVersion,
         environmentIdentity: environment.identity,
+        backendRequirement: environment.startupMode === 'managed'
+          ? managedBackendRequirement()
+          : null,
       }),
       'utf-8',
     );
@@ -132,6 +150,7 @@ function buildAutoUpdateDeps(): AutoUpdateDeps {
     localSitePackages,
     pipEnv,
     ensurePip,
+    backendRequirement: managedBackendRequirement,
   };
 }
 
@@ -147,7 +166,9 @@ function shouldForceManagedBackendInstall(
 ): boolean {
   return (
     environment.startupMode === 'managed'
-    && FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL
+    && resolveBackendDistribution(
+      getCtx().allowTestUpdates(),
+    ).forceUpdateOnInstall
   );
 }
 
@@ -463,7 +484,7 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
       );
       finalVer = updatedVer || autowsgrVersion;
       if (forceBackendInstall && !updatedVer) {
-        ctx.sendProgress('WARNING 个人分支后端强制更新未完成，下次启动将重试');
+        ctx.sendProgress('WARNING 当前通道后端强制更新未完成，下次启动将重试');
         return {
           pythonCmd,
           pythonVersion,

@@ -95,21 +95,26 @@ jobs:
             throw "当前仓库已存在 v$version Release"
           }
 
-      - name: Verify pinned stable backend
+      - name: Verify pinned backend channels
         id: backend
         shell: pwsh
         run: |
           $manifest = Get-Content build/backend-distribution.json |
             ConvertFrom-Json
-          if ($manifest.id -ne "stable") {
-            throw "后端发行清单必须使用 stable id"
+          foreach ($channel in @("stable", "alpha")) {
+            $distribution = $manifest.$channel
+            if (
+              $distribution.id -ne $channel -or
+              $distribution.repository -notmatch '^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$' -or
+              $distribution.ref -notmatch '^[A-Za-z0-9._/-]+$' -or
+              $distribution.commit -notmatch '^[0-9a-f]{40}$'
+            ) {
+              throw "$channel 后端发行清单无效"
+            }
+            echo "Pinned $channel backend: $($distribution.repository)@$($distribution.commit)"
           }
-          if ($manifest.commit -notmatch '^[0-9a-f]{40}$') {
-            throw "后端发行清单必须固定到明确提交"
-          }
-          echo "repository=$($manifest.repository)" >> $env:GITHUB_OUTPUT
-          echo "commit=$($manifest.commit)" >> $env:GITHUB_OUTPUT
-          echo "Pinned backend: $($manifest.repository)@$($manifest.commit)"
+          echo "repository=$($manifest.stable.repository)" >> $env:GITHUB_OUTPUT
+          echo "commit=$($manifest.stable.commit)" >> $env:GITHUB_OUTPUT
 
       - name: Checkout pinned AutoWSGR backend
         uses: actions/checkout@v4

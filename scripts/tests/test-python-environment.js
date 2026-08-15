@@ -37,10 +37,8 @@ const {
   buildDependencyInstallPlan,
 } = require('../../dist/electron/pythonEnv/installer.js');
 const {
-  BACKEND_DISTRIBUTION,
-  FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL,
-  MANAGED_AUTOWSGR_COMMIT,
-  MANAGED_AUTOWSGR_REQUIREMENT,
+  buildManagedAutowsgrRequirement,
+  resolveBackendDistribution,
 } = require('../../dist/electron/pythonEnv/backendRequirement.js');
 const {
   buildBackendRuntimeInstallArgs,
@@ -98,6 +96,7 @@ initPythonEnv({
   sendProgress: () => {},
   getConfiguredPythonPath: () => state.configuredPythonPath,
   getUpdateMode: () => 'manual',
+  allowTestUpdates: () => true,
   getBackendStartupMode: () => state.mode,
   getBackendRepoPath: () => state.repoPath,
   getTempDir: () => temporaryDirectory,
@@ -129,21 +128,30 @@ try {
     managedPlan.toolArgs.includes('maafw>=5.12.3,<6.0'),
     true,
   );
+  const stableDistribution = resolveBackendDistribution(false);
+  const alphaDistribution = resolveBackendDistribution(true);
+  assert.equal(stableDistribution.repository, 'OpenWSGR/AutoWSGR');
+  assert.equal(stableDistribution.ref, 'main');
   assert.equal(
-    MANAGED_AUTOWSGR_COMMIT,
+    stableDistribution.commit,
+    'a5effbfc606794ec30fa8bfd2f8edd2cc15d3852',
+  );
+  assert.equal(alphaDistribution.repository, 'ShiinaKuroko/AutoWSGR');
+  assert.equal(alphaDistribution.ref, 'ShiinaKuroko');
+  assert.equal(
+    alphaDistribution.commit,
     '77f34b7b30d18f7b86cf736bdd5cf17ae35d5f78',
   );
-  assert.equal(BACKEND_DISTRIBUTION.id, 'stable');
-  assert.equal(BACKEND_DISTRIBUTION.ref, 'ShiinaKuroko');
-  assert.equal(FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL, true);
-  assert.equal(
-    MANAGED_AUTOWSGR_REQUIREMENT.endsWith(
-      `${MANAGED_AUTOWSGR_COMMIT}.zip`,
-    ),
-    true,
+  assert.equal(stableDistribution.forceUpdateOnInstall, true);
+  assert.equal(alphaDistribution.forceUpdateOnInstall, true);
+  const alphaRequirement = buildManagedAutowsgrRequirement(
+    alphaDistribution,
   );
-  const managedUpdateArgs = buildManagedAutowsgrUpdateArgs(localSite);
-  assert.equal(managedUpdateArgs.at(-1), MANAGED_AUTOWSGR_REQUIREMENT);
+  const managedUpdateArgs = buildManagedAutowsgrUpdateArgs(
+    localSite,
+    alphaRequirement,
+  );
+  assert.equal(managedUpdateArgs.at(-1), alphaRequirement);
   assert.equal(managedUpdateArgs.includes('autowsgr'), false);
   assert.equal(managedUpdateArgs.includes(localSite), true);
   assert.equal(managedUpdateArgs.includes('--no-deps'), true);
@@ -165,6 +173,7 @@ try {
   assert.match(requirementProbe, /roots\.extend/);
   const forcedUpdateArgs = buildManagedAutowsgrUpdateArgs(
     localSite,
+    alphaRequirement,
     true,
   );
   assert.equal(forcedUpdateArgs.includes('--force-reinstall'), true);

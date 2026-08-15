@@ -5,7 +5,6 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
-import { MANAGED_AUTOWSGR_REQUIREMENT } from './backendRequirement';
 import {
   buildBackendRuntimeContractProbeLines,
 } from './backendContractProbe';
@@ -25,6 +24,7 @@ export interface AutoUpdateDeps {
   localSitePackages: () => string;
   pipEnv: () => NodeJS.ProcessEnv;
   ensurePip: (pythonCmd: string) => Promise<boolean>;
+  backendRequirement: () => string;
 }
 
 /** 生成依赖安装参数，调用方只传入检查后确认需要处理的包。 */
@@ -223,6 +223,7 @@ async function ensureRequirements(
 /** 生成 managed 后端更新参数，确保自动更新不会改装 PyPI 裸包。 */
 export function buildManagedAutowsgrUpdateArgs(
   targetDir: string,
+  backendRequirement: string,
   forceInstall = false,
 ): string[] {
   return [
@@ -234,12 +235,15 @@ export function buildManagedAutowsgrUpdateArgs(
     '--no-deps',
     '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
     '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
-    MANAGED_AUTOWSGR_REQUIREMENT,
+    backendRequirement,
   ];
 }
 
 /** 依赖元数据无法读取时，回退给 pip 做一次完整兼容性解析。 */
-function buildManagedDependencyRepairArgs(targetDir: string): string[] {
+function buildManagedDependencyRepairArgs(
+  targetDir: string,
+  backendRequirement: string,
+): string[] {
   return [
     '-m', 'pip', 'install',
     '--upgrade',
@@ -248,7 +252,7 @@ function buildManagedDependencyRepairArgs(targetDir: string): string[] {
     '--no-build-isolation',
     '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
     '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
-    MANAGED_AUTOWSGR_REQUIREMENT,
+    backendRequirement,
   ];
 }
 
@@ -259,9 +263,10 @@ export async function autoUpdateAutowsgr(
   forceInstall = false,
 ): Promise<string | null> {
   try {
+    const backendRequirement = deps.backendRequirement();
     deps.sendProgress(
       forceInstall
-        ? '正在强制更新个人分支 autowsgr…'
+        ? '正在强制更新当前通道 autowsgr…'
         : '正在检查 autowsgr 更新…',
     );
 
@@ -321,7 +326,7 @@ export async function autoUpdateAutowsgr(
     ];
     deps.sendProgress(
       forceInstall
-        ? '正在重新安装本包指定的个人分支后端…'
+        ? '正在重新安装当前通道指定的后端…'
         : `当前 autowsgr ${incompatibilities.join('、')}，正在安装 GUI 兼容版本…`,
     );
     const failureVersion = forceInstall ? null : localVer;
@@ -358,7 +363,11 @@ export async function autoUpdateAutowsgr(
 
     const exitCode = await runPip(
       pythonCmd,
-      buildManagedAutowsgrUpdateArgs(targetDir, forceInstall),
+      buildManagedAutowsgrUpdateArgs(
+        targetDir,
+        backendRequirement,
+        forceInstall,
+      ),
       deps,
     );
 
@@ -381,7 +390,10 @@ export async function autoUpdateAutowsgr(
     if (runtimeRequirementState === 'probe-failed') {
       const runtimeDepsCode = await runPip(
         pythonCmd,
-        buildManagedDependencyRepairArgs(targetDir),
+        buildManagedDependencyRepairArgs(
+          targetDir,
+          backendRequirement,
+        ),
         deps,
       );
       if (runtimeDepsCode !== 0) {

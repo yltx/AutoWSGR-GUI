@@ -72,6 +72,10 @@ legacy_decisive_automation
 顶层字段。字段默认、类型、边界和旧字段升级由
 `GuiConfigurationService` 负责。
 
+`allow_test_updates` 是统一更新通道选择：`false` 表示主库 GUI + 主库后端的
+Stable 通道，`true` 表示个人仓库 GUI + 个人仓库后端的 Alpha 通道。external
+后端模式继续使用用户指定仓库，不受该字段影响。
+
 `automation` 当前包含：
 
 | 字段 | 语义 |
