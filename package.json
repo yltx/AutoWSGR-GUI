@@ -1,6 +1,6 @@
 {
   "name": "wsgrgui",
-  "version": "2.1.0-alpha.1",
+  "version": "2.1.0",
   "description": "AutoWSGR YAML 管理与自动化桌面界面",
   "main": "dist/electron/main.js",
   "scripts": {
@@ -146,7 +146,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "ShiinaKuroko",
+      "owner": "yltx",
       "repo": "AutoWSGR-GUI",
       "channel": "latest"
     }
