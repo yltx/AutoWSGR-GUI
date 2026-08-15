@@ -214,6 +214,8 @@ function testGuiUpdatePolicy() {
   assert.match(workflow, /manifest\.id -ne "stable"/);
   assert.match(workflow, /PRERELEASE/);
   assert.match(workflow, /Preflight release destinations/);
+  assert.match(workflow, /releases\?per_page=100/);
+  assert.doesNotMatch(workflow, /gh release view/);
   assert.match(workflow, /Publish verified Stable release/);
   assert.match(workflow, /draft: true/);
   assert.doesNotMatch(workflow, /LEGACY_RELEASE_TOKEN/);

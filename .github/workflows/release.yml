@@ -85,8 +85,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
-          gh release view "v$version" --repo "${{ github.repository }}" *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $releases = gh api `
+            "repos/${{ github.repository }}/releases?per_page=100" |
+            ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取当前仓库 Release 列表"
+          }
+          if ($releases.tag_name -contains "v$version") {
             throw "当前仓库已存在 v$version Release"
           }
 
