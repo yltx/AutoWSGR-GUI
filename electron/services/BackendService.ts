@@ -29,7 +29,13 @@ import { shutdownBackendProcess } from './BackendShutdownService';
 import {
   buildResourceEnvironment,
   SHIP_LIBRARY_ENV,
+  STRENGTHEN_DATA_ENV,
+  WSG_NCC_DATA_ENV,
   shipLibraryRoot,
+  strengthenDataPath,
+  wsgNccDataRoot,
+  wsgNccPythonRoot,
+  withResourcePythonBootstrap,
 } from '../resourcePaths';
 
 export { buildBackendRuntimeEnvironment } from '../pythonEnv';
@@ -183,7 +189,9 @@ function verifyBackendRuntimeContract(
   cwd: string,
   processEnv: NodeJS.ProcessEnv,
 ): Promise<void> {
-  const probe = buildBackendCapabilityProbe(environment);
+  const probe = withResourcePythonBootstrap(
+    buildBackendCapabilityProbe(environment),
+  );
   return new Promise((resolve, reject) => {
     execFile(
       pythonCommand,
@@ -276,10 +284,10 @@ export async function startBackend(): Promise<void> {
   const requestedOcrGpuMode = readOcrGpuModeFromSettings();
   const configuredCudaRoot = readCudaPathFromSettings();
   const saveBackendScreenshots = readSaveBackendScreenshotsFromSettings();
-  const bootstrap = buildBackendBootstrap(
+  const bootstrap = withResourcePythonBootstrap(buildBackendBootstrap(
     environment,
     ctx.BACKEND_PORT,
-  );
+  ));
   if (localBackendRepo) {
     console.log(`[Backend] 使用本地后端仓库: ${localBackendRepo}`);
     ctx.sendToRenderer(
@@ -336,6 +344,15 @@ export async function startBackend(): Promise<void> {
   );
   console.log(
     `[Backend] ${SHIP_LIBRARY_ENV}=${shipLibraryRoot(ctx.resourceRoot())}`,
+  );
+  console.log(
+    `[Backend] ${STRENGTHEN_DATA_ENV}=${strengthenDataPath(ctx.resourceRoot())}`,
+  );
+  console.log(
+    `[Backend] ${WSG_NCC_DATA_ENV}=${wsgNccDataRoot(ctx.resourceRoot())}`,
+  );
+  console.log(
+    `[Backend] WSG-NCC Python runtime=${wsgNccPythonRoot(ctx.resourceRoot())}`,
   );
   const backendEnv = applyBackendRuntimeSettings(
     resourceEnv,

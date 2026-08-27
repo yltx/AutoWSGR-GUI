@@ -42,7 +42,7 @@ _setup_tmp/
 .tmp/
 .tmp_*
 node/
-python/
+/python/
 redist/
 adb/
 

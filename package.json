@@ -76,7 +76,9 @@
         "to": "resource",
         "filter": [
           "**/*",
+          "!builtin_plans/**/*",
           "!user_battle_plans/**/*",
+          "!user_daily_plans/**/*",
           "!user_team_plans/**/*"
         ]
       },

@@ -4,7 +4,7 @@
  * 检查目标：
  * 1. GUI 可执行文件和 app.asar 已生成。
  * 2. 内置 Python、ADB 和 VC++ 运行库存在。
- * 3. 地图、系统计划、迁移快照、模板和舰船库完整复制。
+ * 3. 地图、系统计划、迁移快照、模板、强化数据、舰船库和识别码本完整复制。
  * 4. 源资源与安装包资源的文件数量一致。
  * 5. 用户计划目录不会进入只读安装资源。
  * 6. AutoWSGR managed 模式固定到明确提交。
@@ -151,6 +151,7 @@ function assertReleasePackage(distribution) {
     'system_daily_plans',
     'migrations/v6/system_battle_plans',
     'ship-library',
+    'wsg-ncc',
   ]) {
     assertResourceDirectory(directory, packagedResources);
   }
@@ -170,9 +171,16 @@ function assertReleasePackage(distribution) {
 
   for (const file of [
     'builtin_templates.json',
+    'strengthen.json',
     'ship-library/manifest.json',
     'ship-library/labels.zh-CN.json',
     'ship-library/database/ships.sqlite3',
+    'wsg-ncc/codebooks/cascade.npz',
+    'wsg-ncc/gallery_meta.json',
+    'wsg-ncc/NOTICE.md',
+    'wsg-ncc/python/SHA256SUMS',
+    'wsg-ncc/python/cascade_ncc/__init__.py',
+    'wsg-ncc/python/cascade_ncc/recognizer.py',
   ]) {
     assertFile(
       path.join(packagedResources, file),
@@ -181,7 +189,9 @@ function assertReleasePackage(distribution) {
   }
 
   for (const directory of [
+    'builtin_plans',
     'user_battle_plans',
+    'user_daily_plans',
     'user_team_plans',
   ]) {
     assert.equal(
