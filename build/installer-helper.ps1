@@ -5,6 +5,7 @@ param(
         'preserve',
         'restore',
         'stop-processes',
+        'remove-managed-runtime',
         'prepare-upgrade',
         'commit-upgrade',
         'rollback-upgrade'
@@ -590,6 +591,54 @@ function Remove-InstallerTemps {
                 }
             }
         }
+    }
+}
+
+function Assert-ManagedRuntimeTreeSafe {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$RuntimePath
+    )
+
+    $extendedRoot = '\\?\' + $RuntimePath
+    $queue = New-Object System.Collections.Queue
+    $queue.Enqueue($extendedRoot)
+    while ($queue.Count -gt 0) {
+        $current = [string]$queue.Dequeue()
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries($current)) {
+            $attributes = [IO.File]::GetAttributes($entry)
+            if (($attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Managed runtime directory contains a reparse point: $entry"
+            }
+            if (($attributes -band [IO.FileAttributes]::Directory) -ne 0) {
+                $queue.Enqueue($entry)
+            }
+        }
+    }
+}
+
+function Remove-ManagedRuntime {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$InstallRoot
+    )
+
+    $root = Get-CanonicalRoot $InstallRoot 'Install directory' $true
+    $runtime = Get-ContainedPath $root $script:RuntimeRelativePath
+    if (-not (Test-Path -LiteralPath $runtime)) {
+        return
+    }
+
+    Assert-PathChainSafe $runtime 'Managed runtime directory'
+    $runtimeItem = Get-SafeFileSystemItem $runtime 'Managed runtime directory'
+    if (-not $runtimeItem.PSIsContainer) {
+        throw "Managed runtime path must be a directory: $runtime"
+    }
+
+    Assert-ManagedRuntimeTreeSafe $runtimeItem.FullName
+    [IO.Directory]::Delete('\\?\' + $runtimeItem.FullName, $true)
+    if (Test-Path -LiteralPath $runtime) {
+        throw "Managed runtime directory still exists after deletion: $runtime"
     }
 }
 
@@ -2367,6 +2416,31 @@ try {
             Invoke-StopProcesses (
                 $InstallDirectory
             ) $ExcludedProcessId $GracefulExecutableName $GracefulTimeoutSeconds
+        }
+        'remove-managed-runtime' {
+            if (
+                -not $PSBoundParameters.ContainsKey('InstallDirectory') -or
+                [string]::IsNullOrWhiteSpace($InstallDirectory)
+            ) {
+                throw 'InstallDirectory is required for remove-managed-runtime'
+            }
+            foreach ($argumentName in @(
+                'Source',
+                'Backup',
+                'Target',
+                'TransactionRoot',
+                'Scope',
+                'HkcuSource',
+                'HklmSource',
+                'ExcludedProcessId',
+                'GracefulExecutableName',
+                'GracefulTimeoutSeconds'
+            )) {
+                if ($PSBoundParameters.ContainsKey($argumentName)) {
+                    throw "$argumentName is not valid for remove-managed-runtime"
+                }
+            }
+            Remove-ManagedRuntime $InstallDirectory
         }
         'prepare-upgrade' {
             foreach ($argumentName in @('TransactionRoot', 'Target', 'Scope')) {

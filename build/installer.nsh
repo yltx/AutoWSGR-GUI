@@ -162,9 +162,18 @@ Var InstallerPowerShellPath
 !macroend
 
 ; 覆盖升级会调用旧卸载器，此时保留依赖；只有主动卸载才完整清理。
+; NSIS 的 RMDir /r 无法可靠删除 Python 包中的超长嵌套许可证路径，统一交由
+; 已完成 containment/reparse-point 校验的 helper 使用 Win32 extended path 清理。
 !macro customUnInstall
   ${ifNot} ${isUpdated}
-    RMDir /r "$INSTDIR\python\site-packages"
+    nsExec::ExecToLog '"$PowerShellPath" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "$PLUGINSDIR\autowsgr-installer-helper.ps1" -Action remove-managed-runtime -InstallDirectory "$INSTDIR"'
+    Pop $R2
+    ${If} $R2 != 0
+      MessageBox MB_OK|MB_ICONSTOP \
+        "无法完整删除受管 Python 后端目录。请关闭占用安装目录的进程后重新卸载。" /SD IDOK
+      SetErrorLevel 1
+      Quit
+    ${EndIf}
   ${endIf}
 !macroend
 

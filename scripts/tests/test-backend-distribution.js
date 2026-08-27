@@ -1,7 +1,7 @@
 /**
  * 稳定版后端来源与覆盖升级回归测试。
  *
- * 模拟安装包 resources 目录，验证运行时只读取个人仓库的固定提交，
+ * 模拟安装包 resources 目录，验证运行时只读取 OpenWSGR 的固定提交，
  * 并通过 Windows PowerShell 5.1 直接验证旧数据保留/恢复和安装目录进程关闭契约。
  */
 const assert = require('node:assert/strict');
@@ -828,10 +828,15 @@ try {
   assert.match(installer, /!macro customCheckAppRunning/);
   assert.doesNotMatch(installer, /site-packages-update/);
   assert.doesNotMatch(installer, /python\\Lib\\site-packages/);
-  assert.match(
+  assert.doesNotMatch(
     installer,
     /RMDir \/r "\$INSTDIR\\python\\site-packages"/,
-    '主动卸载必须清理 GUI 管理的后端目录',
+    '主动卸载不能使用不支持超长路径的 NSIS 递归删除',
+  );
+  assert.match(
+    installer,
+    /-Action remove-managed-runtime -InstallDirectory "\$INSTDIR"/,
+    '主动卸载必须通过安全 helper 删除 GUI 管理的后端目录',
   );
   assert.match(
     installer,
@@ -2609,10 +2614,77 @@ try {
     /\$\{ifNot\} \$\{isUpdated\}/,
     '覆盖升级调用旧卸载器时不能删除后端依赖',
   );
+  const activeUninstall = installerMacro(installer, 'customUnInstall');
   assert.match(
-    installer,
-    /RMDir \/r "\$INSTDIR\\python\\site-packages"/,
-    '主动卸载时必须删除后端依赖',
+    activeUninstall,
+    /\$\{ifNot\} \$\{isUpdated\}[\s\S]*-Action remove-managed-runtime -InstallDirectory "\$INSTDIR"[\s\S]*Pop \$R2[\s\S]*\$\{If\} \$R2 != 0[\s\S]*SetErrorLevel 1[\s\S]*Quit[\s\S]*\$\{EndIf\}[\s\S]*\$\{endIf\}/,
+    '主动卸载 helper 必须仅在非升级路径运行，并将失败映射为非零退出',
+  );
+  assert.equal(
+    helper.includes("[IO.Directory]::Delete('\\\\?\\' + $runtimeItem.FullName, $true)"),
+    true,
+    'helper 必须使用 Win32 extended path 递归删除受管运行时',
+  );
+  const longPathInstall = path.join(resources, 'long-path-uninstall');
+  let longPathLeaf = path.join(longPathInstall, 'python', 'site-packages');
+  for (let index = 0; index < 24; index += 1) {
+    longPathLeaf = path.join(longPathLeaf, `license-segment-${index}`);
+  }
+  assert.equal(
+    path.join(longPathLeaf, 'LICENSE.txt').length > 260,
+    true,
+    'fixture 必须覆盖 Windows 经典 MAX_PATH 边界',
+  );
+  fs.mkdirSync(longPathLeaf, { recursive: true });
+  fs.writeFileSync(path.join(longPathLeaf, 'LICENSE.txt'), 'license\n');
+  const removeManagedRuntime = runInstallerHelper('remove-managed-runtime', {
+    InstallDirectory: longPathInstall,
+  });
+  assert.equal(
+    removeManagedRuntime.status,
+    0,
+    removeManagedRuntime.stderr || removeManagedRuntime.stdout,
+  );
+  assert.equal(
+    fs.existsSync(path.join(longPathInstall, 'python', 'site-packages')),
+    false,
+    '主动卸载 helper 必须删除超过 MAX_PATH 的受管运行时树',
+  );
+  if (junctionsAvailable) {
+    const reparseInstall = path.join(resources, 'reparse-uninstall');
+    const reparseRuntime = path.join(
+      reparseInstall,
+      'python',
+      'site-packages',
+    );
+    const reparseTarget = path.join(resources, 'reparse-uninstall-target');
+    fs.mkdirSync(reparseRuntime, { recursive: true });
+    createDirectoryJunction(
+      reparseTarget,
+      path.join(reparseRuntime, 'linked'),
+    );
+    const removeReparseRuntime = runInstallerHelper(
+      'remove-managed-runtime',
+      { InstallDirectory: reparseInstall },
+    );
+    assert.notEqual(
+      removeReparseRuntime.status,
+      0,
+      '受管运行时包含 reparse point 时必须 fail closed',
+    );
+    assert.equal(
+      fs.existsSync(reparseRuntime),
+      true,
+      'reparse point 校验失败不得删除受管运行时',
+    );
+  }
+  const missingInstall = runInstallerHelper('remove-managed-runtime', {
+    InstallDirectory: path.join(resources, 'missing-install-root'),
+  });
+  assert.notEqual(
+    missingInstall.status,
+    0,
+    '不存在的安装根目录必须 fail closed',
   );
   assert.match(
     installer,
