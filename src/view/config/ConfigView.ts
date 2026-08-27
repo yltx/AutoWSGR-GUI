@@ -6,6 +6,10 @@
 import type { GuiUpdateStatus } from '../../types/ipc.js';
 import type { NormalFightTaskConfig } from '../../types/model.js';
 import type { ConfigViewObject } from '../../types/view.js';
+import type {
+  IntensifyCandidatePreviewViewObject,
+  IntensifyInventoryViewObject,
+} from '../../types/view.js';
 import {
   DEFAULT_LOOT_PLAN_ID,
   type LootAutomationPlan,
@@ -26,8 +30,11 @@ import { ShipAutocomplete } from '../shared/ShipAutocomplete';
 
 export interface ConfigViewActions {
   onSave(): void;
+  onScanIntensify(): void;
   onPreviewIntensify(): void;
-  onExecuteIntensify(): void;
+  onSelectIntensifyTarget(ref: string): void;
+  onToggleIntensifyMaterial(ref: string): void;
+  onIntensifyMaxMaterialsChange(): void;
   onOpenConfigDir(): void;
   onBrowseEmulator(): void;
   onBrowsePython(): void;
@@ -86,8 +93,14 @@ export class ConfigView {
   private intensifyMaxMaterials = element<HTMLInputElement>('cfg-intensify-max-materials');
   private intensifyProtectedShips = element<HTMLTextAreaElement>('cfg-intensify-protected-ships');
   private intensifyStatus = element<HTMLElement>('cfg-intensify-status');
+  private intensifyScanBtn = element<HTMLButtonElement>('btn-intensify-scan');
   private intensifyPreviewBtn = element<HTMLButtonElement>('btn-intensify-preview');
-  private intensifyExecuteBtn = element<HTMLButtonElement>('btn-intensify-execute');
+  private intensifyOccurrences = element<HTMLElement>('cfg-intensify-occurrences');
+  private intensifyOccurrenceSummary = element<HTMLElement>('cfg-intensify-occurrence-summary');
+  private intensifyTargetOccurrences = element<HTMLElement>('cfg-intensify-target-occurrences');
+  private intensifyMaterialOccurrences = element<HTMLElement>('cfg-intensify-material-occurrences');
+  private intensifyCandidatePreview = element<HTMLElement>('cfg-intensify-candidate-preview');
+  private intensifyActions: ConfigViewActions | null = null;
   private readonly intensifyShipAutocomplete: ShipAutocomplete;
 
   private logLevel = element<HTMLSelectElement>('cfg-log-level');
@@ -177,12 +190,14 @@ export class ConfigView {
   }
 
   bindActions(actions: ConfigViewActions): void {
+    if (this.intensifyActions) return;
+    this.intensifyActions = actions;
     const bindClick = (id: string, action: () => void) => {
       document.getElementById(id)?.addEventListener('click', action);
     };
     bindClick('btn-save-config', actions.onSave);
+    bindClick('btn-intensify-scan', actions.onScanIntensify);
     bindClick('btn-intensify-preview', actions.onPreviewIntensify);
-    bindClick('btn-intensify-execute', actions.onExecuteIntensify);
     bindClick('btn-open-config-dir', actions.onOpenConfigDir);
     bindClick('btn-browse-emu', actions.onBrowseEmulator);
     bindClick('btn-browse-python', actions.onBrowsePython);
@@ -208,6 +223,10 @@ export class ConfigView {
     this.accentColor.addEventListener(
       'input',
       () => actions.onAccentColorInput(this.accentColor.value),
+    );
+    this.intensifyMaxMaterials.addEventListener(
+      'change',
+      actions.onIntensifyMaxMaterialsChange,
     );
   }
 
@@ -435,15 +454,19 @@ export class ConfigView {
     if (!this.automationView.hasLootPlans()) this.autoLoot.checked = false;
   }
 
-  setIntensifyLoading(action: 'preview' | 'execute' | null): void {
-    this.intensifyPreviewBtn.disabled = action !== null;
+  setIntensifyLoading(action: 'scan' | 'preview' | null): void {
+    this.intensifyScanBtn.disabled = action !== null;
+    this.intensifyScanBtn.textContent = action === 'scan'
+      ? '扫描中…'
+      : '扫描只读库存';
+    if (action !== null) this.intensifyPreviewBtn.disabled = true;
     this.intensifyPreviewBtn.textContent = action === 'preview'
-      ? '预览中…'
-      : '安全预览';
-    this.intensifyExecuteBtn.disabled = action !== null;
-    this.intensifyExecuteBtn.textContent = action === 'execute'
-      ? '执行中…'
-      : '尝试执行';
+      ? '生成中…'
+      : '生成候选预览';
+  }
+
+  setIntensifyPreviewEnabled(enabled: boolean): void {
+    this.intensifyPreviewBtn.disabled = !enabled;
   }
 
   setIntensifyStatus(
@@ -452,6 +475,70 @@ export class ConfigView {
   ): void {
     this.intensifyStatus.textContent = text;
     this.intensifyStatus.className = `intensify-status intensify-status-${status}`;
+  }
+
+  clearIntensifyInventory(): void {
+    this.intensifyOccurrences.hidden = true;
+    this.intensifyTargetOccurrences.replaceChildren();
+    this.intensifyMaterialOccurrences.replaceChildren();
+    this.intensifyCandidatePreview.hidden = true;
+    this.intensifyCandidatePreview.replaceChildren();
+    this.setIntensifyPreviewEnabled(false);
+  }
+
+  showIntensifyInventory(vo: IntensifyInventoryViewObject): void {
+    this.intensifyCandidatePreview.hidden = true;
+    this.intensifyCandidatePreview.replaceChildren();
+    this.intensifyOccurrenceSummary.textContent = vo.summary;
+    this.intensifyTargetOccurrences.replaceChildren(...vo.targets.map(item => (
+      this.intensifyOccurrenceButton(
+        `${item.label} · ${item.stats}`,
+        item.selected,
+        () => this.intensifyActions?.onSelectIntensifyTarget(item.ref),
+      )
+    )));
+    this.intensifyMaterialOccurrences.replaceChildren(...vo.materials.map(item => (
+      this.intensifyOccurrenceButton(
+        item.label,
+        item.selected,
+        () => this.intensifyActions?.onToggleIntensifyMaterial(item.ref),
+      )
+    )));
+    this.intensifyOccurrences.hidden = false;
+  }
+
+  showIntensifyCandidatePreview(vo: IntensifyCandidatePreviewViewObject): void {
+    const rows = [
+      vo.summary,
+      `目标：${vo.target}`,
+      `当前：${vo.current}`,
+      `上限：${vo.maximum}`,
+      `预计收益：${vo.projectedGains}`,
+      `预计结果：${vo.projected}`,
+      `素材：${vo.materials.join('、')}`,
+    ].map(text => {
+      const row = document.createElement('p');
+      row.textContent = text;
+      return row;
+    });
+    this.intensifyCandidatePreview.replaceChildren(...rows);
+    this.intensifyCandidatePreview.hidden = false;
+  }
+
+  private intensifyOccurrenceButton(
+    label: string,
+    selected: boolean,
+    action: () => void,
+  ): HTMLButtonElement {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'intensify-occurrence-item';
+    button.classList.toggle('is-selected', selected);
+    button.setAttribute('aria-pressed', String(selected));
+    button.setAttribute('role', 'listitem');
+    button.textContent = label;
+    button.addEventListener('click', action);
+    return button;
   }
 
   private parseShipNames(value: string): string[] {
@@ -483,6 +570,9 @@ export class ConfigView {
   setPlanRoot(path: string): void { this.planRoot.value = path; }
   setCudaPath(path: string): void { this.cudaPath.value = path; }
   getEmulatorSerial(): string { return this.emuSerial.value.trim(); }
+  getIntensifyMaxMaterials(): number {
+    return Math.trunc(this.clamp(this.intensifyMaxMaterials.value, 1, 12, 4));
+  }
   getCudaPath(): string { return this.cudaPath.value.trim(); }
   getPythonPath(): string { return this.pythonPath.value.trim(); }
   getBackendPort(): number { return Math.trunc(this.clamp(this.backendPort.value, 1, 65535, 8438)); }

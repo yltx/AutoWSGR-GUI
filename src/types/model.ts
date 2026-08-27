@@ -85,7 +85,7 @@ export interface GuiAutomationSettings {
   lootStopCount: number;
 }
 
-/** 自动强化安全策略；只支持显式手动预览和执行，不进入 Scheduler。 */
+/** 强化安全策略；只支持显式手动只读预览，不进入 Scheduler。 */
 export interface IntensifyPolicy {
   target_ship: string;
   material_ship_types: string[];

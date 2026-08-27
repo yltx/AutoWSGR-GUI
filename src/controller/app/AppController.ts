@@ -247,9 +247,6 @@ export class AppController {
       configView: this.configView,
       getConfigDir: () => this.configDir,
       saveConfig: () => this.configCtrl.saveConfig(),
-      showIntensifyUnavailable: () => (
-        this.configCtrl.showIntensifyUnavailable()
-      ),
       pickAutomationPlan: currentTask => (
         this.planCtrl.pickManagedBattlePlanForAutomation(currentTask)
       ),
@@ -272,7 +269,7 @@ export class AppController {
         }
         return this.startupCtrl?.startSystem() ?? Promise.resolve(false);
       },
-    });
+    }, undefined, this.api);
     this.settingsCtrl.bindActions();
 
     this.operationsCtrl.bindOpsActions();
@@ -357,7 +354,7 @@ export class AppController {
       loadModelsAndRender: async (b) => {
         await this.templateModel.init(b);
         this.templateCtrl.renderLibrary();
-        this.configCtrl.renderConfig();
+        this.renderConfig();
         this.mainView.setDebugMode(
           browserStorageStore.get('debugMode') === 'true',
         );
@@ -392,8 +389,13 @@ export class AppController {
 
     this.startupCtrl.run().catch((e) => {
       console.error('初始化失败:', e);
-      this.configCtrl.renderConfig();
+      this.renderConfig();
     });
+  }
+
+  private renderConfig(): void {
+    this.settingsCtrl.invalidateIntensifySession();
+    this.configCtrl.renderConfig();
   }
 
   // ════════════════════════════════════════

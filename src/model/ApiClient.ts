@@ -26,7 +26,9 @@ import type {
   GameAcquisitionData,
   IntensifyRequest,
   IntensifyPreviewData,
-  IntensifyResultData,
+  IntensifySnapshotPreviewData,
+  IntensifySnapshotPreviewRequest,
+  IntensifySnapshotSessionData,
   WsMessage,
   WsLogMessage,
   WsTaskUpdate,
@@ -229,9 +231,37 @@ export class ApiClient {
     return this.request('POST', '/api/intensify/preview', policy);
   }
 
-  /** 显式尝试强化。当前后端在设备流程标定完成前会安全中止。 */
-  async intensify(policy: IntensifyRequest): Promise<ApiResponse<IntensifyResultData>> {
-    return this.request('POST', '/api/intensify', policy);
+  /** 扫描完整目标与素材库存并创建短期只读 Session；请求没有 body。 */
+  async createIntensifySnapshotSession(): Promise<ApiResponse<IntensifySnapshotSessionData>> {
+    return this.request('POST', '/api/intensify/snapshot-sessions');
+  }
+
+  /** 使用服务端 Session 和 exact occurrence refs 生成不可执行候选预览。 */
+  async intensifySnapshotPreview(
+    request: IntensifySnapshotPreviewRequest,
+  ): Promise<{
+    status?: number;
+    response: ApiResponse<IntensifySnapshotPreviewData>;
+  }> {
+    Logger.debug(
+      `HTTP POST /api/intensify/snapshot-preview body=${jsonCodec.stringify(request)}`,
+      'api',
+    );
+    if (!this.http.requestWithStatus) {
+      return {
+        response: await this.http.request<ApiResponse<IntensifySnapshotPreviewData>>(
+          'POST',
+          '/api/intensify/snapshot-preview',
+          request,
+        ),
+      };
+    }
+    const result = await this.http.requestWithStatus<ApiResponse<IntensifySnapshotPreviewData>>(
+      'POST',
+      '/api/intensify/snapshot-preview',
+      request,
+    );
+    return { status: result.status, response: result.data };
   }
 
   // ── 健康检查 ──

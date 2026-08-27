@@ -45,16 +45,7 @@ const intensifyApi = new ApiClient(
   {
     request: async (method, requestPath, body) => {
       intensifyCalls.push({ method, requestPath, body });
-      return requestPath.endsWith('/preview')
-        ? { success: true, data: { ...body, executable: false, reason: 'safe preview' } }
-        : {
-          success: true,
-          data: {
-            target_ship: body.target_ship,
-            materials_used: [],
-            material_count: 0,
-          },
-        };
+      return { success: true, data: { executable: false } };
     },
   },
   {},
@@ -68,7 +59,15 @@ const intensifyPolicy = {
 
 async function verifyIntensifyApiContract() {
   await intensifyApi.intensifyPreview(intensifyPolicy);
-  await intensifyApi.intensify(intensifyPolicy);
+  await intensifyApi.createIntensifySnapshotSession();
+  const snapshotPreviewRequest = {
+    session_id: 'snapshot-session',
+    selected_target_ref: 'target:revision:0:0:0:0.1000:0.2000',
+    allowed_material_identities: ['萤火虫'],
+    maximum_materials: 2,
+    selected_material_refs: ['material:revision:0:0:0:0.1000:0.2000'],
+  };
+  await intensifyApi.intensifySnapshotPreview(snapshotPreviewRequest);
   assert.deepEqual(intensifyCalls, [
     {
       method: 'POST',
@@ -77,8 +76,13 @@ async function verifyIntensifyApiContract() {
     },
     {
       method: 'POST',
-      requestPath: '/api/intensify',
-      body: intensifyPolicy,
+      requestPath: '/api/intensify/snapshot-sessions',
+      body: undefined,
+    },
+    {
+      method: 'POST',
+      requestPath: '/api/intensify/snapshot-preview',
+      body: snapshotPreviewRequest,
     },
   ]);
 }

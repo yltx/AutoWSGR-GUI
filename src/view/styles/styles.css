@@ -7441,6 +7441,7 @@ input[type=checkbox]:focus-visible {
 
 .intensify-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -7460,6 +7461,53 @@ input[type=checkbox]:focus-visible {
 .intensify-status-error {
   color: var(--danger);
   background: var(--danger-bg);
+}
+
+.intensify-occurrences,
+.intensify-candidate-preview {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+}
+.intensify-occurrences[hidden],
+.intensify-candidate-preview[hidden] {
+  display: none;
+}
+
+.intensify-occurrence-group {
+  display: grid;
+  gap: 6px;
+}
+
+.intensify-occurrence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.intensify-occurrence-item {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface);
+  text-align: left;
+}
+
+.intensify-occurrence-item.is-selected {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.intensify-candidate-preview p {
+  margin: 0;
 }
 
 @media (max-width: 1180px) {

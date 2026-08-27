@@ -618,13 +618,6 @@ export class ConfigController {
     });
   }
 
-  showIntensifyUnavailable(): void {
-    this.host.configView.setIntensifyStatus(
-      '自动强化将在后续稳定版开放；当前版本仅保存策略，不会调用后端或操作舰船。',
-      'unknown',
-    );
-  }
-
   /** 自动检测模拟器信息，仅在配置为空时填充 */
   async detectAndApplyEmulator(): Promise<void> {
     const bridge = this.gateway;

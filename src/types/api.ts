@@ -149,10 +149,74 @@ export interface IntensifyPreviewData extends IntensifyRequest {
   reason: string;
 }
 
-export interface IntensifyResultData {
-  target_ship: string;
-  materials_used: string[];
-  material_count: number;
+export interface IntensifyStatsData {
+  firepower: number;
+  torpedo: number;
+  armor: number;
+  antiAir: number;
+}
+
+export interface IntensifyTargetOccurrenceData {
+  ref: string;
+  shipId: number;
+  identity: string;
+  occurrence: number;
+  current: IntensifyStatsData;
+}
+
+export interface IntensifyMaterialOccurrenceData {
+  ref: string;
+  shipId: number;
+  identity: string;
+  index: number;
+}
+
+export interface IntensifySnapshotSessionData {
+  sessionId: string;
+  createdAt: string;
+  expiresAt: string;
+  targetTotal: number;
+  targetRevision: string;
+  materialTotal: number;
+  materialViewportCount: number;
+  targets: IntensifyTargetOccurrenceData[];
+  materials: IntensifyMaterialOccurrenceData[];
+}
+
+export interface IntensifySnapshotPreviewRequest {
+  session_id: string;
+  selected_target_ref: string;
+  allowed_material_identities: string[];
+  maximum_materials: number;
+  selected_material_refs: string[];
+}
+
+export interface IntensifyTargetCandidateData extends IntensifyTargetOccurrenceData {
+  maximum: IntensifyStatsData;
+  deficit: IntensifyStatsData;
+  projectedGains: IntensifyStatsData;
+  projected: IntensifyStatsData;
+  needsIntensify: boolean;
+}
+
+export interface IntensifyMaterialCandidateData {
+  ref: string;
+  identity: string;
+  index: number;
+  contribution: IntensifyStatsData;
+  rarity: number;
+  requiresConfirmation: boolean;
+  eligible: boolean;
+  reason: string;
+}
+
+export interface IntensifySnapshotPreviewData {
+  targetRevision: string;
+  materialRevision: string;
+  executionPath: 'direct' | 'confirmation_required' | null;
+  executable: false;
+  targets: IntensifyTargetCandidateData[];
+  materials: IntensifyMaterialCandidateData[];
 }
 
 export interface NodeDecisionReq {

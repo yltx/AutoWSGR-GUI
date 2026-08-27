@@ -1438,8 +1438,8 @@
 
           <section class="config-list-section">
             <div class="config-section-heading">
-              <h3>自动强化（接口预留）</h3>
-              <p>稳定版暂未开放执行；当前仅保存策略，不加入 Scheduler，也不会调用后端或操作舰船。</p>
+              <h3>手动安全强化</h3>
+              <p>不加入 Scheduler。当前只扫描库存、选择 occurrence 并展示收益投影，不提供强化执行入口。</p>
             </div>
             <div class="config-setting-list">
               <div class="config-setting-row">
@@ -1449,7 +1449,7 @@
                 </div>
               </div>
               <div class="config-setting-row">
-                <div class="config-setting-copy"><strong>素材策略</strong><span>未选择舰种表示不限；后端仍会执行锁定、等级与保护校验。</span></div>
+                <div class="config-setting-copy"><strong>素材策略</strong><span>保留舰种策略与单次上限；本页只按扫描结果显式选择素材 occurrence，不会执行强化。</span></div>
                 <div class="config-setting-control config-setting-control-stack">
                   <select id="cfg-intensify-material-types" class="input intensify-material-types" multiple size="5">
                     <option value="AP">补给 AP</option><option value="AV">装母 AV</option>
@@ -1468,14 +1468,26 @@
                 </div>
               </div>
               <div class="config-setting-row">
-                <div class="config-setting-copy"><strong>显式保护舰</strong><span>每行一个舰名，也可用逗号分隔；目标舰和当前编队由后端请求额外保护。</span></div>
+                <div class="config-setting-copy"><strong>显式保护舰</strong><span>每行一个舰名，也可用逗号分隔；当前只读预览不会消耗舰船，该名单保留给未来经确认的执行契约。</span></div>
                 <div class="config-setting-control config-setting-control-stack">
                   <textarea id="cfg-intensify-protected-ships" class="input intensify-protected-ships" rows="3" placeholder="每行一个舰名"></textarea>
                   <div class="intensify-actions">
-                    <button class="btn btn-small" id="btn-intensify-preview" type="button">功能说明</button>
-                    <button class="btn btn-small" id="btn-intensify-execute" type="button">尚未开放</button>
+                    <button class="btn btn-small" id="btn-intensify-scan" type="button">扫描只读库存</button>
+                    <button class="btn btn-small" id="btn-intensify-preview" type="button" disabled>生成候选预览</button>
                   </div>
-                  <div id="cfg-intensify-status" class="intensify-status intensify-status-unknown">当前稳定版不会执行自动强化。</div>
+                  <div id="cfg-intensify-status" class="intensify-status intensify-status-unknown">尚未扫描库存，不会选择、操作或消耗舰船。</div>
+                  <div id="cfg-intensify-occurrences" class="intensify-occurrences" aria-live="polite" hidden>
+                    <p id="cfg-intensify-occurrence-summary" class="config-hint"></p>
+                    <div class="intensify-occurrence-group">
+                      <strong>目标 occurrence</strong>
+                      <div id="cfg-intensify-target-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                    <div class="intensify-occurrence-group">
+                      <strong>素材 occurrences</strong>
+                      <div id="cfg-intensify-material-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                  </div>
+                  <div id="cfg-intensify-candidate-preview" class="intensify-candidate-preview" aria-live="polite" hidden></div>
                 </div>
               </div>
             </div>

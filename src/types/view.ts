@@ -78,6 +78,35 @@ export interface ConfigViewObject {
   planRoot: string;
 }
 
+export interface IntensifyTargetOccurrenceViewObject {
+  readonly ref: string;
+  readonly label: string;
+  readonly stats: string;
+  readonly selected: boolean;
+}
+
+export interface IntensifyMaterialOccurrenceViewObject {
+  readonly ref: string;
+  readonly label: string;
+  readonly selected: boolean;
+}
+
+export interface IntensifyInventoryViewObject {
+  readonly summary: string;
+  readonly targets: readonly IntensifyTargetOccurrenceViewObject[];
+  readonly materials: readonly IntensifyMaterialOccurrenceViewObject[];
+}
+
+export interface IntensifyCandidatePreviewViewObject {
+  readonly summary: string;
+  readonly target: string;
+  readonly current: string;
+  readonly maximum: string;
+  readonly projectedGains: string;
+  readonly projected: string;
+  readonly materials: readonly string[];
+}
+
 export type AppStatus =
   | 'idle'
   | 'running'

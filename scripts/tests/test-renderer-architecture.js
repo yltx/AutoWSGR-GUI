@@ -146,19 +146,29 @@ assert.match(
 
 assertDisposeDelegation('src/view/config/ConfigView.ts', 'intensifyShipAutocomplete');
 
-const configControllerSource = fs.readFileSync(
-  path.join(controllerRoot, 'app', 'ConfigController.ts'),
+const settingsControllerSource = fs.readFileSync(
+  path.join(controllerRoot, 'app', 'SettingsController.ts'),
   'utf8',
 );
-assert.doesNotMatch(
-  configControllerSource,
-  /\.intensify(?:Preview)?\s*\(/,
-  'Stable ConfigController must not call reserved intensify endpoints',
+assert.match(
+  settingsControllerSource,
+  /this\.api\.createIntensifySnapshotSession\(/,
+  'SettingsController must own read-only intensify inventory scanning',
 );
 assert.match(
-  configControllerSource,
-  /showIntensifyUnavailable\(\): void/,
-  'Stable ConfigController must expose an explicit unavailable action',
+  settingsControllerSource,
+  /this\.api\.intensifySnapshotPreview\(/,
+  'SettingsController must own exact-occurrence snapshot preview orchestration',
+);
+assert.doesNotMatch(
+  settingsControllerSource,
+  /this\.api\.intensify\(/,
+  'SettingsController must not call the irreversible intensify endpoint',
+);
+assert.match(
+  appControllerSource,
+  /private renderConfig\(\): void\s*\{\s*this\.settingsCtrl\.invalidateIntensifySession\(\);\s*this\.configCtrl\.renderConfig\(\);\s*\}/,
+  'AppController must invalidate read-only intensify sessions before config rerenders',
 );
 
 const listenerSignals = [];

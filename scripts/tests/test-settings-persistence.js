@@ -1672,8 +1672,86 @@ async function runRendererTest(root, tempDirectory) {
   const intensifyFetchCalls = [];
   window.fetch = async (...args) => {
     intensifyFetchCalls.push(args);
+    const url = String(args[0] ?? '');
+    if (url.endsWith('/api/intensify/snapshot-sessions')) {
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            sessionId: 'snapshot-session',
+            createdAt: '2026-08-24T03:00:00+00:00',
+            expiresAt: '2026-08-24T03:10:00+00:00',
+            targetTotal: 2,
+            targetRevision: 'target-revision',
+            materialTotal: 3,
+            materialViewportCount: 1,
+            targets: [{
+              ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+              shipId: 7,
+              identity: '胡德',
+              occurrence: 0,
+              current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
+            }, {
+              ref: 'target:target-revision:0:0:1:0.2000:0.2000',
+              shipId: 8,
+              identity: '俾斯麦',
+              occurrence: 0,
+              current: { firepower: 2, torpedo: 0, armor: 4, antiAir: 3 },
+            }],
+            materials: [{
+              ref: 'material:material-revision:0:0:0:0.1000:0.2000',
+              shipId: 11,
+              identity: '萤火虫',
+              index: 0,
+            }, {
+              ref: 'material:material-revision:0:0:1:0.2000:0.2000',
+              shipId: 12,
+              identity: '吹雪',
+              index: 1,
+            }, {
+              ref: 'material:material-revision:0:0:2:0.3000:0.2000',
+              shipId: 13,
+              identity: '白雪',
+              index: 2,
+            }],
+          },
+        }),
+      };
+    }
     return {
-      json: async () => ({ success: true }),
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          targetRevision: 'target-revision',
+          materialRevision: 'material-revision',
+          executionPath: 'direct',
+          executable: false,
+          targets: [{
+            ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+            shipId: 7,
+            identity: '胡德',
+            occurrence: 0,
+            current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
+            maximum: { firepower: 5, torpedo: 6, armor: 7, antiAir: 8 },
+            deficit: { firepower: 4, torpedo: 4, armor: 4, antiAir: 4 },
+            projectedGains: { firepower: 1, torpedo: 0, armor: 2, antiAir: 0 },
+            projected: { firepower: 2, torpedo: 2, armor: 5, antiAir: 4 },
+            needsIntensify: true,
+          }],
+          materials: [{
+            ref: 'material:material-revision:0:0:0:0.1000:0.2000',
+            identity: '萤火虫',
+            index: 0,
+            contribution: { firepower: 25, torpedo: 0, armor: 50, antiAir: 0 },
+            rarity: 2,
+            requiresConfirmation: false,
+            eligible: true,
+            reason: 'allowlisted_nonzero_contribution',
+          }],
+        },
+      }),
     };
   };
   try {
@@ -1681,7 +1759,6 @@ async function runRendererTest(root, tempDirectory) {
       configView: view,
       getConfigDir: () => tempDirectory,
       saveConfig: () => controller.saveConfig(),
-      showIntensifyUnavailable: () => controller.showIntensifyUnavailable(),
       pickAutomationPlan: async () => null,
       pickLootAutomationPlans: async () => null,
       getNormalFightRemaining: () => 0,
@@ -1689,25 +1766,251 @@ async function runRendererTest(root, tempDirectory) {
       ensureSystemConnected: async () => false,
     }, null);
     settingsController.bindActions();
+    settingsController.bindActions();
 
-    for (const [buttonId, actionName] of [
-      ['btn-intensify-preview', '预览'],
-      ['btn-intensify-execute', '执行'],
-    ]) {
-      view.setIntensifyStatus('等待测试点击', 'unknown');
-      document.getElementById(buttonId)?.click();
-      await new Promise(resolve => setTimeout(resolve, 0));
-      rendererAssert.match(
-        document.getElementById('cfg-intensify-status')?.textContent ?? '',
-        /不会调用后端或操作舰船/,
-        `稳定版自动强化${actionName}入口必须明确阻塞执行`,
-      );
-      rendererAssert.equal(
-        intensifyFetchCalls.length,
-        0,
-        `稳定版自动强化${actionName}入口不得调用后端`,
-      );
-    }
+    view.setIntensifyStatus('等待测试点击', 'unknown');
+    const collectedBeforeInventory = view.collect();
+    document.getElementById('btn-intensify-scan')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.equal(intensifyFetchCalls.length, 1, '重复绑定不得重复发起扫描');
+    rendererAssert.match(
+      String(intensifyFetchCalls[0]?.[0] ?? ''),
+      /\/api\/intensify\/snapshot-sessions$/,
+    );
+    rendererAssert.equal(
+      intensifyFetchCalls[0]?.[1]?.body,
+      undefined,
+      '扫描 Session 请求不得携带 body',
+    );
+    rendererAssert.deepStrictEqual(
+      view.collect(),
+      collectedBeforeInventory,
+      '只读 occurrence 渲染不得改变设置表单',
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-target-occurrences')?.textContent ?? '',
+      /胡德 #1/,
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-material-occurrences')?.textContent ?? '',
+      /萤火虫 #1/,
+    );
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-target-occurrences button.is-selected',
+      ).length,
+      0,
+      '扫描后不得根据配置舰名隐式选择 target occurrence',
+    );
+    rendererAssert.equal(
+      document.getElementById('btn-intensify-preview')?.disabled,
+      true,
+      '未显式选择目标 occurrence 时不得生成候选预览',
+    );
+    document.querySelector('#cfg-intensify-target-occurrences button')?.click();
+    document.querySelector('#cfg-intensify-material-occurrences button')?.click();
+    document.getElementById('btn-intensify-preview')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-status')?.textContent ?? '',
+      /不可执行/,
+      '候选预览必须明确保持不可执行',
+    );
+    rendererAssert.equal(intensifyFetchCalls.length, 2);
+    rendererAssert.match(String(intensifyFetchCalls[1]?.[0] ?? ''), /\/api\/intensify\/snapshot-preview$/);
+    rendererAssert.deepStrictEqual(
+      JSON.parse(String(intensifyFetchCalls[1]?.[1]?.body)),
+      {
+        session_id: 'snapshot-session',
+        selected_target_ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+        allowed_material_identities: ['萤火虫'],
+        maximum_materials: 4,
+        selected_material_refs: ['material:material-revision:0:0:0:0.1000:0.2000'],
+      },
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-candidate-preview')?.textContent ?? '',
+      /预计收益.*火力 1.*装甲 2/,
+    );
+    rendererAssert.equal(
+      document.getElementById('btn-intensify-execute'),
+      null,
+      '只读 GUI 不得挂载强化执行按钮',
+    );
+
+    const maximumMaterialsInput = document.getElementById(
+      'cfg-intensify-max-materials',
+    );
+    maximumMaterialsInput.value = '1';
+    maximumMaterialsInput.dispatchEvent(new Event('change'));
+    Array.from(document.querySelectorAll(
+      '#cfg-intensify-material-occurrences button',
+    )).find(button => button.textContent.includes('吹雪 #2'))?.click();
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      1,
+      '达到素材上限时不得增加 occurrence 选择',
+    );
+    maximumMaterialsInput.value = '2';
+    maximumMaterialsInput.dispatchEvent(new Event('change'));
+    Array.from(document.querySelectorAll(
+      '#cfg-intensify-material-occurrences button',
+    )).find(button => button.textContent.includes('吹雪 #2'))?.click();
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      2,
+      '提高上限后此前被拒绝的 occurrence 必须可以再次选择',
+    );
+    maximumMaterialsInput.value = '4';
+    maximumMaterialsInput.dispatchEvent(new Event('change'));
+    Array.from(document.querySelectorAll(
+      '#cfg-intensify-material-occurrences button',
+    )).find(button => button.textContent.includes('白雪 #3'))?.click();
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      3,
+      '上限允许时应保留三个显式素材 occurrence 选择',
+    );
+    maximumMaterialsInput.value = '1';
+    maximumMaterialsInput.dispatchEvent(new Event('change'));
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      1,
+      '降低素材上限后必须按 Session occurrence 顺序保留前 N 个选择',
+    );
+    rendererAssert.equal(
+      document.querySelector(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      )?.textContent.includes('萤火虫 #1'),
+      true,
+      '降低素材上限必须确定性保留最早的已选 occurrence',
+    );
+    rendererAssert.equal(
+      document.getElementById('cfg-intensify-candidate-preview')?.hidden,
+      true,
+      '素材上限变化后旧候选预览必须立即清空',
+    );
+    document.getElementById('btn-intensify-preview')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.deepStrictEqual(
+      JSON.parse(String(intensifyFetchCalls.at(-1)?.[1]?.body)),
+      {
+        session_id: 'snapshot-session',
+        selected_target_ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+        allowed_material_identities: ['萤火虫'],
+        maximum_materials: 1,
+        selected_material_refs: ['material:material-revision:0:0:0:0.1000:0.2000'],
+      },
+      '降低素材上限后 Preview 请求不得携带被裁剪的 occurrence refs',
+    );
+    maximumMaterialsInput.value = '4';
+    maximumMaterialsInput.dispatchEvent(new Event('change'));
+    rendererAssert.equal(
+      document.getElementById('cfg-intensify-candidate-preview')?.hidden,
+      true,
+      '提高素材上限后旧候选预览也必须立即清空',
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-status')?.textContent ?? '',
+      /素材上限已更新/,
+      '素材上限任意变化都必须要求重新生成候选预览',
+    );
+
+    let resolveStalePreview;
+    window.fetch = async (...args) => {
+      intensifyFetchCalls.push(args);
+      return new Promise(resolve => {
+        resolveStalePreview = () => resolve({
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              targetRevision: 'target-revision',
+              materialRevision: 'material-revision',
+              executionPath: 'direct',
+              executable: false,
+              targets: [{
+                ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+                shipId: 7,
+                identity: '胡德',
+                occurrence: 0,
+                current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
+                maximum: { firepower: 5, torpedo: 6, armor: 7, antiAir: 8 },
+                deficit: { firepower: 4, torpedo: 4, armor: 4, antiAir: 4 },
+                projectedGains: { firepower: 1, torpedo: 0, armor: 2, antiAir: 0 },
+                projected: { firepower: 2, torpedo: 2, armor: 5, antiAir: 4 },
+                needsIntensify: true,
+              }],
+              materials: [],
+            },
+          }),
+        });
+      });
+    };
+    document.getElementById('btn-intensify-preview')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const targetButtons = document.querySelectorAll('#cfg-intensify-target-occurrences button');
+    targetButtons[1]?.click();
+    resolveStalePreview?.();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.equal(
+      document.getElementById('cfg-intensify-candidate-preview')?.hidden,
+      true,
+      '切换目标后旧异步预览不得覆盖当前选择',
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-status')?.textContent ?? '',
+      /目标 occurrence 已更新/,
+    );
+
+    window.fetch = async (...args) => {
+      intensifyFetchCalls.push(args);
+      return {
+        ok: false,
+        status: 404,
+        json: async () => ({ detail: '强化快照会话不可用' }),
+      };
+    };
+    document.getElementById('btn-intensify-preview')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.equal(
+      document.getElementById('cfg-intensify-occurrences')?.hidden,
+      true,
+      'Preview 404 后必须隐藏并清空失效 Session occurrences',
+    );
+    rendererAssert.equal(
+      document.querySelectorAll('#cfg-intensify-target-occurrences button').length,
+      0,
+      'Preview 404 后不得保留目标 occurrence DOM',
+    );
+    rendererAssert.equal(
+      document.querySelectorAll('#cfg-intensify-material-occurrences button').length,
+      0,
+      'Preview 404 后不得保留素材 occurrence DOM',
+    );
+    rendererAssert.equal(
+      document.getElementById('cfg-intensify-candidate-preview')?.hidden,
+      true,
+      'Preview 404 后不得保留旧候选预览',
+    );
+    rendererAssert.equal(
+      document.getElementById('btn-intensify-preview')?.disabled,
+      true,
+      'Preview 404 后必须禁用预览直到重新扫描',
+    );
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-status')?.textContent ?? '',
+      /会话.*重新扫描/,
+      'Preview 404 后必须明确提示 Session 已失效并要求重新扫描',
+    );
   } finally {
     window.fetch = originalFetch;
   }

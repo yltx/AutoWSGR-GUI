@@ -9,6 +9,12 @@ import {
   normalFightDailyLimit,
 } from '../../model/scheduler/NormalFightDailyQuota.js';
 import type { NormalFightTaskConfig } from '../../types/model.js';
+import type {
+  IntensifyMaterialOccurrenceData,
+  IntensifySnapshotPreviewData,
+  IntensifySnapshotSessionData,
+  IntensifyStatsData,
+} from '../../types/api.js';
 import { ApiClient } from '../../model/ApiClient';
 import { Logger } from '../../utils/Logger';
 import { showAlert, showConfirm } from '../../view/shared/DialogHelper';
@@ -23,7 +29,6 @@ export interface SettingsControllerHost {
   readonly configView: ConfigView;
   getConfigDir(): string;
   saveConfig(): Promise<void>;
-  showIntensifyUnavailable(): void;
   pickAutomationPlan(
     currentTask?: NormalFightTaskConfig,
   ): Promise<ManagedBattlePlanSelection | null>;
@@ -38,14 +43,25 @@ export interface SettingsControllerHost {
 export class SettingsController {
   private shipLibraryUpdating = false;
   private shipLibraryUpdateTarget: ShipLibraryUpdateTarget = 'wiki';
+  private intensifySession: IntensifySnapshotSessionData | null = null;
+  private selectedIntensifyTargetRef: string | null = null;
+  private readonly selectedIntensifyMaterialRefs = new Set<string>();
+  private intensifyRequestGeneration = 0;
+  private actionsBound = false;
 
   constructor(
     private readonly host: SettingsControllerHost,
     private readonly gateway: SettingsGateway | undefined =
       getSettingsGateway(),
+    private readonly api: Pick<
+      ApiClient,
+      'createIntensifySnapshotSession' | 'intensifySnapshotPreview'
+    > = new ApiClient(),
   ) {}
 
   bindActions(): void {
+    if (this.actionsBound) return;
+    this.actionsBound = true;
     const { configView } = this.host;
     this.gateway?.onShipLibraryUpdateProgress((progress) => {
       if (this.shipLibraryUpdating) {
@@ -58,8 +74,11 @@ export class SettingsController {
 
     configView.bindActions({
       onSave: () => void this.host.saveConfig(),
-      onPreviewIntensify: () => this.host.showIntensifyUnavailable(),
-      onExecuteIntensify: () => this.host.showIntensifyUnavailable(),
+      onScanIntensify: () => void this.scanIntensifyInventory(),
+      onPreviewIntensify: () => void this.previewIntensify(),
+      onSelectIntensifyTarget: ref => this.selectIntensifyTarget(ref),
+      onToggleIntensifyMaterial: ref => this.toggleIntensifyMaterial(ref),
+      onIntensifyMaxMaterialsChange: () => this.handleIntensifyMaxMaterialsChange(),
       onOpenConfigDir: () => this.openFolder(this.host.getConfigDir()),
       onBrowseEmulator: () => void this.browseDirectory(
         '选择模拟器安装目录',
@@ -106,6 +125,207 @@ export class SettingsController {
         applyTheme();
       },
     });
+  }
+
+  private async scanIntensifyInventory(): Promise<void> {
+    const { configView } = this.host;
+    const generation = ++this.intensifyRequestGeneration;
+    this.clearIntensifySelection();
+    configView.clearIntensifyInventory();
+    configView.setIntensifyLoading('scan');
+    configView.setIntensifyStatus('正在扫描完整目标与素材库存；只读扫描不会选择舰船。', 'unknown');
+    try {
+      const result = await this.api.createIntensifySnapshotSession();
+      if (generation !== this.intensifyRequestGeneration) return;
+      if (!result.success || !result.data) {
+        throw new Error(result.error || result.message || '强化库存扫描失败');
+      }
+      this.intensifySession = result.data;
+      this.selectedIntensifyTargetRef = null;
+      this.renderIntensifyInventory();
+      configView.setIntensifyStatus(
+        `只读快照已创建，有效期至 ${new Date(result.data.expiresAt).toLocaleTimeString()}。请选择一个目标 occurrence 和素材 occurrences。`,
+        'ok',
+      );
+    } catch (error) {
+      if (generation !== this.intensifyRequestGeneration) return;
+      this.intensifySession = null;
+      configView.setIntensifyStatus(
+        error instanceof Error ? error.message : String(error),
+        'error',
+      );
+    } finally {
+      if (generation === this.intensifyRequestGeneration) {
+        configView.setIntensifyLoading(null);
+      }
+    }
+  }
+
+  private async previewIntensify(): Promise<void> {
+    const { configView } = this.host;
+    const session = this.intensifySession;
+    const targetRef = this.selectedIntensifyTargetRef;
+    if (!session || !targetRef || this.selectedIntensifyMaterialRefs.size === 0) {
+      configView.setIntensifyStatus('请先扫描库存，并选择一个目标与至少一个素材 occurrence。', 'unknown');
+      return;
+    }
+    const generation = ++this.intensifyRequestGeneration;
+    configView.setIntensifyLoading('preview');
+    try {
+      const selectedMaterials = this.selectedMaterials(session);
+      const previewResult = await this.api.intensifySnapshotPreview({
+        session_id: session.sessionId,
+        selected_target_ref: targetRef,
+        allowed_material_identities: [...new Set(selectedMaterials.map(item => item.identity))],
+        maximum_materials: this.host.configView.getIntensifyMaxMaterials(),
+        selected_material_refs: selectedMaterials.map(item => item.ref),
+      });
+      if (generation !== this.intensifyRequestGeneration) return;
+      if (previewResult.status === 404) {
+        this.invalidateIntensifySession();
+        configView.setIntensifyStatus(
+          '强化快照会话已失效，请重新扫描库存。',
+          'error',
+        );
+        return;
+      }
+      const result = previewResult.response;
+      if (!result.success || !result.data) {
+        throw new Error(result.error || result.message || '强化候选预览失败');
+      }
+      this.renderIntensifyCandidate(result.data, targetRef);
+      configView.setIntensifyStatus('候选预览已生成；未操作设备且不可执行。', 'ok');
+    } catch (error) {
+      if (generation !== this.intensifyRequestGeneration) return;
+      configView.setIntensifyStatus(
+        error instanceof Error ? error.message : String(error),
+        'error',
+      );
+    } finally {
+      if (generation === this.intensifyRequestGeneration) {
+        configView.setIntensifyLoading(null);
+        this.updateIntensifyPreviewEnabled();
+      }
+    }
+  }
+
+  private selectIntensifyTarget(ref: string): void {
+    if (!this.intensifySession?.targets.some(item => item.ref === ref)) return;
+    this.intensifyRequestGeneration += 1;
+    this.host.configView.setIntensifyLoading(null);
+    this.selectedIntensifyTargetRef = ref;
+    this.host.configView.setIntensifyStatus('目标 occurrence 已更新，请重新生成候选预览。', 'unknown');
+    this.renderIntensifyInventory();
+  }
+
+  private toggleIntensifyMaterial(ref: string): void {
+    const session = this.intensifySession;
+    if (!session?.materials.some(item => item.ref === ref)) return;
+    const maximum = this.host.configView.getIntensifyMaxMaterials();
+    if (this.selectedIntensifyMaterialRefs.has(ref)) {
+      this.selectedIntensifyMaterialRefs.delete(ref);
+    } else if (this.selectedIntensifyMaterialRefs.size < maximum) {
+      this.selectedIntensifyMaterialRefs.add(ref);
+    } else {
+      this.host.configView.setIntensifyStatus(`单次最多选择 ${maximum} 艘素材舰。`, 'unknown');
+      return;
+    }
+    this.intensifyRequestGeneration += 1;
+    this.host.configView.setIntensifyLoading(null);
+    this.renderIntensifyInventory();
+  }
+
+  private handleIntensifyMaxMaterialsChange(): void {
+    const session = this.intensifySession;
+    if (!session) return;
+    const maximum = this.host.configView.getIntensifyMaxMaterials();
+    const retainedRefs = this.selectedMaterials(session)
+      .slice(0, maximum)
+      .map(item => item.ref);
+    this.selectedIntensifyMaterialRefs.clear();
+    retainedRefs.forEach(ref => this.selectedIntensifyMaterialRefs.add(ref));
+    this.intensifyRequestGeneration += 1;
+    this.host.configView.setIntensifyLoading(null);
+    this.host.configView.setIntensifyStatus(
+      `素材上限已更新，当前保留前 ${retainedRefs.length} 个 occurrence，请重新生成候选预览。`,
+      'unknown',
+    );
+    this.renderIntensifyInventory();
+  }
+
+  private renderIntensifyInventory(): void {
+    const session = this.intensifySession;
+    if (!session) return;
+    this.host.configView.showIntensifyInventory({
+      summary: `目标 ${session.targetTotal} 艘；素材 ${session.materialTotal} 艘；当前选择 ${this.selectedIntensifyMaterialRefs.size} 艘素材。`,
+      targets: session.targets.map(item => ({
+        ref: item.ref,
+        label: `${item.identity} #${item.occurrence + 1}`,
+        stats: this.formatIntensifyStats(item.current),
+        selected: item.ref === this.selectedIntensifyTargetRef,
+      })),
+      materials: session.materials.map(item => ({
+        ref: item.ref,
+        label: `${item.identity} #${item.index + 1}`,
+        selected: this.selectedIntensifyMaterialRefs.has(item.ref),
+      })),
+    });
+    this.updateIntensifyPreviewEnabled();
+  }
+
+  private renderIntensifyCandidate(
+    preview: IntensifySnapshotPreviewData,
+    targetRef: string,
+  ): void {
+    const target = preview.targets.find(item => item.ref === targetRef);
+    if (!target) throw new Error('所选目标 occurrence 不属于当前候选预览');
+    const materials = preview.materials.filter(item => this.selectedIntensifyMaterialRefs.has(item.ref));
+    this.host.configView.showIntensifyCandidatePreview({
+      summary: preview.executionPath === 'confirmation_required'
+        ? '所选素材包含高星舰，若未来执行必须经过保护确认；当前仍不可执行。'
+        : '当前只展示离线收益投影，不会执行强化。',
+      target: `${target.identity} #${target.occurrence + 1}`,
+      current: this.formatIntensifyStats(target.current),
+      maximum: this.formatIntensifyStats(target.maximum),
+      projectedGains: this.formatIntensifyStats(target.projectedGains),
+      projected: this.formatIntensifyStats(target.projected),
+      materials: materials.map(item => `${item.identity}（${item.rarity} 星）`),
+    });
+  }
+
+  private selectedMaterials(
+    session: IntensifySnapshotSessionData,
+  ): IntensifyMaterialOccurrenceData[] {
+    return session.materials.filter(item => this.selectedIntensifyMaterialRefs.has(item.ref));
+  }
+
+  private updateIntensifyPreviewEnabled(): void {
+    this.host.configView.setIntensifyPreviewEnabled(Boolean(
+      this.intensifySession
+      && this.selectedIntensifyTargetRef
+      && this.selectedIntensifyMaterialRefs.size > 0
+    ));
+  }
+
+  private clearIntensifySelection(): void {
+    this.intensifySession = null;
+    this.selectedIntensifyTargetRef = null;
+    this.selectedIntensifyMaterialRefs.clear();
+  }
+
+  invalidateIntensifySession(): void {
+    this.intensifyRequestGeneration += 1;
+    this.clearIntensifySelection();
+    this.host.configView.setIntensifyLoading(null);
+    this.host.configView.clearIntensifyInventory();
+    this.host.configView.setIntensifyStatus(
+      '尚未扫描库存，不会选择、操作或消耗舰船。',
+      'unknown',
+    );
+  }
+
+  private formatIntensifyStats(stats: IntensifyStatsData): string {
+    return `火力 ${stats.firepower} / 鱼雷 ${stats.torpedo} / 装甲 ${stats.armor} / 防空 ${stats.antiAir}`;
   }
 
   async refreshAdbStatus(): Promise<void> {
