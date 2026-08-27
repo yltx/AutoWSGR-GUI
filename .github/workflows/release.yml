@@ -143,6 +143,7 @@ jobs:
           Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
           node scripts/sync-map-resources.js --backend "${{ github.workspace }}/AutoWSGR" --check
           npm run test:build
+          node scripts/test-ship-library-contract.js
           npm run test:migrations
           npm run test:main-services
           npm run test:main-ipc
@@ -249,11 +250,11 @@ jobs:
             4. 1.4.x 覆盖升级会先将旧用户数据备份到 `%LOCALAPPDATA%\AutoWSGR-GUI\legacy-upgrade`；确认迁移结果前不要删除该目录
             5. 关闭“允许测试版更新”时只接收稳定版；开启后也接收版本号更高的 Alpha
 
-            ### 自动强化
-            2.0.0 仅保存自动强化策略，不加入 Scheduler，生产路径为零后端调用，也不会操作舰船。
+            ### 手动安全强化
+            设置页可发起只读库存扫描和候选预览；不会加入 Scheduler，不提供强化执行入口，也不会提交舰船操作。
 
             ### 回退
-            如需回退，请退出 2.0，使用旧安装器重新安装，并从 `legacy-upgrade` 备份恢复旧格式数据；不要让旧版直接写入或覆盖唯一的 2.0 `userData`。
+            如需回退，请退出 2.x，使用旧安装器重新安装，并从 `legacy-upgrade` 备份恢复旧格式数据；不要让旧版直接写入或覆盖唯一的 2.x `userData`。
 
             ### 系统要求
             - Windows 10/11 x64

@@ -78,9 +78,29 @@ external 仓库无效时直接失败，不能回退 managed，也不能把 GUI s
 ```text
 AUTOWSGR_OCR_GPU_MODE=cpu|cuda
 AUTOWSGR_SAVE_IMAGES=true|false
+AUTOWSGR_SHIP_LIBRARY=<resource>/resource/ship-library
+AUTOWSGR_STRENGTHEN_DATA=<resource>/resource/strengthen.json
+AUTOWSGR_WSG_NCC_DATA=<resource>/resource/wsg-ncc
+PYTHONPATH=<resource>/resource/wsg-ncc/python;<existing entries>
+PYTHONDONTWRITEBYTECODE=1
 ```
 
-GUI 不通过 monkey patch 控制 OCR。
+GUI 不通过 monkey patch 控制 OCR。系统资源路径由 Electron 从只读安装资源解析后
+传给 Python；后端不得从当前工作目录、用户数据目录、包管理器缓存或 HTTP 请求推导
+这些路径。GUI 将 `resource/wsg-ncc/python` 最小前置到既有 `PYTHONPATH`，并原序保留
+用户或 Python 环境已有条目；这使固定 WSG-NCC runtime 可离线导入，不依赖 pip、uv、
+Git 或网络安装。
+
+WSG-NCC 运行数据和 Python runtime 必须随安装资源提供，不能依赖开发机缓存。
+`resource/wsg-ncc/NOTICE.md` 记录源码项目与固定上游 commit、作者已授权维护者随 GUI
+再分发且授权证明由维护者持有，不虚构许可证文本或扩张授权范围；
+`resource/wsg-ncc/python/SHA256SUMS` 固定完整 Python 文件集合和哈希，资源契约及发布
+契约同时检查源码、数据与完整性清单。
+
+`resource/strengthen.json` 的 source ID 按后端既有规则映射为 canonical ship ID。资源
+契约要求覆盖集合精确等于舰船清单，当前只显式排除 4 个没有可信强化业务数据的
+special ID：`8007`、`8009`、`8111`、`8116`。不得从同名普通舰复制或猜测数值；这些
+ID 若被识别为目标或素材，后端因缺少 `strengthenMax`/`strengthenSupply` 必须 fail closed。
 
 ## ADB 与模拟器
 

@@ -54,12 +54,13 @@ Renderer 只通过 `window.electronBridge` 使用 Main 能力，且 Controller �
 
 | 数据 | 位置 |
 |---|---|
-| 系统作战/编队/日常方案、地图、内置模板 | `resource/` |
+| 系统作战/编队/日常方案、地图、内置模板、强化数据 | `resource/` |
 | 用户作战方案 | `userData/user_battle_plans/` |
 | 用户编队方案 | `userData/user_team_plans/` |
 | 用户日常方案 | `userData/user_daily_plans/` |
 | YAML/GUI 设置、任务组、用户模板 | `userData/` |
 | 舰船资料库工作副本 | `userData/ship-library/` |
+| 舰船资料库内置源 | `resource/ship-library/`，只读 |
 | 迁移账本 | `userData/.migration-state.json` |
 | 执行计划 | temp 的进程专属目录 |
 

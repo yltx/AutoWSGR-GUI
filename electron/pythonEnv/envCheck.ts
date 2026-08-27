@@ -463,7 +463,7 @@ export async function checkEnvironment(): Promise<EnvCheckResult> {
       );
       finalVer = updatedVer || autowsgrVersion;
       if (forceBackendInstall && !updatedVer) {
-        ctx.sendProgress('WARNING 个人分支后端强制更新未完成，下次启动将重试');
+        ctx.sendProgress('WARNING 本包固定后端提交强制更新未完成，下次启动将重试');
         return {
           pythonCmd,
           pythonVersion,

@@ -2,7 +2,7 @@
  * GUI 管理模式使用的 AutoWSGR 后端来源。
  *
  * 打包版本从 resources/backend-distribution.json 读取不可变发行清单。
- * 开发环境默认使用个人 ShiinaKuroko 分支对应的已验证提交。
+ * 开发环境默认与发行清单保持同一 OpenWSGR 仓库目标和固定提交。
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -17,9 +17,9 @@ export interface BackendDistribution {
 
 const DEFAULT_DISTRIBUTION: BackendDistribution = {
   id: 'stable',
-  repository: 'ShiinaKuroko/AutoWSGR',
-  ref: 'ShiinaKuroko',
-  commit: '77f34b7b30d18f7b86cf736bdd5cf17ae35d5f78',
+  repository: 'OpenWSGR/AutoWSGR',
+  ref: 'main',
+  commit: 'b9cfa72e4be10418b5f21e9f68388505a6515925',
   forceUpdateOnInstall: true,
 };
 

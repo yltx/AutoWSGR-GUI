@@ -321,7 +321,7 @@ export async function autoUpdateAutowsgr(
     ];
     deps.sendProgress(
       forceInstall
-        ? '正在重新安装本包指定的个人分支后端…'
+        ? '正在重新安装本包指定的固定后端提交…'
         : `当前 autowsgr ${incompatibilities.join('、')}，正在安装 GUI 兼容版本…`,
     );
     const failureVersion = forceInstall ? null : localVer;

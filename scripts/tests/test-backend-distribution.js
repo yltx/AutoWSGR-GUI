@@ -715,11 +715,11 @@ try {
   assert.equal(result.distribution.id, 'stable');
   assert.equal(
     result.distribution.repository,
-    'ShiinaKuroko/AutoWSGR',
+    'OpenWSGR/AutoWSGR',
   );
-  assert.equal(result.distribution.ref, 'ShiinaKuroko');
+  assert.equal(result.distribution.ref, 'main');
   assert.equal(result.distribution.forceUpdateOnInstall, true);
-  assert.match(result.requirement, /ShiinaKuroko\/AutoWSGR/);
+  assert.match(result.requirement, /OpenWSGR\/AutoWSGR/);
 
   const installer = fs.readFileSync(
     path.join(root, 'build', 'installer.nsh'),

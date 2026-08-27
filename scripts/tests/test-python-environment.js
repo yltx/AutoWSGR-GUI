@@ -131,10 +131,10 @@ try {
   );
   assert.equal(
     MANAGED_AUTOWSGR_COMMIT,
-    '77f34b7b30d18f7b86cf736bdd5cf17ae35d5f78',
+    'b9cfa72e4be10418b5f21e9f68388505a6515925',
   );
   assert.equal(BACKEND_DISTRIBUTION.id, 'stable');
-  assert.equal(BACKEND_DISTRIBUTION.ref, 'ShiinaKuroko');
+  assert.equal(BACKEND_DISTRIBUTION.ref, 'main');
   assert.equal(FORCE_MANAGED_AUTOWSGR_UPDATE_ON_INSTALL, true);
   assert.equal(
     MANAGED_AUTOWSGR_REQUIREMENT.endsWith(

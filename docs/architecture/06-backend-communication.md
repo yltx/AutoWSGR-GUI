@@ -124,10 +124,18 @@ ws://localhost:<backend_port>
 | 游戏状态 | `/api/game/context`、`acquisition` |
 | 建造/奖励/食堂 | `/api/build/*`、`/api/reward/collect`、`/api/cook` |
 | 修理/解体 | `/api/repair/*`、`/api/destroy` |
+| 强化只读预览 | `/api/intensify/snapshot-sessions`、`/api/intensify/snapshot-preview` |
 | 健康检查 | `/api/health` |
 
 具体请求类型定义在 `src/types/api.ts`。新增字段先确认 AutoWSGR 正式 API 契约，
 再修改 GUI DTO 和契约 fixture。
+
+强化扫描 Session 由后端持有并设有短期 TTL。GUI 只能使用 Session 响应公开的
+opaque target/material occurrence refs，不发送设备 serial、资源路径、扫描结果、proof
+或执行授权。`SettingsController` 独占当前 Session、选择和异步代次；这些临时状态不进入
+配置、Scheduler 或浏览器存储。`snapshot-preview` 必须携带一个服务端验证的
+`selected_target_ref`，响应只包含该目标；端点固定为不可执行，Renderer 不挂载真实强化
+执行入口。
 
 ### TaskRequest
 

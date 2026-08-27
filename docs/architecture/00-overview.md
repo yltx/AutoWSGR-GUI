@@ -131,7 +131,7 @@ AutoWSGR-GUI/
 | 舰船资料库工作副本 | `userData/ship-library/` |
 | 迁移账本 | `userData/.migration-state.json` |
 | Cron、额度、轻量 UI 偏好 | Renderer `localStorage` |
-| 系统方案、地图、内置模板 | `resource/`，只读 |
+| 系统方案、地图、内置模板、强化数据、舰船资料库内置源、WSG-NCC 运行数据 | `resource/`，只读 |
 | 执行前展开方案 | 系统 temp 下的进程专属目录 |
 
 安装目录中的同名配置只作为旧版本迁移来源，不能成为新的运行时写入目标。
