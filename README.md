@@ -287,6 +287,6 @@ GUI 保存的 YAML 必须通过当前前端校验，并最终符合 AutoWSGR 后
 
 ## 许可证
 
-项目源码采用 MIT 许可证。第三方运行时资源不因进入本仓库而自动适用 MIT；例如
-随包分发的 WSG-NCC 运行数据按 [`resource/wsg-ncc/NOTICE.md`](resource/wsg-ncc/NOTICE.md)
-记录的作者授权处理。
+项目源码采用 MIT 许可证。第三方运行时资源按各自随附许可处理；随包分发的
+WSG-NCC 运行数据与 Python runtime 使用其上游 MIT 许可证，详情见
+[`resource/wsg-ncc/NOTICE.md`](resource/wsg-ncc/NOTICE.md)。

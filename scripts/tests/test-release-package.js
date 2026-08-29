@@ -80,6 +80,23 @@ function assertResourceDirectory(name, packagedResources) {
   );
 }
 
+function assertNoPythonBytecode(directory, label) {
+  if (!fs.existsSync(directory)) return;
+  const pending = [directory];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const target = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        assert.notEqual(entry.name, '__pycache__', `${label} 不应包含 Python 缓存目录`);
+        pending.push(target);
+      } else {
+        assert.equal(/\.py[cod]$/i.test(entry.name), false, `${label} 不应包含 Python 字节码: ${entry.name}`);
+      }
+    }
+  }
+}
+
 function assertReleasePackage(distribution) {
   const releaseDirectory = path.join(releaseRoot, distribution.id);
   const unpacked = path.join(releaseDirectory, 'win-unpacked');
@@ -169,12 +186,18 @@ function assertReleasePackage(distribution) {
     );
   }
 
+  assertNoPythonBytecode(
+    path.join(packagedResources, 'wsg-ncc'),
+    `${label} WSG-NCC 资源`,
+  );
+
   for (const file of [
     'builtin_templates.json',
     'strengthen.json',
     'ship-library/manifest.json',
     'ship-library/labels.zh-CN.json',
     'ship-library/database/ships.sqlite3',
+    'wsg-ncc/LICENSE',
     'wsg-ncc/codebooks/cascade.npz',
     'wsg-ncc/gallery_meta.json',
     'wsg-ncc/NOTICE.md',

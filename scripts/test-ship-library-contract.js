@@ -90,9 +90,10 @@ for (const record of strengthenData) {
 
 const wsgNccRoot = wsgNccDataRoot(projectRoot);
 const wsgNccAssets = new Map([
+  ['LICENSE', '17451f2f5d0bc57cd8911e26c2e0610c95d81ae36398278c464a89c63f737351'],
   ['codebooks/cascade.npz', '81f1b3fb027f79d85f42dca86dc237fab5e0b8fe6c2da5a7c8bc52ac10a5be4b'],
   ['gallery_meta.json', '503f58607c637b6fa727663d09527dd48b093fde2c4ed96370732507b916bbe4'],
-  ['python/SHA256SUMS', 'feeaa1542d27ab832236db564842cfbfc6f3946c2849a7b5b41b336d8b288a9c'],
+  ['python/SHA256SUMS', 'b82027e0e883494fb01df6e1bd793101ed981f1642bbd0e230a554c22762aa3f'],
 ]);
 for (const [relativePath, expectedSha256] of wsgNccAssets) {
   const assetPath = path.join(wsgNccRoot, ...relativePath.split('/'));
@@ -106,11 +107,13 @@ for (const [relativePath, expectedSha256] of wsgNccAssets) {
 }
 const wsgNccNotice = fs.readFileSync(path.join(wsgNccRoot, 'NOTICE.md'), 'utf8');
 assert.match(wsgNccNotice, /https:\/\/github\.com\/CV-souryu\/WSG-NCC/);
+assert.match(wsgNccNotice, /1739742a4aba63321b4ae67f590e899ac7dbefcb/);
+assert.match(wsgNccNotice, /v2026\.08\.28/);
 assert.match(wsgNccNotice, /939e0dcf8c45df4892638acce1c7ff6f4cd07c55/);
-assert.match(wsgNccNotice, /feeaa1542d27ab832236db564842cfbfc6f3946c2849a7b5b41b336d8b288a9c/);
-assert.match(wsgNccNotice, /explicitly\s+authorized[^\n]*maintainer to redistribute/i);
-assert.match(wsgNccNotice, /maintainer holds the authorization evidence outside this\s+public repository/i);
-assert.match(wsgNccNotice, /does not invent\s+or grant a software license/i);
+assert.match(wsgNccNotice, /b82027e0e883494fb01df6e1bd793101ed981f1642bbd0e230a554c22762aa3f/);
+assert.match(wsgNccNotice, /redistributed under the bundled MIT license/i);
+assert.match(wsgNccNotice, /explicitly authorized[^\n]*AutoWSGR-GUI maintainer/i);
+assert.match(wsgNccNotice, /maintainer holds that authorization evidence outside this public repository/i);
 
 const pythonRoot = wsgNccPythonRoot(projectRoot);
 const pythonManifest = fs.readFileSync(path.join(pythonRoot, 'SHA256SUMS'), 'utf8')
@@ -218,6 +221,16 @@ assert.equal(
   resourceEntry.filter.some(pattern => pattern.includes('wsg-ncc')),
   false,
   'electron-builder resource filters must not exclude WSG-NCC runtime data',
+);
+assert.equal(
+  resourceEntry.filter.includes('!**/__pycache__/**/*'),
+  true,
+  'electron-builder must exclude Python bytecode cache directories',
+);
+assert.equal(
+  resourceEntry.filter.includes('!**/*.py[cod]'),
+  true,
+  'electron-builder must exclude Python bytecode files',
 );
 for (const excluded of ['builtin_plans', 'user_battle_plans', 'user_daily_plans', 'user_team_plans']) {
   assert.equal(

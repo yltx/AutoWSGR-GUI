@@ -76,6 +76,8 @@
         "to": "resource",
         "filter": [
           "**/*",
+          "!**/__pycache__/**/*",
+          "!**/*.py[cod]",
           "!builtin_plans/**/*",
           "!user_battle_plans/**/*",
           "!user_daily_plans/**/*",

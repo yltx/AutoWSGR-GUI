@@ -92,8 +92,8 @@ GUI 不通过 monkey patch 控制 OCR。系统资源路径由 Electron 从只读
 Git 或网络安装。
 
 WSG-NCC 运行数据和 Python runtime 必须随安装资源提供，不能依赖开发机缓存。
-`resource/wsg-ncc/NOTICE.md` 记录源码项目与固定上游 commit、作者已授权维护者随 GUI
-再分发且授权证明由维护者持有，不虚构许可证文本或扩张授权范围；
+`resource/wsg-ncc/NOTICE.md` 记录源码项目、固定上游 release/commit 和资源哈希，
+`resource/wsg-ncc/LICENSE` 随包提供上游 MIT 许可证；
 `resource/wsg-ncc/python/SHA256SUMS` 固定完整 Python 文件集合和哈希，资源契约及发布
 契约同时检查源码、数据与完整性清单。
 
