@@ -107,24 +107,29 @@ class WikiShipTypeTest(unittest.TestCase):
         ships = module_ships("DD", "DD")
         ships[1]["name"] = "塞尔弗里奇"
         ships[2]["name"] = "塞尔弗里奇·改"
+        ships[3]["name"] = "让巴尔"
+        ships[4]["name"] = "让巴尔·改"
 
         records = build_ship_records(
-            index_html(1, "DD") + index_html(2, "DD"),
+            index_html(1, "DD")
+            + index_html(2, "DD")
+            + index_html(3, "DD")
+            + index_html(4, "DD"),
             ships,
             "native",
         )
 
         self.assertEqual(
             [record.source_name for record in records],
-            ["塞尔弗里奇", "塞尔弗里奇·改"],
+            ["塞尔弗里奇", "塞尔弗里奇·改", "让巴尔", "让巴尔·改"],
         )
         self.assertEqual(
             [record.display_name_zh for record in records],
-            ["赛尔弗里吉", "赛尔弗里吉·改"],
+            ["赛尔弗里吉", "赛尔弗里吉·改", "让·巴尔", "让·巴尔·改"],
         )
         self.assertEqual(
             [record.search_name for record in records],
-            ["赛尔弗里吉", "赛尔弗里吉"],
+            ["赛尔弗里吉", "赛尔弗里吉", "让·巴尔", "让·巴尔"],
         )
 
     def test_bundled_library_keeps_canonical_types_and_all_assets(self) -> None:

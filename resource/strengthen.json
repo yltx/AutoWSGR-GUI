@@ -11033,6 +11033,74 @@
     }
   },
   {
+    "id": 10065213,
+    "title": "俄亥俄",
+    "strengthenLevelUpExp": 30,
+    "strengthenSupply": {
+      "atk": 106,
+      "torpedo": 0,
+      "def": 101,
+      "airDef": 87
+    },
+    "strengthenMax": {
+      "atk": 750,
+      "torpedo": 0,
+      "def": 600,
+      "airDef": 1050
+    }
+  },
+  {
+    "id": 10065311,
+    "title": "科西嘉人",
+    "strengthenLevelUpExp": 10,
+    "strengthenSupply": {
+      "atk": 0,
+      "torpedo": 22,
+      "def": 6,
+      "airDef": 18
+    },
+    "strengthenMax": {
+      "atk": 200,
+      "torpedo": 500,
+      "def": 150,
+      "airDef": 300
+    }
+  },
+  {
+    "id": 10065411,
+    "title": "S-189",
+    "strengthenLevelUpExp": 12,
+    "strengthenSupply": {
+      "atk": 0,
+      "torpedo": 33,
+      "def": 15,
+      "airDef": 0
+    },
+    "strengthenMax": {
+      "atk": 240,
+      "torpedo": 600,
+      "def": 180,
+      "airDef": 0
+    }
+  },
+  {
+    "id": 10065511,
+    "title": "水貂",
+    "strengthenLevelUpExp": 12,
+    "strengthenSupply": {
+      "atk": 0,
+      "torpedo": 13,
+      "def": 5,
+      "airDef": 0
+    },
+    "strengthenMax": {
+      "atk": 240,
+      "torpedo": 600,
+      "def": 180,
+      "airDef": 0
+    }
+  },
+  {
     "id": 11000113,
     "title": "胡德",
     "strengthenLevelUpExp": 30,

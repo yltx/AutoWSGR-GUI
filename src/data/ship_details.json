@@ -2087,7 +2087,7 @@
     },
     {
         "id": 299,
-        "name": "让巴尔",
+        "name": "让·巴尔",
         "nation": "法国",
         "ship_type": "bb",
         "is_retrofit": false
@@ -5769,7 +5769,7 @@
     },
     {
         "id": 1299,
-        "name": "让巴尔·改",
+        "name": "让·巴尔·改",
         "nation": "法国",
         "ship_type": "bbg",
         "is_retrofit": true

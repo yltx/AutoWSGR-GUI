@@ -361,6 +361,7 @@ def variant_code(ship_id: int, source_name: str) -> str:
 
 SHIP_NAME_CORRECTIONS = {
     "塞尔弗里奇": "赛尔弗里吉",
+    "让巴尔": "让·巴尔",
 }
 
 
