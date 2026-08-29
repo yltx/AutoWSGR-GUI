@@ -45,6 +45,8 @@ export interface ConfigViewObject {
   lootStopCount: number;
   logLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
   logRoot: string;
+  /** GUI 日志文件目录（相对配置目录或绝对路径），默认 "logs"。 */
+  guiLogRoot: string;
   themeMode: 'dark' | 'light' | 'system';
   accentColor: string;
   debugMode: boolean;
@@ -283,6 +285,7 @@ export interface PlanPreviewViewObject {
   gap?: number;
   lootCountGe?: number;
   shipCountGe?: number;
+  collectResultInfo?: boolean;
 }
 
 export type FleetPresetCatalogStatus = 'loading' | 'ready' | 'error';

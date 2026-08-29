@@ -1733,14 +1733,65 @@ async function stopNormalFightLifecycleHarness(harness) {
   harness.binder.dispose();
 }
 
+let earlyCompletionApi;
+earlyCompletionApi = createSchedulerApi({
+  taskStart: async () => {
+    earlyCompletionApi.callbacks.onTaskCompleted({
+      type: 'task_completed',
+      task_id: 'early-backend-task',
+      success: true,
+      result: null,
+      error: null,
+    });
+    return {
+      success: true,
+      data: { task_id: 'early-backend-task', status: 'running' },
+    };
+  },
+});
+const earlyCompletionScheduler = new schedulerModule.Scheduler(earlyCompletionApi);
+earlyCompletionScheduler.setAutoExpedition(false);
+assert.equal(await earlyCompletionScheduler.start(), true);
+earlyCompletionScheduler.addTask(
+  'HTTP 响应前完成测试',
+  'normal_fight',
+  { type: 'normal_fight' },
+);
+earlyCompletionScheduler.startConsuming();
+await wait(0);
+assert.equal(
+  earlyCompletionScheduler.currentRunningTask,
+  null,
+  'HTTP 响应前到达的匹配完成事件必须在绑定后重放',
+);
+assert.equal(earlyCompletionScheduler.status, 'idle');
+await earlyCompletionScheduler.stop();
+
 const completedLifecycle =
   await createNormalFightLifecycleHarness();
 completedLifecycle.cron.tick();
 await wait(0);
 assert.equal(completedLifecycle.loadCount, 1);
 assert.equal(completedLifecycle.scheduler.status, 'running');
+const completedBackendTaskId =
+  completedLifecycle.scheduler.currentRunningTask?.backendTaskId;
+assert.equal(typeof completedBackendTaskId, 'string');
 completedLifecycle.api.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'stale-backend-task',
+  success: true,
+  result: null,
+  error: null,
+});
+await wait(0);
+assert.equal(
+  completedLifecycle.scheduler.currentRunningTask?.backendTaskId,
+  completedBackendTaskId,
+  '旧后端任务完成事件不得结束当前轮次',
+);
+completedLifecycle.api.callbacks.onTaskCompleted({
+  type: 'task_completed',
+  task_id: completedBackendTaskId,
   success: true,
   result: null,
   error: null,
@@ -1785,6 +1836,7 @@ try {
   assert.equal(intervalLifecycle.scheduler.status, 'running');
   intervalLifecycle.api.callbacks.onTaskCompleted({
     type: 'task_completed',
+    task_id: 'backend-task-1',
     success: true,
     result: null,
     error: null,
@@ -1818,6 +1870,7 @@ exhaustedQuotaLifecycle.cron.tick();
 await wait(0);
 exhaustedQuotaLifecycle.api.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'backend-task-1',
   success: true,
   result: null,
   error: null,
@@ -1874,6 +1927,7 @@ executionFailureLifecycle.scheduler.currentRunningTask.retryCount =
   executionFailureLifecycle.scheduler.currentRunningTask.maxRetries;
 executionFailureLifecycle.api.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'backend-task-1',
   success: false,
   result: null,
   error: '模拟运行失败',
@@ -1928,6 +1982,7 @@ assert.equal(
 );
 clearQueueLifecycle.api.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'backend-task-1',
   success: true,
   result: null,
   error: null,
@@ -2174,6 +2229,7 @@ decisiveScheduler.startConsuming();
 await wait(0);
 decisiveApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'decisive-backend-1',
   success: true,
   result: null,
   error: null,
@@ -2229,6 +2285,7 @@ gapScheduler.startConsuming();
 await wait(0);
 gapApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'gap-backend-1',
   success: true,
   result: null,
   error: null,
@@ -2391,6 +2448,7 @@ terminalCampaignScheduler.startConsuming();
 await wait(0);
 terminalCampaignApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'terminal-campaign-1',
   success: false,
   result: {
     total_runs: 1,
@@ -2487,12 +2545,26 @@ const conditionParentId = conditionScheduler.addTask(
 );
 conditionScheduler.startConsuming();
 await wait(0);
+conditionApi.callbacks.onLog({
+  type: 'log',
+  timestamp: new Date().toISOString(),
+  level: 'INFO',
+  channel: 'ui',
+  message: '[UI] 战利品数量: 5/5',
+});
+await wait(0);
+assert.equal(
+  conditionStopCalls,
+  0,
+  'WebSocket 的重复计数不得触发停止条件',
+);
 conditionScheduler.processBackendLog('[UI] 战利品数量: 5/5');
 await wait(0);
 assert.equal(conditionStopCalls, 1);
 assert.equal(conditionScheduler.status, 'stopping');
 conditionApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'backend-task-1',
   success: false,
   result: null,
   error: null,
@@ -2618,6 +2690,7 @@ assert.deepEqual(
 );
 expeditionQueueApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'expedition-queue-1',
   success: true,
   result: null,
   error: null,
@@ -2766,6 +2839,7 @@ const wsStopPromise = wsStoppingScheduler.stopRunning();
 await new Promise(resolve => setTimeout(resolve, 20));
 wsStopApi.callbacks.onTaskCompleted({
   type: 'task_completed',
+  task_id: 'backend-task-1',
   success: false,
   result: null,
   error: null,

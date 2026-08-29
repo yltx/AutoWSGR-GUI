@@ -114,6 +114,14 @@ export class GuiConfigurationService {
     this.dependencies.clearPythonCache();
   }
 
+  /** 返回 GUI 日志保存目录；默认 'logs'（配置目录下）。 */
+  guiLogRoot(): string {
+    const raw = this.store.read().gui_log_root;
+    return typeof raw === 'string' && raw.trim()
+      ? raw.trim()
+      : 'logs';
+  }
+
   /** 返回 GUI 更新检查模式。 */
   updateMode(): UpdateMode {
     return this.store.read().update_mode === 'manual'
@@ -431,6 +439,9 @@ export class GuiConfigurationService {
       save_backend_screenshots:
         settings.saveBackendScreenshots === true,
       python_path: settings.pythonPath ?? '',
+      gui_log_root: typeof settings.guiLogRoot === 'string'
+        ? settings.guiLogRoot.trim()
+        : 'logs',
       automation: this.mergeAutomationSettings(normalizedAutomation),
     };
     this.dependencies.clearPythonCache();

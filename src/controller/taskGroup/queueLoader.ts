@@ -152,6 +152,8 @@ function addPlanTaskToQueue(
     planId,
     host.getShipNameAliases(),
   );
+  // sortKey 不再传 chapter：从任务列表加入队列时一律按加入时间排序，
+  // 让用户先加入的任务排在前面；批量加载（loadGroupToQueue）按 group.items 配置顺序入队。
   host.scheduler.addTask(
     plan.mapName,
     plan.isEvent ? 'event_fight' : 'normal_fight',
@@ -167,9 +169,6 @@ function addPlanTaskToQueue(
     !!item.allowPolling,
     plan.data.endpoint_nodes,
     plan.data.result,
-    typeof plan.data.chapter === 'number'
-      ? plan.data.chapter || undefined
-      : undefined,
   );
 }
 

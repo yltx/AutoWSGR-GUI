@@ -42,6 +42,7 @@ export interface GuiSettingsCommitRequest {
   cudaPath: string | null;
   saveBackendScreenshots: boolean;
   pythonPath: string | null;
+  guiLogRoot: string;
   windowPreferences: Omit<WindowPreferences, 'lastActivePage'>;
   automation: GuiAutomationSettings;
   usersettingsYaml: string;
@@ -361,6 +362,7 @@ export interface ElectronBridge {
   ) => Promise<string | null>;
   readFile: (path: string) => Promise<string>;
   appendFile: (path: string, content: string) => Promise<void>;
+  appendGuiLog: (content: string) => Promise<void>;
   detectEmulator: () => Promise<{
     type: string;
     path: string;
@@ -403,6 +405,7 @@ export interface ElectronBridge {
   onSetupLog: (callback: (text: string) => void) => void;
   getAppVersion: () => string;
   getBackendPort: () => number;
+  getGuiLogRoot: () => string;
   setBackendPort: (port: number) => Promise<void>;
   getGuiAutomationSettings: () => Promise<{
     exists: boolean;

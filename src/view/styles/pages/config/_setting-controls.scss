@@ -305,12 +305,24 @@
 .config-advanced-box {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   margin: 0 16px 12px;
-  padding: 12px;
+  padding: 4px 0;
+  overflow: hidden;
   background: var(--bg-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius);
+
+  .config-setting-row {
+    min-height: 40px;
+    padding: 5px 12px;
+    border-bottom: 1px solid var(--border);
+
+    &:last-child,
+    &:has(~ #cfg-backend-repo-wrap[style*="display: none"]) {
+      border-bottom: none;
+    }
+  }
 }
 
 .config-range-preview {

@@ -246,7 +246,7 @@ export class SchedulerBinder {
       onLog: (msg) => {
         const changed = this.runtime.consume(msg.message);
         if (changed) this.host.renderMain();
-        Logger.logLevel(msg.level.toLowerCase(), msg.message, msg.channel);
+        // Backend stdout is the GUI log owner; this WebSocket event is its duplicate.
       },
 
       onQueueChange: () => {

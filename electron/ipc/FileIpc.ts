@@ -4,6 +4,7 @@
 import * as fs from 'fs';
 import type { FileFilter } from 'electron';
 import type { CombatPlanRepository } from '../services/CombatPlanRepository';
+import type { GuiLogService } from '../services/GuiLogService';
 import type { SafePathService } from '../services/SafePathService';
 import type { SecureFileService } from '../services/SecureFileService';
 import type { IpcRegistrar } from './IpcRegistrar';
@@ -31,6 +32,7 @@ export interface FolderAdapter {
 export interface FileIpcDependencies {
   dialog: FileDialogAdapter;
   shell: FolderAdapter;
+  guiLogs: GuiLogService;
   secureFiles: SecureFileService;
   safePaths: SafePathService;
   combatPlans: CombatPlanRepository;
@@ -113,6 +115,10 @@ export function registerFileIpc(
       dependencies.secureFiles.append(filePath, content);
     },
   );
+
+  ipc.handle('append-gui-log', async (_event, content: string) => {
+    dependencies.guiLogs.append(content);
+  });
 
   ipc.handle('get-app-root', () => dependencies.appRoot());
 

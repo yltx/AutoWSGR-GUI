@@ -359,6 +359,18 @@ def variant_code(ship_id: int, source_name: str) -> str:
     return "normal"
 
 
+SHIP_NAME_CORRECTIONS = {
+    "塞尔弗里奇": "赛尔弗里吉",
+}
+
+
+def game_ship_name(source_name: str) -> str:
+    """修正 Wiki 中与游戏实际文本不一致的舰名。"""
+    suffix = "·改" if source_name.endswith("·改") else ""
+    base_name = source_name.removesuffix(suffix)
+    return f"{SHIP_NAME_CORRECTIONS.get(base_name, base_name)}{suffix}"
+
+
 def search_name(source_name: str) -> str:
     name = source_name[:-2] if source_name.endswith("·改") else source_name
     return SHIP_NAME_NOTE_SUFFIX_RE.sub("", name).strip()
@@ -418,12 +430,13 @@ def build_ship_records(
         wiki_url = urljoin(WIKI_ROOT, str(anchor.get("href", ""))) if anchor else ""
         size_code, role_code = ship_type_groups(ship_type_code)
         source_name = str(source["name"])
+        display_name = game_ship_name(source_name)
         rarity = int(source["rarity"])
         data = {
             "ship_id": ship_id,
             "source_name": source_name,
-            "display_name_zh": source_name,
-            "search_name": search_name(source_name),
+            "display_name_zh": display_name,
+            "search_name": search_name(display_name),
             "variant_code": variant_code(ship_id, source_name),
             "rarity": rarity,
             "ship_type_code": ship_type_code,

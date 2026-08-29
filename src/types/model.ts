@@ -180,6 +180,7 @@ export interface PlanData {
   gap?: number;
   stop_condition?: StopCondition;
   scheduled_time?: string;
+  collect_result_info?: boolean;
 }
 
 export interface StopCondition {

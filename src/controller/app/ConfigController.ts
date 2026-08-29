@@ -33,7 +33,7 @@ import {
   type ConfigurationGateway,
 } from '../../adapter/IpcAdapter';
 import { browserStorageStore } from '../../adapter/StorageAdapter';
-import { Logger } from '../../utils/Logger';
+import { Logger, LOG_LEVEL_ALIASES } from '../../utils/Logger';
 import {
   applyTheme,
   getAccentColor,
@@ -356,6 +356,10 @@ export class ConfigController {
       lootStopCount: gui.lootStopCount,
       logLevel: cfg.log.level,
       logRoot: cfg.log.root,
+      guiLogRoot: (
+        this.gateway?.getGuiLogRoot?.()
+        ?? browserStorageStore.get('guiLogRoot')
+      ) || 'logs',
       themeMode: getThemeMode(),
       accentColor: getAccentColor(),
       debugMode: browserStorageStore.get('debugMode') === 'true',
@@ -393,6 +397,8 @@ export class ConfigController {
     };
     this.host.configView.render(vo);
     this.savedConfigSnapshot = this.configSnapshot();
+    // 日志等级设置同时作用于 GUI 日志文件（低于该等级的日志不写入文件）
+    Logger.setLevel(LOG_LEVEL_ALIASES[vo.logLevel] ?? 'debug');
   }
 
   /** 保存配置并同步各组件 */
@@ -456,6 +462,7 @@ export class ConfigController {
         cudaPath: collected.cudaPath || null,
         saveBackendScreenshots: collected.saveBackendScreenshots,
         pythonPath: collected.pythonPath || null,
+        guiLogRoot: collected.guiLogRoot,
         windowPreferences: {
           defaultWidth: collected.defaultWindowWidth,
           defaultHeight: collected.defaultWindowHeight,
@@ -481,6 +488,9 @@ export class ConfigController {
         String(collected.debugMode),
       );
       browserStorageStore.set('updateMode', collected.updateMode);
+      // GUI 日志目录与日志等级均为 GUI 侧即时生效配置
+      browserStorageStore.set('guiLogRoot', collected.guiLogRoot);
+      Logger.setLevel(LOG_LEVEL_ALIASES[collected.logLevel] ?? 'debug');
       this.host.mainView.setDebugMode(collected.debugMode);
       applyTheme();
 
@@ -575,6 +585,13 @@ export class ConfigController {
         ...model.current.log,
         level: collected.logLevel,
         root: collected.logRoot,
+        // 调试模式设置同时作用于后端：控制各通道 DEBUG 输出开关
+        show_emulator_debug: collected.debugMode,
+        show_ui_debug: collected.debugMode,
+        show_vision_debug: collected.debugMode,
+        show_ops_debug: collected.debugMode,
+        show_combat_state_debug: collected.debugMode,
+        show_combat_recognition_debug: collected.debugMode,
       },
       daily_automation: {
         ...model.current.daily_automation,

@@ -31,6 +31,10 @@ const electronBridge = {
     return ipcRenderer.sendSync('get-backend-port-sync') as number;
   },
 
+  getGuiLogRoot: () => {
+    return ipcRenderer.sendSync('get-gui-log-root-sync') as string;
+  },
+
   getBackendStartupMode: () => {
     return ipcRenderer.sendSync('get-backend-startup-mode-sync') as 'managed' | 'external';
   },
@@ -337,6 +341,9 @@ const electronBridge = {
 
   appendFile: (filePath: string, content: string) => {
     return ipcRenderer.invoke('append-file', filePath, content);
+  },
+  appendGuiLog: (content: string) => {
+    return ipcRenderer.invoke('append-gui-log', content);
   },
 
   detectEmulator: () => {

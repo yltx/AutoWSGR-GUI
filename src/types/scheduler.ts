@@ -72,7 +72,11 @@ export interface SchedulerTask {
   endpointNodes?: string[];
   /** 终点节点的最低战果要求；未设置时仅判断是否经过终点。 */
   endpointResult?: BattleResultGrade;
-  /** 同优先级内排序键（数值越小越靠前），用于周常等需要严格按章节顺序执行的场景 */
+  /**
+   * 同优先级内排序键（数值越小越靠前）。
+   * 业务任务入队时不传该参数（默认 undefined=Infinity，被 push 到队尾，等价于按加入时间排序）；
+   * 仅用于内部重试/跟随等需要插入到特定位置的场景。
+   */
   sortKey?: number;
 }
 

@@ -86,6 +86,10 @@ const {
   GuiSettingsCommitService,
 } = require('../../../dist/electron/services/GuiSettingsCommitService.js');
 const {
+  GuiLogService,
+  resolveGuiLogDirectory,
+} = require('../../../dist/electron/services/GuiLogService.js');
+const {
   PythonEnvironmentService,
 } = require('../../../dist/electron/services/PythonEnvironmentService.js');
 const {
@@ -129,6 +133,8 @@ module.exports = {
   CudaEnvironmentService,
   GuiConfigurationService,
   GuiSettingsCommitService,
+  GuiLogService,
+  resolveGuiLogDirectory,
   PythonEnvironmentService,
   BackendUpdateService,
   temporaryDirectory,

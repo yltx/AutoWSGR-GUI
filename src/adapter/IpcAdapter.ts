@@ -94,7 +94,7 @@ export function getNavigationGateway(): NavigationGateway | undefined {
 
 export type AppRuntimeGateway = Pick<
   ElectronBridge,
-  'getAppVersion' | 'getBackendPort'
+  'getAppVersion' | 'getBackendPort' | 'getGuiLogRoot'
 >;
 
 export function getAppRuntimeGateway(): AppRuntimeGateway | undefined {
@@ -103,7 +103,7 @@ export function getAppRuntimeGateway(): AppRuntimeGateway | undefined {
 
 export type StartupGateway = Pick<
   ElectronBridge,
-  | 'appendFile'
+  | 'appendGuiLog'
   | 'autoCheckBackendUpdates'
   | 'checkEnvironment'
   | 'checkGuiUpdates'
@@ -133,6 +133,7 @@ export type ConfigurationGateway = Pick<
   | 'commitGuiSettings'
   | 'detectEmulator'
   | 'getBackendPort'
+  | 'getGuiLogRoot'
   | 'getBackendRepoPath'
   | 'getBackendStartupMode'
   | 'getBackendUpdateMode'

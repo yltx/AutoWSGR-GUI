@@ -53,6 +53,10 @@ export function registerConfigurationIpc(
     event.returnValue = dependencies.backendPort;
   });
 
+  ipc.on('get-gui-log-root-sync', (event) => {
+    event.returnValue = configuration.guiLogRoot();
+  });
+
   ipc.on('get-backend-startup-mode-sync', (event) => {
     event.returnValue = configuration.backendStartupMode();
   });

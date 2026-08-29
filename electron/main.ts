@@ -85,6 +85,7 @@ import {
 import {
   GuiSettingsCommitService,
 } from './services/GuiSettingsCommitService';
+import { GuiLogService } from './services/GuiLogService';
 import { PythonEnvironmentService } from './services/PythonEnvironmentService';
 import { registerBackendIpc } from './ipc/BackendIpc';
 import { registerCombatPlanIpc } from './ipc/CombatPlanIpc';
@@ -252,6 +253,7 @@ const guiConfigurationService = new GuiConfigurationService(
     environmentPort: () => process.env.AUTOWSGR_PORT,
   },
 );
+const guiLogService = new GuiLogService(appPaths, guiConfigurationService);
 const BACKEND_PORT = guiConfigurationService.backendPort();
 const windowService = new WindowService(guiSettingsStore, {
   backendPort: BACKEND_PORT,
@@ -455,6 +457,7 @@ function userDataRoot(): string {
 registerFileIpc(ipcMain, {
   dialog,
   shell,
+  guiLogs: guiLogService,
   secureFiles: secureFileService,
   safePaths: safePathService,
   combatPlans: combatPlanRepository,

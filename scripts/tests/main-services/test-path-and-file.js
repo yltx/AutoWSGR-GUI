@@ -32,6 +32,8 @@ const {
   AdbService,
   CudaEnvironmentService,
   GuiConfigurationService,
+  GuiLogService,
+  resolveGuiLogDirectory,
   PythonEnvironmentService,
   temporaryDirectory,
 } = context;
@@ -252,6 +254,59 @@ function testSecureFileService() {
   );
 }
 
+/** Verifies GUI logs use the latest configured root without weakening file IPC. */
+function testGuiLogService() {
+  const userData = path.join(temporaryDirectory, 'gui-log-user-data');
+  const externalRoot = path.join(temporaryDirectory, 'gui-log-external');
+  const appPaths = new AppPaths({
+    moduleDirectory: path.join(temporaryDirectory, 'dist', 'electron'),
+    isPackaged: () => true,
+    getPath: name => name === 'exe'
+      ? path.join(temporaryDirectory, 'AutoWSGR.exe')
+      : userData,
+    getResourcesPath: () => path.join(temporaryDirectory, 'resources'),
+  });
+  fs.mkdirSync(userData, { recursive: true });
+  const settings = new GuiSettingsStore(
+    () => path.join(userData, 'gui_settings.json'),
+    new AtomicFileStore(),
+  );
+  const configuration = new GuiConfigurationService(settings, {
+    clearPythonCache: () => {},
+    normalizeCudaPath: value => value,
+  });
+  settings.write({ gui_log_root: externalRoot });
+  const service = new GuiLogService(appPaths, configuration);
+
+  service.append('external\n');
+  const externalLog = fs.readdirSync(externalRoot).find(name =>
+    /^gui_\d{4}-\d{2}-\d{2}\.debug\.log$/.test(name),
+  );
+  assert.ok(externalLog);
+  assert.equal(
+    fs.readFileSync(path.join(externalRoot, externalLog), 'utf8'),
+    'external\n',
+  );
+
+  const relativeRootName = 'logs-after-save';
+  settings.write({ gui_log_root: relativeRootName });
+  service.append('relative\n');
+  const relativeRoot = path.join(userData, relativeRootName);
+  const relativeLog = fs.readdirSync(relativeRoot).find(name =>
+    /^gui_\d{4}-\d{2}-\d{2}\.debug\.log$/.test(name),
+  );
+  assert.ok(relativeLog);
+  assert.equal(
+    fs.readFileSync(path.join(relativeRoot, relativeLog), 'utf8'),
+    'relative\n',
+  );
+
+  assert.equal(
+    resolveGuiLogDirectory('\\\\server\\share\\logs', userData),
+    '\\\\server\\share\\logs',
+  );
+}
+
 /** 验证普通写入、覆盖写入和替换失败时保留旧文件。 */
 function testAtomicFileStore() {
   const store = new AtomicFileStore();
@@ -376,5 +431,6 @@ function testAtomicFileStore() {
 module.exports = {
   testAppPaths,
   testSecureFileService,
+  testGuiLogService,
   testAtomicFileStore,
 };

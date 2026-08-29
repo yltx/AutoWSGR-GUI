@@ -77,7 +77,7 @@ export function registerUpdaterIpc(
 ): void {
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
-  autoUpdater.allowDowngrade = false;
+  autoUpdater.allowDowngrade = true;
   autoUpdater.logger = context.logger;
 
   let updatePolicy = resolveGuiUpdateSelectionPolicy(
@@ -96,7 +96,7 @@ export function registerUpdaterIpc(
       channel: updatePolicy.channel,
     });
     autoUpdater.channel = updatePolicy.channel;
-    autoUpdater.allowDowngrade = false;
+    autoUpdater.allowDowngrade = true;
     autoUpdater.allowPrerelease = updatePolicy.allowPrerelease;
   };
   applyUpdatePolicy();

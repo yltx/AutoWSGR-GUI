@@ -34,6 +34,7 @@ export interface ConfigViewActions {
   onBrowseBackendRepo(): void;
   onBrowseCuda(): void;
   onBrowseLogRoot(): void;
+  onBrowseGuiLogRoot(): void;
   onBrowsePlanRoot(): void;
   onAddNormalFightTask(): void;
   onLoadLootPlans(): void;
@@ -61,7 +62,10 @@ export class ConfigView {
   private configTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('[data-config-tab]'));
   private configPanels = Array.from(document.querySelectorAll<HTMLElement>('[data-config-panel]'));
   private configTabDescription = document.getElementById('config-tab-description');
-  private backendUpdateChecking = false;
+  /** GUI 更新流程进行中（检查/下载/安装）。 */
+  private guiUpdateActive = false;
+  /** 后端更新流程进行中（检查/准备/下载）。 */
+  private backendUpdateActive = false;
   private readonly automationView = new ConfigAutomationView();
   private readonly runtimeView = new ConfigRuntimeView();
 
@@ -75,6 +79,7 @@ export class ConfigView {
   private backendUpdateButton = element<HTMLButtonElement>(
     'btn-check-backend-updates',
   );
+  private guiUpdateButton = element<HTMLButtonElement>('btn-check-updates');
   private allowTestUpdates = element<HTMLInputElement>('cfg-allow-test-updates');
   private autoExpedition = element<HTMLInputElement>('cfg-auto-expedition');
   private expeditionInterval = element<HTMLInputElement>('cfg-expedition-interval');
@@ -91,6 +96,7 @@ export class ConfigView {
 
   private logLevel = element<HTMLSelectElement>('cfg-log-level');
   private logRoot = element<HTMLInputElement>('cfg-log-root');
+  private guiLogRoot = element<HTMLInputElement>('cfg-gui-log-root');
   private themeMode = element<HTMLSelectElement>('cfg-theme-mode');
   private accentColor = element<HTMLInputElement>('cfg-accent-color');
   private accentLabel = element<HTMLElement>('cfg-accent-label');
@@ -142,11 +148,16 @@ export class ConfigView {
     });
     this.allowTestUpdates.addEventListener(
       'change',
-      () => this.updateBackendUpdateVisibility(),
+      () => this.updateUpdateButtons(),
+    );
+    this.updateMode.addEventListener('change', () => this.updateUpdateButtons());
+    this.backendUpdateMode.addEventListener(
+      'change',
+      () => this.updateUpdateButtons(),
     );
     this.backendStartupMode.addEventListener('change', () => {
       this.updateBackendRepoVisibility();
-      this.updateBackendUpdateVisibility();
+      this.updateUpdateButtons();
     });
     this.cudaPath.addEventListener('input', () => {
       const hasPath = this.cudaPath.value.trim().length > 0;
@@ -184,6 +195,7 @@ export class ConfigView {
     bindClick('btn-browse-backend-repo', actions.onBrowseBackendRepo);
     bindClick('btn-browse-cuda', actions.onBrowseCuda);
     bindClick('btn-browse-log-root', actions.onBrowseLogRoot);
+    bindClick('btn-browse-gui-log-root', actions.onBrowseGuiLogRoot);
     bindClick('btn-browse-plan-root', actions.onBrowsePlanRoot);
     bindClick('btn-add-normal-fight-task', actions.onAddNormalFightTask);
     bindClick('btn-load-loot-plans', actions.onLoadLootPlans);
@@ -240,6 +252,7 @@ export class ConfigView {
     this.lootStopCount.value = String(vo.lootStopCount);
     this.logLevel.value = vo.logLevel;
     this.logRoot.value = vo.logRoot;
+    this.guiLogRoot.value = vo.guiLogRoot;
     this.themeMode.value = vo.themeMode;
     this.accentColor.value = vo.accentColor;
     this.accentLabel.textContent = vo.accentColor;
@@ -281,7 +294,7 @@ export class ConfigView {
 
     this.updateDebugAdvancedVisibility();
     this.updateBackendRepoVisibility();
-    this.updateBackendUpdateVisibility();
+    this.updateUpdateButtons();
   }
 
   /** 收集并校验当前表单。 */
@@ -326,6 +339,7 @@ export class ConfigView {
       lootStopCount: Math.trunc(this.clamp(this.lootStopCount.value, 1, 50, 50)),
       logLevel: this.logLevel.value as ConfigViewObject['logLevel'],
       logRoot: this.logRoot.value.trim() || 'logs',
+      guiLogRoot: this.guiLogRoot.value.trim() || 'logs',
       themeMode: this.themeMode.value as ConfigViewObject['themeMode'],
       accentColor: this.accentColor.value,
       debugMode: this.debugMode.checked,
@@ -406,14 +420,26 @@ export class ConfigView {
     this.backendRepoPath.required = show;
   }
 
-  private updateBackendUpdateVisibility(): void {
+  /**
+   * 统一计算两个更新按钮（GUI/后端）的可用状态。
+   * - 任一更新流程进行中（检查/下载/安装）时，两个按钮互斥置灰
+   * - 自动更新模式下对应按钮置灰
+   * - 后端按钮额外受 alpha 开关与外部后端启动方式约束
+   */
+  private updateUpdateButtons(): void {
     const alphaEnabled = this.allowTestUpdates.checked;
     this.backendUpdateRow.hidden = !alphaEnabled;
     this.backendUpdateMode.disabled = !alphaEnabled;
+    const anyActive = this.guiUpdateActive || this.backendUpdateActive;
+    this.guiUpdateButton.disabled = (
+      this.updateMode.value === 'auto'
+      || anyActive
+    );
     this.backendUpdateButton.disabled = (
       !alphaEnabled
       || this.backendStartupMode.checked
-      || this.backendUpdateChecking
+      || this.backendUpdateMode.value === 'auto'
+      || anyActive
     );
   }
 
@@ -446,6 +472,7 @@ export class ConfigView {
   setPythonPath(path: string): void { this.pythonPath.value = path; }
   setBackendRepoPath(path: string): void { this.backendRepoPath.value = path; }
   setLogRoot(path: string): void { this.logRoot.value = path; }
+  setGuiLogRoot(path: string): void { this.guiLogRoot.value = path; }
   setPlanRoot(path: string): void { this.planRoot.value = path; }
   setCudaPath(path: string): void { this.cudaPath.value = path; }
   getEmulatorSerial(): string { return this.emuSerial.value.trim(); }
@@ -508,17 +535,25 @@ export class ConfigView {
   }
 
   setUpdateCheckLoading(loading: boolean): void {
+    this.guiUpdateActive = loading;
     this.runtimeView.setUpdateCheckLoading(loading);
+    this.updateUpdateButtons();
   }
 
   setGuiUpdateStatus(status: GuiUpdateStatus): void {
     this.runtimeView.setGuiUpdateStatus(status);
   }
 
+  /** 由更新状态事件驱动：检查/下载/安装中置位，结束后复位并重算按钮置灰。 */
+  setGuiUpdateActive(active: boolean): void {
+    this.guiUpdateActive = active;
+    this.updateUpdateButtons();
+  }
+
   setBackendUpdateCheckLoading(loading: boolean): void {
-    this.backendUpdateChecking = loading;
+    this.backendUpdateActive = loading;
     this.runtimeView.setBackendUpdateCheckLoading(loading);
-    this.updateBackendUpdateVisibility();
+    this.updateUpdateButtons();
   }
 
   setBackendUpdateStatus(status: BackendUpdateStatus): void {

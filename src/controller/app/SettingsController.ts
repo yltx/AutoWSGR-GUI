@@ -52,6 +52,11 @@ export class SettingsController {
       }
     });
     this.gateway?.onUpdateStatus((status) => {
+      configView.setGuiUpdateActive(
+        status.status === 'checking'
+        || status.status === 'downloading'
+        || status.status === 'installing',
+      );
       configView.setGuiUpdateStatus(status);
     });
     this.gateway?.onBackendUpdateStatus((status) => {
@@ -82,6 +87,10 @@ export class SettingsController {
       onBrowseLogRoot: () => void this.browseDirectory(
         '选择后端日志目录',
         path => configView.setLogRoot(path),
+      ),
+      onBrowseGuiLogRoot: () => void this.browseDirectory(
+        '选择 GUI 日志目录',
+        path => configView.setGuiLogRoot(path),
       ),
       onBrowsePlanRoot: () => void this.browseDirectory(
         '选择后端作战方案根目录',

@@ -5,7 +5,12 @@
  * Electron 与真实用户数据不会被加载。
  */
 const { fs, temporaryDirectory } = require('./main-services/test-context');
-const { testAppPaths, testSecureFileService, testAtomicFileStore } = require('./main-services/test-path-and-file');
+const {
+  testAppPaths,
+  testSecureFileService,
+  testGuiLogService,
+  testAtomicFileStore,
+} = require('./main-services/test-path-and-file');
 const {
   testWindowService,
   testGuiSettingsStore,
@@ -34,6 +39,7 @@ async function main() {
   testSingleInstanceService();
   testAppPaths();
   testSecureFileService();
+  testGuiLogService();
   testWindowService();
   testGuiSettingsStore();
   testGuiConfigurationService();

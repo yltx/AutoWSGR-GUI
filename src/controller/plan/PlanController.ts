@@ -273,6 +273,8 @@ export class PlanController {
         this.currentPlan.data.stop_condition[field] = value as number | undefined;
         const sc = this.currentPlan.data.stop_condition;
         if (sc.loot_count_ge == null && sc.ship_count_ge == null) this.currentPlan.data.stop_condition = undefined;
+      } else if (field === 'collect_result_info') {
+        this.currentPlan.data.collect_result_info = value as boolean;
       }
     };
 

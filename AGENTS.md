@@ -175,7 +175,7 @@
 - 只有维护者明确要求并批准 PR 时，才允许从主库目标分支的当前远端指针创建对应 PR 分支；格式为 `feat/<功能>-PR` 或 `fix/<功能>-PR`，Git 分支名不得使用反斜杠。PR 分支只 cherry-pick 本次待审业务提交；push 前必须对比主库目标分支，确认 diff 不包含 `AGENTS.md`。创建下一条 PR 前必须检查上一条临时 PR 的状态，确认代码已经合入目标分支后，删除对应的本地和远端 PR 分支；未合入或状态不明确时不得删除。
 - GitHub 网络操作前读取系统当前代理设置；只允许命令级临时代理，不得硬编码端口或修改全局 Git 配置。
 - 每次 push `ShiinaSakuya` 或 `ShiinaKuroko` 前必须先 `git fetch origin`。本地落后或出现分叉时，先审查并整合远端提交，不得用强推覆盖远端代码。
-- 只有维护者明确要求并批准时，才以对应目标分支的当前远端指针创建不可移动备份 `backup/YYYYMMDD-<short-sha>`；不得擅自创建、移动、复用或删除 backup 分支。
+- 每次 push 前以对应目标分支的当前远端指针创建不可移动备份 `backup/YYYYMMDD-<short-sha>`；备份仅保留本次 push 和上一次 push 的两个，创建新备份后删除更早的旧备份。不得擅自移动、复用或删除 backup 分支，但按本条保留策略执行的删除除外。
 - 普通 push 禁止 `--force` 和 `--force-with-lease`。只有用户明确授权历史改写、已说明将被替换的远端提交且备份完成时，才允许使用 `--force-with-lease`。
 - push 完成后检查其他本地工作分支：只有确认有效提交已进入对应目标分支、没有独有未推送提交、没有未提交修改且未被 worktree 使用时才能删除。不得批量强删；保留 `main`、`ShiinaSakuya`、`ShiinaKuroko` 和仍未合入的活动 PR 分支。
 
@@ -232,3 +232,11 @@
 - 本文件维护长期工程门禁和主库 1.4.4 协作契约，`docs/architecture/**` 维护当前 GUI 结构与 ADR；发现两者与实现不一致时按第 2 节处理。
 - 工具入口只指向本文件，不复制整套规则。阶段性迁移清单、历史事故和已结束的单次分工放入对应任务文档，不写入长期 Agent 约束。
 - 修改本文件前必须先审查当前代码和门禁；新增、删除或降低规则前，先向用户列明具体动作、原因和影响并取得确认。
+
+## 11. Project Worktree Coordination
+
+When this repository is inside a parent project containing a coordination `AGENTS.md`, read the parent policy before writing. The parent meta repository owns the `planning-with-files` task files; this repository owns only GUI code, tests, build, packaging, and release artifacts.
+
+- The current project policy explicitly authorizes local task branches and worktrees for parallel work. This does not authorize remote branch, push, tag, or release operations.
+- Work only in the child worktree assigned to the matching `codex/<task-id>` branch. Do not switch the shared `ShiinaKuroko` or `main` checkout to another task branch.
+- Keep GUI commits and verification in this repository, and record the resulting SHA in the parent meta task's `progress.md`.

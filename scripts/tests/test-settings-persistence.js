@@ -173,6 +173,7 @@ async function runRendererTest(root, tempDirectory) {
     lootStopCount: 17,
     logLevel: 'WARNING',
     logRoot: 'C:\\SettingsTest\\logs',
+    guiLogRoot: 'C:\\SettingsTest\\gui-logs',
     themeMode: 'light',
     accentColor: '#123456',
     debugMode: true,
@@ -1417,6 +1418,7 @@ async function runRendererTest(root, tempDirectory) {
       settings: structuredClone(guiSettings.automation ?? {}),
     }),
     getAllowTestUpdates: () => guiSettings.allow_test_updates === true,
+    getGuiLogRoot: () => guiSettings.gui_log_root ?? 'logs',
     setGuiAutomationSettings: async settings => {
       if (failGuiAutomationMigration) {
         throw new Error('模拟 GUI 自动化配置写入失败');
@@ -1446,6 +1448,7 @@ async function runRendererTest(root, tempDirectory) {
         cuda_path: request.cudaPath ?? '',
         save_backend_screenshots: request.saveBackendScreenshots,
         python_path: request.pythonPath ?? '',
+        gui_log_root: request.guiLogRoot ?? 'logs',
         default_window_width: request.windowPreferences.defaultWidth,
         default_window_height: request.windowPreferences.defaultHeight,
         remember_window_bounds: request.windowPreferences.rememberBounds,
@@ -1777,6 +1780,14 @@ async function runRendererTest(root, tempDirectory) {
     false,
     '成功保存后设置页不得被标记为未保存',
   );
+  const guiLogRootInput = document.getElementById('cfg-gui-log-root');
+  guiLogRootInput.value = sample.guiLogRoot;
+  rendererAssert.equal(
+    controller.hasUnsavedChanges(),
+    true,
+    '修改 GUI 日志目录后必须被标记为未保存',
+  );
+  await controller.saveConfig();
   view.setNormalFightRemaining(sample.normalFightTasks, 1);
   rendererAssert.equal(
     controller.hasUnsavedChanges(),
@@ -1917,6 +1928,12 @@ async function runRendererTest(root, tempDirectory) {
   rendererAssert.deepStrictEqual(savedYaml.log, {
     level: sample.logLevel,
     root: sample.logRoot,
+    show_emulator_debug: sample.debugMode,
+    show_ui_debug: sample.debugMode,
+    show_vision_debug: sample.debugMode,
+    show_ops_debug: sample.debugMode,
+    show_combat_state_debug: sample.debugMode,
+    show_combat_recognition_debug: sample.debugMode,
     channels: {
       'stale.channel': 'DEBUG',
       backend_metadata: {
@@ -1995,6 +2012,7 @@ async function runRendererTest(root, tempDirectory) {
     sample.saveBackendScreenshots,
   );
   rendererAssert.equal(savedGui.python_path, sample.pythonPath);
+  rendererAssert.equal(savedGui.gui_log_root, sample.guiLogRoot);
   rendererAssert.equal(savedGui.update_mode, sample.updateMode);
   rendererAssert.equal(savedGui.backend_update_mode, 'auto');
   rendererAssert.equal(
@@ -2163,6 +2181,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-loot-stop-count',
     'cfg-log-level',
     'cfg-log-root',
+    'cfg-gui-log-root',
     'cfg-debug-mode',
     'cfg-python-path',
     'cfg-backend-port',

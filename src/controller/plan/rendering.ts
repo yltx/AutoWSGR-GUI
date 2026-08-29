@@ -128,5 +128,6 @@ export function buildPlanPreviewVO(
     gap: plan.data.gap,
     lootCountGe: plan.data.stop_condition?.loot_count_ge,
     shipCountGe: plan.data.stop_condition?.ship_count_ge,
+    collectResultInfo: plan.data.collect_result_info,
   };
 }

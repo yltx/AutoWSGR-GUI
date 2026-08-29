@@ -89,6 +89,9 @@ export class PlanModel {
       gap: parsed.gap != null ? Number(parsed.gap) : undefined,
       stop_condition: parsed.stop_condition as PlanData['stop_condition'],
       scheduled_time: typeof parsed.scheduled_time === 'string' ? parsed.scheduled_time : undefined,
+      collect_result_info: typeof parsed.collect_result_info === 'boolean'
+        ? parsed.collect_result_info
+        : undefined,
     };
 
     return new PlanModel(data, path, comment, structuredClone(parsed));
@@ -244,6 +247,7 @@ export class PlanModel {
     this.setOptionalField(obj, 'gap', this.data.gap);
     this.setOptionalField(obj, 'stop_condition', this.data.stop_condition);
     this.setOptionalField(obj, 'scheduled_time', this.data.scheduled_time);
+    this.setOptionalField(obj, 'collect_result_info', this.data.collect_result_info);
 
     if (this.data.fleet_presets !== undefined) {
       if (this.data.fleet_presets.length > 0) {
