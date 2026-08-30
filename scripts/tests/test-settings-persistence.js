@@ -197,6 +197,7 @@ async function runRendererTest(root, tempDirectory) {
     rememberWindowBounds: true,
     operationDelayMin: 0.4,
     operationDelayMax: 1.6,
+    dockFullMode: 0,
     dockFullDestroy: false,
     repairManually: true,
     bathroomCount: 6,
@@ -2236,6 +2237,10 @@ async function runRendererTest(root, tempDirectory) {
     sample.operationDelayMax,
   );
   rendererAssert.equal(
+    savedYaml.dock_full_mode,
+    sample.dockFullMode,
+  );
+  rendererAssert.equal(
     savedYaml.dock_full_destroy,
     sample.dockFullDestroy,
   );
@@ -2497,7 +2502,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-ocr-confidence',
     'cfg-ship-name-aliases',
     'cfg-ship-name-corrections',
-    'cfg-dock-full-destroy',
+    'cfg-dock-full-mode',
     'cfg-repair-manually',
     'cfg-bathroom-count',
     'cfg-destroy-ship-mode',

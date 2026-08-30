@@ -69,6 +69,7 @@ export interface ConfigViewObject {
   rememberWindowBounds: boolean;
   operationDelayMin: number;
   operationDelayMax: number;
+  dockFullMode: number;
   dockFullDestroy: boolean;
   repairManually: boolean;
   bathroomCount: number;

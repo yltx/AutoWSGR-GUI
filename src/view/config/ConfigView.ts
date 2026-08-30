@@ -133,7 +133,7 @@ export class ConfigView {
   private delayMinRange = element<HTMLInputElement>('cfg-delay-min-range');
   private delayMax = element<HTMLInputElement>('cfg-delay-max');
   private delayMaxRange = element<HTMLInputElement>('cfg-delay-max-range');
-  private dockFullDestroy = element<HTMLInputElement>('cfg-dock-full-destroy');
+  private dockFullMode = element<HTMLSelectElement>('cfg-dock-full-mode');
   private repairManually = element<HTMLSelectElement>('cfg-repair-manually');
   private bathroomCount = element<HTMLInputElement>('cfg-bathroom-count');
   private destroyShipWorkMode = element<HTMLSelectElement>('cfg-destroy-ship-mode');
@@ -299,7 +299,7 @@ export class ConfigView {
     this.rememberWindowBounds.checked = vo.rememberWindowBounds;
     this.setRangeValue(this.delayMinRange, this.delayMin, vo.operationDelayMin);
     this.setRangeValue(this.delayMaxRange, this.delayMax, vo.operationDelayMax);
-    this.dockFullDestroy.checked = vo.dockFullDestroy;
+    this.dockFullMode.value = String(vo.dockFullMode ?? (vo.dockFullDestroy ? 1 : 0));
     this.repairManually.value = String(vo.repairManually);
     this.bathroomCount.value = String(vo.bathroomCount);
     this.destroyShipWorkMode.value = String(vo.destroyShipWorkMode);
@@ -386,7 +386,8 @@ export class ConfigView {
       rememberWindowBounds: this.rememberWindowBounds.checked,
       operationDelayMin,
       operationDelayMax,
-      dockFullDestroy: this.dockFullDestroy.checked,
+      dockFullMode: Math.trunc(this.clamp(this.dockFullMode.value, 0, 3, 0)),
+      dockFullDestroy: (Math.trunc(this.clamp(this.dockFullMode.value, 0, 3, 0))) > 0,
       repairManually: this.repairManually.value === 'true',
       bathroomCount: Math.trunc(this.clamp(this.bathroomCount.value, 1, 12, 2)),
       destroyShipWorkMode: Math.trunc(this.clamp(this.destroyShipWorkMode.value, 0, 2, 0)),

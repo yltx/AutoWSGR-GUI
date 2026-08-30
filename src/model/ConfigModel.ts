@@ -68,6 +68,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   },
   operation_delay_min: 0,
   operation_delay_max: 0,
+  dock_full_mode: 0,
   dock_full_destroy: false,
   repair_manually: false,
   bathroom_count: 2,
@@ -272,8 +273,12 @@ export class ConfigModel {
       10,
       0,
     );
-    if (typeof parsed.dock_full_destroy === 'boolean') {
+    if (parsed.dock_full_mode !== undefined) {
+      base.dock_full_mode = this.dockFullMode(parsed.dock_full_mode);
+      base.dock_full_destroy = base.dock_full_mode > 0;
+    } else if (typeof parsed.dock_full_destroy === 'boolean') {
       base.dock_full_destroy = parsed.dock_full_destroy;
+      base.dock_full_mode = parsed.dock_full_destroy ? 1 : 0;
     }
     if (typeof parsed.repair_manually === 'boolean') {
       base.repair_manually = parsed.repair_manually;
@@ -338,6 +343,7 @@ export class ConfigModel {
 
     output.operation_delay_min = this.settings.operation_delay_min;
     output.operation_delay_max = this.settings.operation_delay_max;
+    output.dock_full_mode = this.settings.dock_full_mode;
     output.dock_full_destroy = this.settings.dock_full_destroy;
     output.repair_manually = this.settings.repair_manually;
     output.bathroom_count = this.settings.bathroom_count;
@@ -377,6 +383,7 @@ export class ConfigModel {
     for (const key of [
       'operation_delay_min',
       'operation_delay_max',
+      'dock_full_mode',
       'dock_full_destroy',
       'repair_manually',
       'bathroom_count',
@@ -691,6 +698,28 @@ export class ConfigModel {
     }
     this.invalidLegacyDecisiveFields = invalid;
     return output;
+  }
+
+  private dockFullMode(value: unknown): number {
+    const aliases: Record<string, number> = {
+      '关闭': 0,
+      disable: 0,
+      '解装': 1,
+      destroy: 1,
+      '强化': 2,
+      intensify: 2,
+      '自动': 3,
+      auto: 3,
+      '混合': 3,
+    };
+    if (typeof value === 'string' && value.trim() in aliases) {
+      return aliases[value.trim()];
+    }
+    if (typeof value === 'boolean') {
+      return value ? 1 : 0;
+    }
+    const number = Math.trunc(Number(value));
+    return [0, 1, 2, 3].includes(number) ? number : 0;
   }
 
   private destroyMode(value: unknown): number {

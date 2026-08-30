@@ -217,13 +217,15 @@
             </div>
             <div class="config-setting-list">
               <div class="config-setting-row">
-                <div class="config-setting-copy"><strong>船坞满处理</strong><span>船坞已满时是否自动进入解装流程。</span></div>
+                <div class="config-setting-copy"><strong>船坞满处理</strong><span>船坞已满时的自动化策略：解装、强化或自动混合（部分强化、部分解装）。</span></div>
                 <div class="config-setting-control">
-                  <label class="config-switch">
-                    <input type="checkbox" id="cfg-dock-full-destroy">
-                    <span class="config-switch-track" aria-hidden="true"></span>
-                    <span>自动处理</span>
-                  </label>
+                  <select id="cfg-dock-full-mode" class="input"
+                          data-animated-select-width="source">
+                    <option value="0">关闭（不处理）</option>
+                    <option value="1">自动解装</option>
+                    <option value="2">自动强化</option>
+                    <option value="3">自动（先强化后解装）</option>
+                  </select>
                 </div>
               </div>
               <div class="config-setting-row">

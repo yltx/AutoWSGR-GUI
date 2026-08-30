@@ -101,6 +101,7 @@ export interface UserSettings {
   daily_automation: DailyAutomationConfig;
   operation_delay_min: number;
   operation_delay_max: number;
+  dock_full_mode: number;
   dock_full_destroy: boolean;
   repair_manually: boolean;
   bathroom_count: number;
