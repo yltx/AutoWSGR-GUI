@@ -7,7 +7,8 @@ export type OperationName =
   | 'reward'
   | 'buildCollect'
   | 'cook'
-  | 'repair';
+  | 'repair'
+  | 'intensify';
 
 export class StatusBar {
   private statusDot: HTMLElement;
@@ -42,6 +43,7 @@ export class StatusBar {
       buildCollect: this.getButton('btn-ops-build-collect'),
       cook: this.getButton('btn-ops-cook'),
       repair: this.getButton('btn-ops-repair'),
+      intensify: this.getButton('btn-ops-intensify'),
     };
     for (const [operation, button] of Object.entries(
       this.operationButtons,

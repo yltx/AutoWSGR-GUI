@@ -1,7 +1,7 @@
 /**
  * 组装主进程服务、注册 IPC，并管理 Electron 生命周期。
  */
-import { app, BrowserWindow, ipcMain, dialog, screen, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, screen, shell, Menu } from 'electron';
 import * as path from 'path';
 import {
   initPythonEnv, clearPythonCache,
@@ -681,6 +681,7 @@ function initializeApplicationLifecycle(): void {
         app.quit();
       },
     });
+    Menu.setApplicationMenu(null);
     windowService.createWindow();
     const migrationNotice = buildLegacyMigrationNotice(
       legacyMigrationResult,

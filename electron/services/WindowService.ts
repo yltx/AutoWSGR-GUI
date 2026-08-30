@@ -182,6 +182,7 @@ export class WindowService {
       center: initialBounds === null,
       minWidth: MIN_WINDOW_WIDTH,
       minHeight: MIN_WINDOW_HEIGHT,
+      autoHideMenuBar: true,
       webPreferences: {
         preload: path.join(
           this.dependencies.moduleDirectory,
@@ -199,6 +200,9 @@ export class WindowService {
         'logo.png',
       ),
     });
+    if (typeof win.setMenuBarVisibility === 'function') {
+      win.setMenuBarVisibility(false);
+    }
 
     const htmlPath = path.join(
       this.dependencies.getAppPath(),

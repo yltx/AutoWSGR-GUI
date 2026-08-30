@@ -37,6 +37,10 @@ export class OperationsController {
         label: '浴室修理',
         run: () => this.api.repairBath(),
       },
+      intensify: {
+        label: '自动强化',
+        run: () => this.api.autoIntensify(),
+      },
     };
   }
 

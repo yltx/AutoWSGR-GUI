@@ -226,6 +226,11 @@ export class ApiClient {
     return this.request('POST', '/api/destroy', { ship_types: shipTypes ?? null, remove_equipment: removeEquipment });
   }
 
+  /** 执行自动强化（自动扫描、规划并执行强化） */
+  async autoIntensify(policy?: IntensifyRequest): Promise<ApiResponse> {
+    return this.request('POST', '/api/intensify', policy);
+  }
+
   /** 纯策略预览：后端不读取设备上下文，也不会点击或消耗舰船。 */
   async intensifyPreview(policy: IntensifyRequest): Promise<ApiResponse<IntensifyPreviewData>> {
     return this.request('POST', '/api/intensify/preview', policy);
