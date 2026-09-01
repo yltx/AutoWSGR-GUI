@@ -1,9 +1,27 @@
 /**
- * Preload 脚本 —— 通过 contextBridge 安全暴露 IPC 方法给渲染进程。
+ * 通过 contextBridge 向渲染进程安全暴露 IPC 方法。
  */
 import { contextBridge, ipcRenderer } from 'electron';
+import type {
+  LootAutomationPlan,
+  LootPlanSource,
+} from '../src/shared/lootPlans';
+import type {
+  LegacyDecisiveAutomationSettings,
+} from '../src/shared/legacyDecisiveAutomation';
+import type {
+  DecisiveAutomationSource,
+} from '../src/shared/decisiveAutomation';
+import type {
+  DecisivePlanSettings,
+  ElectronBridge,
+  GuiSettingsCommitRequest,
+  GuiSettingsCommitResult,
+  GuiUpdateStatus,
+  ShipLibraryUpdateTarget,
+} from '../src/types/ipc';
 
-contextBridge.exposeInMainWorld('electronBridge', {
+const electronBridge = {
   getAppVersion: () => {
     return ipcRenderer.sendSync('get-app-version-sync') as string;
   },
@@ -30,6 +48,63 @@ contextBridge.exposeInMainWorld('electronBridge', {
 
   getSaveBackendScreenshots: () => {
     return ipcRenderer.sendSync('get-save-backend-screenshots-sync') as boolean;
+  },
+
+  getWindowPreferences: () => {
+    return ipcRenderer.sendSync('get-window-preferences-sync') as {
+      defaultWidth: number;
+      defaultHeight: number;
+      rememberBounds: boolean;
+    };
+  },
+
+  setWindowPreferences: (preferences: {
+    defaultWidth: number;
+    defaultHeight: number;
+    rememberBounds: boolean;
+  }) => {
+    return ipcRenderer.invoke('set-window-preferences', preferences);
+  },
+
+  getGuiAutomationSettings: () => {
+    return ipcRenderer.invoke('get-gui-automation-settings');
+  },
+
+  setGuiAutomationSettings: (settings: {
+    expeditionInterval: number;
+    battleTimes: number;
+    autoDecisive: boolean;
+    decisiveTemplateId: DecisiveAutomationSource;
+    autoLoot: boolean;
+    lootPlanSource: LootPlanSource;
+    lootPlanId: string;
+    lootPlans: LootAutomationPlan[];
+    lootStopCount: number;
+  }) => {
+    return ipcRenderer.invoke('set-gui-automation-settings', settings);
+  },
+
+  commitGuiSettings: (
+    settings: GuiSettingsCommitRequest,
+  ): Promise<GuiSettingsCommitResult> => {
+    return ipcRenderer.invoke('commit-gui-settings', settings);
+  },
+
+  migrateLegacyDecisiveAutomation: (
+    settings: LegacyDecisiveAutomationSettings,
+  ) => {
+    return ipcRenderer.invoke(
+      'migrate-legacy-decisive-automation',
+      settings,
+    );
+  },
+
+  getDecisivePlanSettings: () => {
+    return ipcRenderer.invoke('get-decisive-plan-settings');
+  },
+
+  setDecisivePlanSettings: (settings: DecisivePlanSettings) => {
+    return ipcRenderer.invoke('set-decisive-plan-settings', settings);
   },
 
   setBackendPort: (port: number) => {
@@ -64,8 +139,170 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.sendSync('get-update-mode-sync') as 'auto' | 'manual';
   },
 
+  getAllowTestUpdates: () => {
+    return ipcRenderer.sendSync('get-allow-test-updates-sync') as boolean;
+  },
+
   setUpdateMode: (mode: 'auto' | 'manual') => {
     return ipcRenderer.invoke('set-update-mode', mode);
+  },
+
+  getShipLibraryStatus: () => {
+    return ipcRenderer.invoke('get-ship-library-status');
+  },
+
+  getShipLibraryManifest: () => {
+    return ipcRenderer.invoke('get-ship-library-manifest');
+  },
+
+  updateShipLibrary: (target: ShipLibraryUpdateTarget = 'wiki') => {
+    return ipcRenderer.invoke('update-ship-library', target);
+  },
+
+  onShipLibraryUpdateProgress: (callback: (progress: { message: string }) => void) => {
+    ipcRenderer.on('ship-library-update-progress', (_event, progress) => callback(progress));
+  },
+
+  saveUserTeamPlan: (
+    plan: unknown,
+    overwrite = false,
+    currentFile?: string,
+    source: 'system' | 'user' = 'user',
+  ) => {
+    return ipcRenderer.invoke(
+      'save-user-team-plan',
+      plan,
+      overwrite,
+      currentFile,
+      source,
+    );
+  },
+
+  pickUserTeamPlan: () => {
+    return ipcRenderer.invoke('pick-user-team-plan');
+  },
+
+  listTeamPlans: () => {
+    return ipcRenderer.invoke('list-team-plans');
+  },
+
+  getPlanManagement: () => {
+    return ipcRenderer.invoke('get-plan-management');
+  },
+
+  listDailyPlans: () => {
+    return ipcRenderer.invoke('list-daily-plans');
+  },
+
+  readDailyPlan: (
+    source: 'system' | 'user',
+    file: string,
+  ) => {
+    return ipcRenderer.invoke('read-daily-plan', source, file);
+  },
+
+  getDailyDecisivePlan: (chapter: number) => {
+    return ipcRenderer.invoke('get-daily-decisive-plan', chapter);
+  },
+
+  getSystemDailyDecisivePlan: (chapter: number) => {
+    return ipcRenderer.invoke(
+      'get-system-daily-decisive-plan',
+      chapter,
+    );
+  },
+
+  saveDailyDecisivePlan: (settings: DecisivePlanSettings) => {
+    return ipcRenderer.invoke('save-daily-decisive-plan', settings);
+  },
+
+  getMigrationConflicts: () => {
+    return ipcRenderer.invoke('get-migration-conflicts');
+  },
+
+  resolveMigrationConflicts: (keepIds: string[]) => {
+    return ipcRenderer.invoke('resolve-migration-conflicts', keepIds);
+  },
+
+  exportUserPlans: (
+    selections: Array<{
+      kind: 'battle' | 'team';
+      file: string;
+    }>,
+  ) => {
+    return ipcRenderer.invoke('export-user-plans', selections);
+  },
+
+  exportLegacy143Plans: (
+    selections: Array<{ kind: 'battle' | 'team'; file: string }>,
+  ) => ipcRenderer.invoke('export-legacy-143-plans', selections),
+
+  importLocalCombatPlan: () => {
+    return ipcRenderer.invoke('import-local-combat-plan');
+  },
+
+  setPlanUnlinkedIgnored: (
+    kind: 'battle' | 'team',
+    source: 'system' | 'user',
+    file: string,
+    ignored: boolean,
+  ) => {
+    return ipcRenderer.invoke(
+      'set-plan-unlinked-ignored',
+      kind,
+      source,
+      file,
+      ignored,
+    );
+  },
+
+  readManagedCombatPlan: (
+    source: 'system' | 'user',
+    file: string,
+  ) => {
+    return ipcRenderer.invoke('read-managed-combat-plan', source, file);
+  },
+
+  readCombatPlanFile: (filePath: string) => {
+    return ipcRenderer.invoke('read-combat-plan-file', filePath);
+  },
+
+  prepareCombatPlanExecution: (
+    content: string,
+    hint: string,
+  ) => {
+    return ipcRenderer.invoke(
+      'prepare-combat-plan-execution',
+      content,
+      hint,
+    );
+  },
+
+  saveManagedCombatPlan: (
+    name: string,
+    content: string,
+    overwrite = false,
+    currentFile?: string,
+  ) => {
+    return ipcRenderer.invoke(
+      'save-managed-combat-plan',
+      name,
+      content,
+      overwrite,
+      currentFile,
+    );
+  },
+
+  renameUserCombatPlan: (file: string, newName: string) => {
+    return ipcRenderer.invoke('rename-user-combat-plan', file, newName);
+  },
+
+  deleteUserCombatPlan: (file: string) => {
+    return ipcRenderer.invoke('delete-user-combat-plan', file);
+  },
+
+  deleteUserTeamPlan: (file: string) => {
+    return ipcRenderer.invoke('delete-user-team-plan', file);
   },
 
   openDirectoryDialog: (title?: string) => {
@@ -100,12 +337,16 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('check-adb-devices');
   },
 
-  getAppRoot: () => {
-    return ipcRenderer.invoke('get-app-root');
+  connectAdbDevice: (serial: string) => {
+    return ipcRenderer.invoke('connect-adb-device', serial);
   },
 
-  resolveAppPath: (filePath: string) => {
-    return ipcRenderer.invoke('resolve-app-path', filePath);
+  disconnectAdbDevice: (serial: string) => {
+    return ipcRenderer.invoke('disconnect-adb-device', serial);
+  },
+
+  getAppRoot: () => {
+    return ipcRenderer.invoke('get-app-root');
   },
 
   getPlansDir: () => {
@@ -128,23 +369,9 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('check-environment');
   },
 
-  /*
-   * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-  checkUpdates: () => {
-    return ipcRenderer.invoke('check-updates');
-  },
-  */
-
   installDeps: () => {
     return ipcRenderer.invoke('install-deps');
   },
-
-  /*
-   * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-  pullUpdates: () => {
-    return ipcRenderer.invoke('pull-updates');
-  },
-  */
 
   startBackend: () => {
     return ipcRenderer.invoke('start-backend');
@@ -158,7 +385,7 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('install-portable-python');
   },
 
-  // ── Python 路径配置 ──
+  // Python 路径配置
   getPythonPath: () => {
     return ipcRenderer.sendSync('get-python-path-sync') as string | null;
   },
@@ -171,20 +398,12 @@ contextBridge.exposeInMainWorld('electronBridge', {
     return ipcRenderer.invoke('validate-python', pythonPath);
   },
 
-  // ── GUI 自动更新 ──
+  // GUI 自动更新
   checkGuiUpdates: () => {
     return ipcRenderer.invoke('check-gui-updates');
   },
 
-  downloadGuiUpdate: () => {
-    return ipcRenderer.invoke('download-gui-update');
-  },
-
-  installGuiUpdate: () => {
-    return ipcRenderer.invoke('install-gui-update');
-  },
-
-  onUpdateStatus: (callback: (status: any) => void) => {
+  onUpdateStatus: (callback: (status: GuiUpdateStatus) => void) => {
     ipcRenderer.on('update-status', (_event, status) => callback(status));
   },
 
@@ -195,4 +414,6 @@ contextBridge.exposeInMainWorld('electronBridge', {
   onSetupLog: (callback: (text: string) => void) => {
     ipcRenderer.on('setup-log', (_event, text: string) => callback(text));
   },
-});
+} satisfies ElectronBridge;
+
+contextBridge.exposeInMainWorld('electronBridge', electronBridge);

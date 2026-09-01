@@ -13,7 +13,7 @@
     "resolveJsonModule": true,
     "declaration": false,
     "sourceMap": false,
-    "noImplicitAny": false
+    "noImplicitAny": true
   },
   "include": ["electron/**/*.ts", "src/**/*.ts"],
   "exclude": ["node_modules", "dist", "autowsgr"]

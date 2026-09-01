@@ -1,21 +1,52 @@
 /**
- * Barrel re-exports — 保持外部导入路径 './pythonEnv' 不变。
+ * 汇总 Python 环境模块的公共导出。
  */
 
-// context
 export { type PythonEnvContext, initPythonEnv, clearPythonCache } from './context';
 
-// finder
-export { isAllowedPythonVersion, findPython, findPythonSync } from './finder';
+export { isAllowedPythonVersion, findPython } from './finder';
 
-// utils
-export { type EnvCheckResult, sysPathInsert, ensurePthFile, pipEnv, localSitePackages, ensurePip, ensureSslCertForPython } from './utils';
+export {
+  type EnvCheckResult,
+  ensurePthFile,
+  pipEnv,
+  localSitePackages,
+  ensurePip,
+  ensureSslCertForPython,
+  isLocalPython,
+} from './utils';
 
-// envCheck
+export {
+  type BackendStartupMode,
+  type PythonSource,
+  type PythonEnvironment,
+  resolveExternalBackendRoot,
+  resolvePythonEnvironment,
+  backendShipNamesPath,
+  buildPythonProcessEnv,
+  installTargetArgs,
+} from './environment';
+
+export {
+  readCudaVersionFile,
+  resolveConfiguredCudaRoot,
+  buildCudaEnvironment,
+  buildBackendRuntimeEnvironment,
+} from './cuda';
+
 export { checkEnvironment } from './envCheck';
 
-// installer
-export { installPortablePython, checkForUpdates, installDependencies, pullUpdates } from './installer';
+export {
+  type DependencyInstallPlan,
+  installPortablePython,
+  checkForUpdates,
+  buildDependencyInstallPlan,
+  installDependencies,
+} from './installer';
 
-// updater (DI 接口，供外部直接调用时使用)
+export {
+  MANAGED_AUTOWSGR_COMMIT,
+  MANAGED_AUTOWSGR_REQUIREMENT,
+} from './backendRequirement';
+
 export { type AutoUpdateDeps, autoUpdateAutowsgr } from './updater';

@@ -1,0 +1,182 @@
+{
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      217,
+      240
+    ],
+    "next": []
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      300,
+      67
+    ],
+    "next": []
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      487,
+      97
+    ],
+    "next": []
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      330,
+      180
+    ],
+    "next": []
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      225,
+      367
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      135,
+      502
+    ],
+    "next": []
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      382,
+      472
+    ],
+    "next": []
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      442,
+      360
+    ],
+    "next": []
+  },
+  "I": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      495,
+      240
+    ],
+    "next": []
+  },
+  "J": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      660,
+      165
+    ],
+    "next": []
+  },
+  "K": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      615,
+      352
+    ],
+    "next": []
+  },
+  "L": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      825,
+      262
+    ],
+    "next": []
+  },
+  "M": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      585,
+      495
+    ],
+    "next": []
+  },
+  "N": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      825,
+      352
+    ],
+    "next": []
+  },
+  "O": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      742,
+      487
+    ],
+    "next": []
+  },
+  "P": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      870,
+      180
+    ],
+    "next": []
+  },
+  "α": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      120,
+      135
+    ],
+    "next": []
+  },
+  "β": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      705,
+      75
+    ],
+    "next": []
+  }
+}

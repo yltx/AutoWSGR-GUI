@@ -1,0 +1,33 @@
+  <!-- 主页：队列管理 -->
+  <div id="task-list-loader" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-team-loader-dialog task-list-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>队列管理</h3>
+          <p>选择或删除计划组，右侧可预览并拖拽调整出征计划顺序。</p>
+        </div>
+        <div class="fleet-team-loader-header-actions">
+          <span id="task-list-loader-count">共 0 个计划组</span>
+        </div>
+      </div>
+      <div class="fleet-team-loader-content task-list-loader-content">
+        <section class="task-list-loader-groups">
+          <h4>计划组</h4>
+          <div id="task-list-loader-groups" class="fleet-team-loader-list"></div>
+        </section>
+        <section class="task-list-loader-preview">
+          <div class="task-list-loader-preview-heading">
+            <h4 id="task-list-loader-preview-title">计划列表预览：未选择</h4>
+            <span>拖拽卡片可以调整执行顺序</span>
+          </div>
+          <div id="task-list-loader-preview" class="task-list-loader-preview-list">
+            <div class="fleet-team-loader-preview-empty">从左侧选择一个计划组</div>
+          </div>
+        </section>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-task-list-loader" type="button">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-task-list-loader" type="button" disabled>加载</button>
+      </div>
+    </div>
+  </div>

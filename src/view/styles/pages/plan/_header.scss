@@ -63,52 +63,107 @@
   font-weight: 600;
 }
 
-.plan-comment {
-  font-size: 12px;
-  color: var(--text-muted);
-  font-style: italic;
-  white-space: pre-line;
-  line-height: 1.5;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  cursor: pointer;
-  border-radius: var(--radius-sm);
-  padding: 2px 4px;
-  margin: 4px 0;
-  transition: background 0.15s;
+.plan-config-card {
+  flex: 0 0 auto;
+  padding: 9px 11px;
 }
 
-.plan-comment:hover {
-  background: var(--bg-hover);
+.plan-module-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
 }
 
-.plan-comment:empty {
-  display: block;
-  min-height: 22px;
+.plan-module-header h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
 }
 
-.plan-comment:empty::before {
-  content: '点击编辑任务说明…';
-  color: var(--text-muted);
-  opacity: 0.5;
+.plan-config-primary-row {
+  flex-wrap: nowrap;
 }
 
-.plan-comment-editing {
-  font-size: 12px;
+.plan-config-primary-row > h3 {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.plan-map-picker {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.plan-map-picker .input-inline {
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 26px;
+  padding: 4px 7px;
+  font-size: 11px;
+}
+
+.plan-map-picker #plan-edit-map {
+  flex: 0 0 54px;
+  width: 54px;
+  min-width: 54px;
+}
+
+.plan-config-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.plan-config-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.plan-config-row > span:first-child,
+.plan-task-config-row > span:first-child {
+  flex: 0 0 auto;
+}
+
+.plan-config-row .input-inline {
+  width: min(130px, 100%) !important;
+  min-width: 0;
+  height: 26px;
+  font-size: 11px;
+}
+
+.plan-config-pair .plan-config-row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr);
+  justify-content: normal;
+}
+
+.plan-config-pair .plan-config-row .input-inline {
+  width: 100% !important;
+}
+
+.plan-repair-method .config-switch {
+  gap: 5px;
   color: var(--text);
-  white-space: pre-wrap;
-  line-height: 1.5;
-  padding: 4px 6px;
-  margin: 4px 0;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--bg-input);
-  outline: none;
-  min-height: 40px;
-  resize: vertical;
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
+  font-size: 11px;
+}
+
+@media (max-width: 880px) {
+  .plan-config-primary-row {
+    gap: 5px;
+  }
+
+  .plan-map-picker {
+    gap: 4px;
+  }
 }

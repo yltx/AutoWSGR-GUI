@@ -1,0 +1,105 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.524,
+      0.236
+    ],
+    "next": [
+      "A",
+      "B"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.571,
+      0.473
+    ],
+    "next": [
+      "C",
+      "D"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.414,
+      0.445
+    ],
+    "next": [
+      "E",
+      "F"
+    ]
+  },
+  "C": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.704,
+      0.386
+    ],
+    "next": []
+  },
+  "D": {
+    "type": "Penalty",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.616,
+      0.738
+    ],
+    "next": []
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.445,
+      0.679
+    ],
+    "next": [
+      "G"
+    ]
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.255,
+      0.421
+    ],
+    "next": [
+      "H"
+    ]
+  },
+  "G": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.358,
+      0.875
+    ],
+    "next": []
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.208,
+      0.201
+    ],
+    "next": []
+  }
+}

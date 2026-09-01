@@ -1,0 +1,31 @@
+  <!-- ═══ 顶部导航栏 ═══ -->
+  <nav class="nav-bar">
+    <div class="nav-primary">
+      <div class="nav-title">WSGR GUI <span class="nav-version" id="app-version"></span></div>
+      <div class="nav-tabs">
+        <span class="nav-tab-indicator" aria-hidden="true"></span>
+        <button class="nav-tab active" data-page="main">作战</button>
+        <button class="nav-tab" data-page="plan">计划</button>
+        <button class="nav-tab" data-page="config">设置</button>
+      </div>
+    </div>
+    <div class="nav-task-state" id="nav-task-state" title="当前无运行任务">
+      <div class="nav-task-meta">
+        <span class="nav-task-name" id="nav-task-name">当前无任务</span>
+        <span class="nav-task-remaining" id="nav-task-remaining">剩余 0/0</span>
+      </div>
+      <div class="nav-task-progress" id="nav-task-progress" role="progressbar" aria-label="当前任务进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="nav-task-progress-fill" id="nav-task-progress-fill"></span>
+      </div>
+    </div>
+    <div class="nav-runtime">
+      <div class="nav-expedition" title="距离下次自动远征检查的时间">
+        <span class="nav-runtime-label">远征</span>
+        <span id="expedition-timer">--:--</span>
+      </div>
+      <div class="nav-status" title="当前运行状态">
+        <span class="status-indicator" id="status-dot"></span>
+        <span id="status-text">未连接</span>
+      </div>
+    </div>
+  </nav>

@@ -1,6 +1,5 @@
 /**
- * Python 环境共享上下文与缓存状态。
- * 由 main.ts 在启动时通过 initPythonEnv() 注入。
+ * 保存由 main.ts 注入的 Python 环境上下文和路径缓存。
  */
 
 export interface PythonEnvContext {
@@ -8,6 +7,8 @@ export interface PythonEnvContext {
   sendProgress: (msg: string) => void;
   getConfiguredPythonPath: () => string | null;
   getUpdateMode: () => 'auto' | 'manual';
+  getBackendStartupMode: () => 'managed' | 'external';
+  getBackendRepoPath: () => string;
   getTempDir: () => string;
 }
 
@@ -17,19 +18,17 @@ export function initPythonEnv(context: PythonEnvContext): void {
   ctx = context;
 }
 
-/** 内部访问器：获取已注入的上下文 */
+/** 获取已注入的 Python 环境上下文。 */
 export function getCtx(): PythonEnvContext {
   return ctx;
 }
 
-// ════════════════════════════════════════
 // Python 路径缓存
-// ════════════════════════════════════════
 
-/** 缓存的 Python 路径 (undefined = 尚未查找) */
+/** 缓存的 Python 路径，undefined 表示尚未查找。 */
 let cachedPythonCmd: string | null | undefined;
 
-/** 清除 Python 路径缓存（用户切换路径后调用） */
+/** 清除 Python 路径缓存。 */
 export function clearPythonCache(): void {
   cachedPythonCmd = undefined;
 }

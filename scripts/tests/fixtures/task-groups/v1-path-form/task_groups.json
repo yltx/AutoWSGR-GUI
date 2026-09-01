@@ -1,0 +1,151 @@
+{
+  "activeGroup": "决战",
+  "groups": [
+    {
+      "name": "默认",
+      "items": [
+        {
+          "path": "D:\\AutoWSGR-GUI\\plans\\9-4胖次6SS.yaml",
+          "kind": "plan",
+          "times": 500,
+          "label": "9-4胖次6SS"
+        }
+      ]
+    },
+    {
+      "name": "周常列表",
+      "items": [
+        {
+          "path": "resource/builtin_plans/周常1章-1-2.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常1章-1-2 · 岛风日驱队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常2章-2-1.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常2章-2-1 · 岛风日驱队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常3章-3-1.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常3章-3-1 · 契卡洛夫日驱队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常4章-4-1.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常4章-4-1 · 契卡洛夫日驱队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常5章-5-5.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常5章-5-5 · SS*6)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常6章-6-4.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常6章-6-4 · 克劳塞维茨德系队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": true
+        },
+        {
+          "path": "resource/builtin_plans/周常7章-7-4.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常7章-7-4 · SS*6)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常8章-8-2.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常8章-8-2 · 大淀AIII队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常9章-9-2.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常9章-9-2 · 三响岛风)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "path": "resource/builtin_plans/周常10章-10-1.yaml",
+          "kind": "plan",
+          "times": 3,
+          "label": "周常任务 (周常10章-10-1 · 空想351潜艇队)",
+          "fleetPresetIndex": 0,
+          "fleet_id": 3,
+          "autoFleetFallback": false,
+          "forceRetry": false
+        },
+        {
+          "templateId": "builtin_decisive_6",
+          "kind": "template",
+          "times": 5,
+          "label": "决战 (第 6 章)",
+          "chapter": 6
+        }
+      ]
+    },
+    {
+      "name": "练级",
+      "items": [
+        {
+          "path": "C:\\ShiinaKuroko\\01.Project\\AutoWSGR-GUI\\plans\\9-3练级-min航速≤27.yaml",
+          "kind": "plan",
+          "times": 6,
+          "label": "9-3练级-min航速≤27"
+        }
+      ]
+    },
+    {
+      "name": "决战",
+      "items": [
+        {
+          "templateId": "builtin_decisive_6",
+          "kind": "template",
+          "times": 999,
+          "label": "决战 (第 6 章)",
+          "chapter": 6
+        }
+      ]
+    }
+  ]
+}

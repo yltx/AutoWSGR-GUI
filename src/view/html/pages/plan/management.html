@@ -1,0 +1,117 @@
+      <div class="plan-tab-panel" data-plan-panel="manage" hidden>
+        <div class="plan-management-layout">
+          <div class="card plan-team-management-card">
+            <div class="plan-management-heading">
+              <div class="plan-management-title">
+                <h3>YAML 计划管理</h3>
+                <p>查看出征计划、舰队方案及其关联状态。系统文件只读，用户文件可管理。</p>
+              </div>
+              <button class="btn btn-small" id="btn-refresh-plan-management" type="button">刷新</button>
+            </div>
+
+            <div class="plan-management-summary" aria-label="计划统计">
+              <div class="plan-management-stat">
+                <span>出征计划</span>
+                <strong id="plan-management-battle-count">0</strong>
+              </div>
+              <div class="plan-management-stat">
+                <span>舰队方案</span>
+                <strong id="plan-management-team-count">0</strong>
+              </div>
+              <div class="plan-management-stat is-linked">
+                <span>关联正常</span>
+                <strong id="plan-management-linked-count">0</strong>
+              </div>
+              <div class="plan-management-stat is-warning">
+                <span>关联异常</span>
+                <strong id="plan-management-attention-count">0</strong>
+              </div>
+            </div>
+
+            <div class="plan-management-toolbar">
+              <div class="plan-management-subtabs" role="tablist" aria-label="计划来源">
+                <button
+                  class="plan-management-subtab active"
+                  type="button"
+                  data-plan-management-source="all"
+                >全部</button>
+                <button
+                  class="plan-management-subtab"
+                  type="button"
+                  data-plan-management-source="system"
+                >系统</button>
+                <button
+                  class="plan-management-subtab"
+                  type="button"
+                  data-plan-management-source="user"
+                >用户</button>
+                <button
+                  class="btn btn-small btn-primary plan-management-export"
+                  id="btn-export-user-plans"
+                  type="button"
+                  disabled
+                >批量导出</button>
+                <button
+                  class="btn btn-small plan-management-export"
+                  id="btn-export-legacy-143-plans"
+                  type="button"
+                >导出 1.4.3 降级备份</button>
+                <button
+                  class="btn btn-small btn-danger plan-management-delete"
+                  id="btn-delete-user-plans"
+                  type="button"
+                  disabled
+                >批量删除</button>
+              </div>
+              <div class="plan-management-filters">
+                <input
+                  class="input plan-management-search"
+                  id="plan-management-search"
+                  type="search"
+                  placeholder="搜索计划、舰队或文件名"
+                >
+                <div class="plan-management-kind-filter" role="group" aria-label="YAML 类型">
+                  <button class="active" type="button" data-plan-management-kind="all">全部 YAML</button>
+                  <button type="button" data-plan-management-kind="battle">出征计划</button>
+                  <button type="button" data-plan-management-kind="team">舰队方案</button>
+                </div>
+                <label class="config-switch plan-management-attention-filter">
+                  <input id="plan-management-attention-only" type="checkbox">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>过滤非异常</span>
+                </label>
+              </div>
+            </div>
+
+            <p class="plan-management-warning" id="plan-management-warning" hidden></p>
+
+            <div class="plan-team-management-table-wrap">
+              <table class="plan-team-management-table">
+                <thead>
+                  <tr>
+                    <th class="plan-management-selection-column">
+                      <input
+                        id="plan-management-select-all"
+                        type="checkbox"
+                        aria-label="全选当前筛选结果中的用户配置"
+                        title="全选当前筛选结果中的用户配置"
+                      >
+                    </th>
+                    <th>YAML 配置</th>
+                    <th>来源</th>
+                    <th>关联关系</th>
+                    <th>任务分组</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="plan-team-management-body">
+                  <tr>
+                    <td colspan="7">正在读取计划…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>

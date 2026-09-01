@@ -1,3 +1,4 @@
+/** 根据远征状态计算并发布下一次收取倒计时。 */
 /**
  * ExpeditionTimer — 远征定时器。
  * 从 Scheduler 中拆出，负责远征检查的定时触发和倒计时。
@@ -23,8 +24,6 @@ export class ExpeditionTimer {
     this._intervalMs = intervalMs;
     this.callbacks = callbacks;
   }
-
-  get intervalMs(): number { return this._intervalMs; }
 
   /** 更新间隔（毫秒），如果正在运行则自动重启 */
   setInterval(ms: number): void {

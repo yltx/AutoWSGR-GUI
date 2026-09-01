@@ -24,15 +24,15 @@
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--accent-foreground);
   font-weight: 600;
-  box-shadow: 0 2px 8px rgba(15, 125, 255, 0.25);
+  box-shadow: 0 2px 8px var(--accent-glow);
 }
 
 .btn-primary:hover {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
-  box-shadow: 0 4px 14px rgba(15, 125, 255, 0.35);
+  box-shadow: 0 4px 14px var(--accent-glow);
 }
 
 .btn-small {

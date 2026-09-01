@@ -16,6 +16,7 @@ dist/
 logs/
 log/
 *.log
+/ocr-log-report/
 
 # 系统文件
 .DS_Store
@@ -25,6 +26,7 @@ Thumbs.db
 usersettings.yaml
 gui_settings.json
 task_groups.json
+!scripts/tests/fixtures/**/task_groups.json
 templates.json
 .env_ready
 plans/
@@ -38,13 +40,18 @@ release/
 # 安装临时文件
 _setup_tmp/
 .tmp/
+.tmp_*
 node/
-python/
+/python/
 redist/
 adb/
 
 # 缓存
 .cache/
+.dbg/
+__pycache__/
+*.py[cod]
+/debug-backend-pipe-epipe.md
 
 # Kilo 工作区
 .kilo/

@@ -1,4 +1,55 @@
-import type { MainViewObject } from '../../types/view';
+/** 渲染任务队列进度并发出删除和停止操作意图。 */
+import type { MainViewObject } from '../../types/view.js';
+import {
+  captureScrollPosition,
+  restoreScrollPosition,
+} from '../shared/scrollPosition';
+
+function clampPercent(value: number): number {
+  return Math.min(1, Math.max(0, value));
+}
+
+/** 统一计算队列和顶栏显示的当前任务进度。 */
+export function resolveTaskProgressPercent(
+  item: MainViewObject['taskQueue'][number],
+  isRunning: boolean,
+): number {
+  if (!isRunning) return 0;
+
+  // 多轮任务优先按“轮次/总轮次”计算，避免后端单轮 1/1 进度把条形图误显示为 100%。
+  if (item.totalTimes > 1) {
+    if (item.progress) {
+      const parts = item.progress.split('/');
+      if (parts.length === 2) {
+        const cur = parseInt(parts[0], 10);
+        const total = parseInt(parts[1], 10);
+        if (Number.isFinite(cur) && Number.isFinite(total) && total > 1) {
+          return clampPercent(cur / total);
+        }
+      }
+    }
+
+    const currentRound = item.totalTimes - item.remaining + 1;
+    return clampPercent(currentRound / item.totalTimes);
+  }
+
+  if (item.progressPercent != null && Number.isFinite(item.progressPercent)) {
+    return clampPercent(item.progressPercent);
+  }
+
+  if (item.progress) {
+    const parts = item.progress.split('/');
+    if (parts.length === 2) {
+      const cur = parseInt(parts[0], 10);
+      const total = parseInt(parts[1], 10);
+      if (Number.isFinite(cur) && Number.isFinite(total) && total > 0) {
+        return clampPercent(cur / total);
+      }
+    }
+  }
+
+  return 0;
+}
 
 export class TaskQueueView {
   private taskAreaIdle: HTMLElement;
@@ -9,12 +60,36 @@ export class TaskQueueView {
   onMoveQueueItem?: (fromIndex: number, toIndex: number) => void;
   onDropFromTaskGroup?: (itemIndex: number) => void;
   onEditQueueItem?: (taskId: string, x: number, y: number) => void;
+  onStopTask?: () => void;
+  onClearQueue?: () => void;
+  onImportPlan?: () => void;
+  onStartQueue?: () => void;
 
   constructor() {
     this.taskAreaIdle = document.getElementById('task-area-idle')!;
     this.taskAreaQueue = document.getElementById('task-area-queue')!;
     this.taskQueueList = document.getElementById('task-queue-list')!;
     this.initDropZone();
+    this.bindActions();
+  }
+
+  private bindActions(): void {
+    document.getElementById('btn-stop-task')?.addEventListener(
+      'click',
+      () => this.onStopTask?.(),
+    );
+    document.getElementById('btn-clear-queue')?.addEventListener(
+      'click',
+      () => this.onClearQueue?.(),
+    );
+    document.getElementById('btn-import-plan')?.addEventListener(
+      'click',
+      () => this.onImportPlan?.(),
+    );
+    document.getElementById('btn-start-queue')?.addEventListener(
+      'click',
+      () => this.onStartQueue?.(),
+    );
   }
 
   private initDropZone(): void {
@@ -41,49 +116,8 @@ export class TaskQueueView {
     });
   }
 
-  private clampPercent(value: number): number {
-    return Math.min(1, Math.max(0, value));
-  }
-
-  private resolveProgressPercent(item: MainViewObject['taskQueue'][number], isRunning: boolean): number {
-    if (!isRunning) return 0;
-
-    // 多轮任务优先按“轮次/总轮次”计算，避免后端单轮 1/1 进度把条形图误显示为 100%。
-    if (item.totalTimes > 1) {
-      if (item.progress) {
-        const parts = item.progress.split('/');
-        if (parts.length === 2) {
-          const cur = parseInt(parts[0], 10);
-          const total = parseInt(parts[1], 10);
-          if (Number.isFinite(cur) && Number.isFinite(total) && total > 1) {
-            return this.clampPercent(cur / total);
-          }
-        }
-      }
-
-      const currentRound = item.totalTimes - item.remaining + 1;
-      return this.clampPercent(currentRound / item.totalTimes);
-    }
-
-    if (item.progressPercent != null && Number.isFinite(item.progressPercent)) {
-      return this.clampPercent(item.progressPercent);
-    }
-
-    if (item.progress) {
-      const parts = item.progress.split('/');
-      if (parts.length === 2) {
-        const cur = parseInt(parts[0], 10);
-        const total = parseInt(parts[1], 10);
-        if (Number.isFinite(cur) && Number.isFinite(total) && total > 0) {
-          return this.clampPercent(cur / total);
-        }
-      }
-    }
-
-    return 0;
-  }
-
   render(vo: MainViewObject): void {
+    const scrollPosition = captureScrollPosition(this.taskQueueList);
     const hasQueue = vo.taskQueue.length > 0;
 
     if (hasQueue) {
@@ -95,6 +129,7 @@ export class TaskQueueView {
       for (let i = 0; i < vo.taskQueue.length; i++) {
         const item = vo.taskQueue[i];
         const isRunning = item.id === vo.runningTaskId;
+        const canReorder = !isRunning && !item.waiting;
         const queueIndex = hasRunning ? i - 1 : i;
         const div = document.createElement('div');
         div.className = 'task-queue-item' + (isRunning ? ' tq-running' : '');
@@ -102,7 +137,7 @@ export class TaskQueueView {
         const mainRow = document.createElement('div');
         mainRow.className = 'tq-main-row';
 
-        if (!isRunning) {
+        if (canReorder) {
           div.draggable = true;
           div.addEventListener('dragstart', (e) => {
             div.classList.add('tq-dragging');
@@ -131,7 +166,7 @@ export class TaskQueueView {
           });
         }
 
-        if (!isRunning) {
+        if (canReorder) {
           const handle = document.createElement('span');
           handle.className = 'tq-drag-handle';
           handle.textContent = '⠿';
@@ -140,7 +175,9 @@ export class TaskQueueView {
 
         const nameSpan = document.createElement('span');
         nameSpan.className = 'tq-name';
-        nameSpan.textContent = item.totalTimes > 1
+        nameSpan.textContent = item.unlimited
+          ? `${item.name} ×无限`
+          : item.totalTimes > 1
           ? `${item.name} ×${item.totalTimes}`
           : item.name;
         mainRow.appendChild(nameSpan);
@@ -148,7 +185,9 @@ export class TaskQueueView {
         if (isRunning) {
           const progSpan = document.createElement('span');
           progSpan.className = 'tq-progress';
-          if (item.totalTimes > 1) {
+          if (item.unlimited) {
+            progSpan.textContent = item.progress || '无限';
+          } else if (item.totalTimes > 1) {
             let useBackendProgress = false;
             if (item.progress) {
               const parts = item.progress.split('/');
@@ -175,6 +214,11 @@ export class TaskQueueView {
             acqSpan.textContent = item.acquisitionText;
             mainRow.appendChild(acqSpan);
           }
+        } else if (item.waitingText) {
+          const waitingSpan = document.createElement('span');
+          waitingSpan.className = 'tq-progress';
+          waitingSpan.textContent = item.waitingText;
+          mainRow.appendChild(waitingSpan);
         }
 
         const prioSpan = document.createElement('span');
@@ -196,7 +240,7 @@ export class TaskQueueView {
         div.appendChild(mainRow);
 
         if (isRunning) {
-          const pct = this.resolveProgressPercent(item, isRunning);
+          const pct = resolveTaskProgressPercent(item, isRunning);
           const track = document.createElement('div');
           track.className = 'tq-progress-track';
           const fill = document.createElement('div');
@@ -215,15 +259,32 @@ export class TaskQueueView {
       }
 
       const startBtn = document.getElementById('btn-start-queue');
-      const stopBtn = document.getElementById('btn-stop-task');
+      const stopBtn = document.getElementById(
+        'btn-stop-task',
+      ) as HTMLButtonElement | null;
       const clearBtn = document.getElementById('btn-clear-queue');
       const isRunningOrStopping = vo.status === 'running' || vo.status === 'stopping';
-      if (startBtn) startBtn.style.display = isRunningOrStopping ? 'none' : '';
-      if (stopBtn) stopBtn.style.display = isRunningOrStopping ? '' : 'none';
+      const hasReadyTask = vo.taskQueue.some(
+        item => !item.waiting && item.id !== vo.runningTaskId,
+      );
+      if (startBtn) {
+        startBtn.style.display = isRunningOrStopping || !hasReadyTask
+          ? 'none'
+          : '';
+      }
+      if (stopBtn) {
+        const isStopping = vo.status === 'stopping';
+        stopBtn.style.display = isRunningOrStopping ? '' : 'none';
+        stopBtn.disabled = isStopping;
+        stopBtn.classList.toggle('is-stopping', isStopping);
+        stopBtn.setAttribute('aria-busy', String(isStopping));
+        stopBtn.textContent = isStopping ? '停止中' : '停止任务';
+      }
       if (clearBtn) clearBtn.style.display = isRunningOrStopping ? 'none' : '';
     } else {
       this.taskAreaIdle.style.display = '';
       this.taskAreaQueue.style.display = 'none';
     }
+    restoreScrollPosition(this.taskQueueList, scrollPosition);
   }
 }

@@ -1,0 +1,150 @@
+      <div class="plan-tab-panel" data-plan-panel="decisive" hidden>
+        <div class="fleet-planner-layout decisive-plan-layout">
+        <section class="fleet-planner-fleet card decisive-plan-card">
+          <div class="fleet-formation-heading fleet-planner-toolbar decisive-plan-heading">
+            <div class="decisive-plan-title-line">
+              <h2>决战计划（旧）</h2>
+              <p>主选队列优先加入编队，不足六艘时按备选队列顺序补充。</p>
+            </div>
+            <div class="decisive-plan-actions">
+              <button class="btn btn-small" id="btn-reset-decisive-plan" type="button" disabled>恢复默认</button>
+              <button class="btn btn-small btn-primary" id="btn-save-decisive-plan" type="button">保存配置</button>
+            </div>
+          </div>
+
+          <div class="decisive-plan-controls">
+            <label class="decisive-plan-field">
+              <span>章节选择</span>
+              <select class="input" id="decisive-plan-chapter">
+                <option value="1">第 1 章</option>
+                <option value="2">第 2 章</option>
+                <option value="3">第 3 章</option>
+                <option value="4">第 4 章</option>
+                <option value="5">第 5 章</option>
+                <option value="6">第 6 章</option>
+              </select>
+            </label>
+            <label class="config-switch">
+              <input type="checkbox" id="decisive-plan-quick-repair" checked>
+              <span class="config-switch-track" aria-hidden="true"></span>
+              <span>启用快速修理</span>
+            </label>
+            <label class="config-switch">
+              <input type="checkbox" id="decisive-plan-edit-enabled">
+              <span class="config-switch-track" aria-hidden="true"></span>
+              <span>允许修改队伍</span>
+            </label>
+            <span class="decisive-plan-status" id="decisive-plan-status">正在读取配置…</span>
+          </div>
+
+          <div class="fleet-formation-heading decisive-tier-heading">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-primary">主选队列</h3>
+            <strong class="decisive-automation-note">
+              该页面最后保存配置即系统设置中自动决战选择“用户计划”时所执行配置；选择“系统预设”时不使用此配置。
+            </strong>
+          </div>
+          <section class="fleet-formation-section">
+            <div class="fleet-slot-scroll">
+              <div class="fleet-slot-list" id="decisive-level1-list" aria-label="决战主选编队槽位"></div>
+            </div>
+          </section>
+
+          <div class="fleet-formation-heading fleet-backup-heading decisive-tier-heading">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-backup">备选队列</h3>
+            <div class="fleet-backup-actions">
+              <strong id="decisive-level2-count">0 艘</strong>
+                <button class="btn btn-small btn-primary" id="btn-add-decisive-backup" type="button" disabled>增加备选</button>
+            </div>
+          </div>
+          <section class="fleet-formation-section fleet-backup-section">
+            <div class="fleet-backup-scroll">
+              <div class="fleet-backup-slot-list" id="decisive-level2-list" aria-label="决战备选编队槽位"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="fleet-planner-library card decisive-plan-library">
+          <div class="fleet-library-header">
+            <div class="fleet-library-title">
+              <h2>舰娘图鉴</h2>
+              <span id="decisive-gallery-count">正在读取图鉴…</span>
+            </div>
+            <div class="fleet-library-search-actions">
+              <label class="fleet-search">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  id="decisive-gallery-search"
+                  type="search"
+                  placeholder="搜索舰名或编号"
+                  autocomplete="off"
+                >
+              </label>
+              <div class="fleet-library-filter-triggers">
+                <button class="btn btn-small fleet-filter-trigger" type="button" data-decisive-filter-trigger="filter" aria-expanded="false">
+                  <span class="fleet-filter-trigger-name">筛选</span>
+                  <span id="decisive-filter-count"></span>
+                </button>
+                <button class="btn btn-small" id="btn-reset-decisive-filter" type="button">恢复默认</button>
+              </div>
+            </div>
+            <div class="fleet-filter-popover" id="decisive-filter-popover" hidden>
+              <div class="fleet-filter-popover-header">
+                <div class="fleet-filter-popover-heading">
+                  <strong>综合筛选</strong>
+                  <label class="config-switch fleet-refit-filter">
+                    <span>过滤改造</span>
+                    <input id="decisive-filter-refit-only" type="checkbox">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+                <div class="fleet-filter-popover-actions">
+                  <button class="btn btn-small btn-primary" id="btn-confirm-decisive-filter" type="button">确定</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">舰型分组</span>
+                <div class="fleet-filter-options" id="decisive-filter-groups">
+                  <button class="fleet-filter-option active" type="button" data-filter-kind="group" data-filter-value="all">全部</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="large">大型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="medium">中型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="small">小型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="main_force">主力舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="escort">护卫舰</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">类型</span>
+                <div class="fleet-filter-options fleet-filter-options-scroll" id="decisive-filter-types"></div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">国籍</span>
+                <div class="fleet-filter-options" id="decisive-filter-countries"></div>
+              </div>
+              <div class="fleet-filter-section fleet-filter-sort-section">
+                <span class="fleet-filter-label">排序规则</span>
+                <div class="fleet-filter-sort-controls">
+                  <div class="fleet-filter-options">
+                    <button class="fleet-filter-option" type="button" data-sort-field="type">类型</button>
+                    <button class="fleet-filter-option" type="button" data-sort-field="name">名称</button>
+                    <button class="fleet-filter-option active" type="button" data-sort-field="id">编号</button>
+                  </div>
+                  <label class="fleet-sort-direction">
+                    <span>正序</span>
+                    <input type="checkbox" id="decisive-sort-desc">
+                    <span class="fleet-sort-track" aria-hidden="true"></span>
+                    <span>倒序</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="fleet-ship-gallery decisive-ship-gallery"
+            id="decisive-ship-gallery"
+            aria-label="决战舰娘图鉴"
+          >
+            <div class="fleet-library-empty">正在加载本地舰船资料库…</div>
+          </div>
+        </section>
+        </div>
+      </div>

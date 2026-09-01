@@ -1,22 +1,33 @@
+/** 渲染模板库卡片并发出使用、编辑和删除意图。 */
 /**
  * TemplateLibraryView —— 模板库纯渲染组件。
  * 接收 TemplateLibraryItemVO[] 并渲染模板卡片列表；不包含业务逻辑。
  */
-import type { TemplateLibraryItemVO } from '../../types/view';
+import type { TemplateLibraryItemVO } from '../../types/view.js';
 
 export class TemplateLibraryView {
-  private container: HTMLElement;
+  private container: HTMLElement | null;
 
+  onCreate?: () => void;
+  onImport?: () => void;
   onUse?: (id: string) => void;
   onEdit?: (id: string) => void;
   onDelete?: (id: string) => void;
   onRename?: (id: string) => void;
 
   constructor() {
-    this.container = document.getElementById('template-library-items')!;
+    this.container = document.getElementById('template-library-items');
+    document.getElementById('btn-create-template')?.addEventListener(
+      'click',
+      () => this.onCreate?.(),
+    );
+    document.getElementById('btn-import-template')?.addEventListener(
+      'click',
+      () => this.onImport?.(),
+    );
 
     // 委托点击
-    this.container.addEventListener('click', (e) => {
+    this.container?.addEventListener('click', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-tpl-action]') as HTMLElement | null;
       if (!btn) return;
       const id = btn.dataset.tplId!;
@@ -29,6 +40,7 @@ export class TemplateLibraryView {
   }
 
   render(items: TemplateLibraryItemVO[]): void {
+    if (!this.container) return;
     if (items.length === 0) {
       this.container.innerHTML = '<p class="tpl-empty">暂无模板，点击「创建模板」添加</p>';
       return;
@@ -51,16 +63,6 @@ export class TemplateLibraryView {
         </div>
       </div>`;
     }).join('');
-  }
-
-  /** 填充决战模板下拉列表（配置页用） */
-  populateDecisiveSelect(options: { id: string; name: string }[], selectedId?: string): void {
-    const sel = document.getElementById('cfg-decisive-template') as HTMLSelectElement | null;
-    if (!sel) return;
-    const desiredVal = selectedId ?? sel.value;
-    sel.innerHTML = '<option value="">未选择</option>' +
-      options.map(o => `<option value="${o.id}">${this.esc(o.name)}</option>`).join('');
-    sel.value = desiredVal;
   }
 
   private esc(s: string): string {

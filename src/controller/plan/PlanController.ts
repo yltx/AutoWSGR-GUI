@@ -1,29 +1,56 @@
+/** 协调作战方案加载、预览、编辑、保存和任务执行。 */
 /**
- * PlanController —— 方案 & 任务预设子控制器（瘦身版）。
- * 核心逻辑委托给 importExport / presetFlow / nodeEditor / rendering 模块。
+ * 编排受管方案、任务预设、节点编辑和计划预览。
  */
 import { PlanPreviewView } from '../../view/plan/PlanPreviewView';
-import type { PlanModel } from '../../model/PlanModel';
-import type { CombatPlanReq, EventFightReq, NodeDecisionReq, NormalFightReq } from '../../types/api';
-import type { Scheduler } from '../../model/scheduler';
-import { TaskPriority } from '../../model/scheduler';
-import type { NodeArgs, TaskPreset } from '../../types/model';
-import { getNodeType, isNightNode, isDetourNode, isTerminalNode } from '../../model/MapDataLoader';
+import { PlanModel } from '../../model/PlanModel';
+import type {
+  EventMapCatalogEntry,
+  FleetPreset,
+  NormalFightTaskConfig,
+  TaskPreset,
+} from '../../types/model.js';
+import {
+  getNodeType,
+  isNightNode,
+  isDetourNode,
+  isTerminalNode,
+  loadEventMapCatalog,
+  loadMapData,
+  loadEventMapData,
+} from '../../model/MapDataLoader';
 import type { MapData } from '../../model/MapDataLoader';
-import { toBackendName, resolveFleetPreset, resolveFleetPresetRules, shipSlotLabel } from '../../data/shipData';
+import type {
+  ManagedBattlePlanSelection,
+  PlanPresetSource,
+  ShipLibraryShip,
+  UserTeamPlan,
+} from '../../types/ipc.js';
+import { taskPresetCodec } from '../../shared/taskPreset';
+import { BattlePlanLoaderView } from '../../view/plan/BattlePlanLoaderView';
 import { Logger } from '../../utils/Logger';
-import { importPlanFlow, exportPlanFlow, savePlanFlow, confirmNewPlanFlow, type PlanSetters } from './importExport';
-import { importTaskPresetFlow, showPresetDetailFlow, closePresetDetailFlow, executePresetFlow, type PresetState } from './presetFlow';
+import {
+  showAlert,
+  showConfirm,
+  showSaveSuccess,
+  showWarningNotice,
+} from '../../view/shared/DialogHelper';
+import { importTaskPresetFlow, closePresetDetailFlow, executePresetFlow, type PresetState } from './presetFlow';
+import { jsonCodec, parseYamlRecord } from '../../adapter';
+import {
+  getManagedCombatPlanRepository,
+  type ManagedCombatPlanRepository,
+} from '../../adapter/IpcAdapter';
 import { saveNodeEditorValues } from './nodeEditor';
 import { buildPlanPreviewVO } from './rendering';
-import { normalizeSelectedNodesForBackend } from './selectedNodes';
-
-export interface PlanHost {
-  readonly scheduler: Scheduler;
-  plansDir: string;
-  renderMain(): void;
-  switchPage(page: string): void;
-}
+import { BattlePlanLoaderController } from './BattlePlanLoaderController';
+import type { LootAutomationPlan } from '../../shared/lootPlans.js';
+import {
+  PlanFleetPresetController,
+  type PlanFleetPresetRepository,
+} from './PlanFleetPresetController.js';
+import { initialSelectedNodesForNewPlan } from './selectedNodes';
+import type { PlanHost } from '../contracts.js';
 
 export class PlanController {
   private currentPlan: PlanModel | null = null;
@@ -31,24 +58,133 @@ export class PlanController {
   private editingNodeId: string | null = null;
   private currentPreset: TaskPreset | null = null;
   private currentPresetFilePath = '';
+  private currentPresetSource: PlanPresetSource = 'user';
+  private mapLoadVersion = 0;
+  private planPresetName = '';
+  private currentManagedPlanFile: string | null = null;
+  private currentPlanSource: PlanPresetSource = 'user';
+  private savedPlanSnapshot = '';
+  private eventMapCatalog: EventMapCatalogEntry[] = [];
+  private readonly battlePlanLoader: BattlePlanLoaderController;
+  private readonly fleetPresetController: PlanFleetPresetController;
 
   constructor(
     private readonly planView: PlanPreviewView,
     readonly host: PlanHost,
-  ) {}
+    fleetPresetRepository?: PlanFleetPresetRepository,
+    private readonly managedPlans: ManagedCombatPlanRepository | undefined =
+      getManagedCombatPlanRepository(),
+  ) {
+    this.fleetPresetController = new PlanFleetPresetController(
+      fleetPresetRepository,
+    );
+    this.battlePlanLoader = new BattlePlanLoaderController(
+      new BattlePlanLoaderView(),
+      {
+        getCurrentPlanIdentity: () => ({
+          file: this.currentManagedPlanFile,
+          source: this.currentPlanSource,
+        }),
+        openManagedPlan: (file, source) => (
+          this.openManagedPlan(file, source)
+        ),
+      },
+      this.managedPlans,
+    );
+  }
 
   // ── 公共访问器 ──
 
   getCurrentPlan(): PlanModel | null { return this.currentPlan; }
 
-  setCurrentPlan(plan: PlanModel, mapData: MapData | null): void {
-    this.currentPlan = plan;
-    this.currentMapData = mapData;
+  async synchronizeTeamPlan(
+    previousName: string | null,
+    plan: UserTeamPlan,
+  ): Promise<void> {
+    await this.fleetPresetController.load();
+    if (!this.currentPlan) {
+      this.renderFleetPresetSelector();
+      return;
+    }
+
+    const hadUnsavedChanges = this.hasUnsavedPlanChanges();
+    const previousNameForCurrentPlan = this.currentPlanSource === 'user'
+      ? previousName
+      : null;
+    const synchronized = this.fleetPresetController.synchronizePreset(
+      this.currentPlan.data.fleet_presets ?? [],
+      plan.name,
+      previousNameForCurrentPlan,
+      'user',
+    );
+    if (!synchronized) {
+      this.renderFleetPresetSelector();
+      return;
+    }
+
+    this.applyFleetPresets(synchronized);
+    if (!hadUnsavedChanges) {
+      this.savedPlanSnapshot = this.planDraftSnapshot();
+    }
+    this.renderPlanPreview();
   }
 
-  getCurrentPresetInfo(): { preset: TaskPreset; filePath: string } | null {
+  pickManagedBattlePlan(): Promise<ManagedBattlePlanSelection | null> {
+    return this.battlePlanLoader.pick('task-list');
+  }
+
+  async pickManagedBattlePlanForQueue(): Promise<ManagedBattlePlanSelection | null> {
+    if (this.hasUnsavedPlanChanges()) {
+      const confirmed = await showConfirm(
+        '未保存修改',
+        '当前出征规划存在未保存修改，是否先保存再选择加入队列？',
+      );
+      if (!confirmed || !await this.savePlan()) return null;
+    }
+    return this.battlePlanLoader.pick('queue');
+  }
+
+  pickManagedBattlePlanForAutomation(
+    currentTask?: NormalFightTaskConfig,
+  ): Promise<ManagedBattlePlanSelection | null> {
+    return this.battlePlanLoader.pick('automation', currentTask);
+  }
+
+  pickManagedLootPlans(
+    currentPlans: readonly LootAutomationPlan[],
+  ): Promise<LootAutomationPlan[] | null> {
+    return this.battlePlanLoader.pickLootPlans(currentPlans);
+  }
+
+  setCurrentPlan(plan: PlanModel, mapData: MapData | null): void {
+    this.editingNodeId = null;
+    this.planView.resetNodeEditorDrafts();
+    this.planView.hideNodeEditor();
+    this.mapLoadVersion++;
+    this.currentPlan = plan;
+    this.currentMapData = mapData;
+    this.planPresetName = this.planNameFromPath(plan.fileName);
+    this.currentManagedPlanFile = null;
+    this.currentPlanSource = 'user';
+    this.savedPlanSnapshot = this.planDraftSnapshot();
+    this.refreshFleetPresetCatalog();
+  }
+
+  private async ensureEventMapCatalog(): Promise<void> {
+    this.eventMapCatalog = await loadEventMapCatalog();
+  }
+
+  getCurrentPresetInfo(): {
+    preset: TaskPreset;
+    filePath: string;
+    source: PlanPresetSource;
+  } | null {
     return this.currentPreset && this.currentPresetFilePath
-      ? { preset: this.currentPreset, filePath: this.currentPresetFilePath }
+      ? {
+          preset: this.currentPreset,
+          filePath: this.currentPresetFilePath,
+          source: this.currentPresetSource,
+        }
       : null;
   }
 
@@ -62,15 +198,8 @@ export class PlanController {
       set currentPreset(v) { self.currentPreset = v; },
       get currentPresetFilePath() { return self.currentPresetFilePath; },
       set currentPresetFilePath(v) { self.currentPresetFilePath = v; },
-    };
-  }
-
-  private get planSetters(): PlanSetters {
-    return {
-      setCurrentPlan: (plan) => { this.currentPlan = plan; },
-      setCurrentMapData: (mapData) => { this.currentMapData = mapData; },
-      renderPlanPreview: () => this.renderPlanPreview(),
-      importTaskPreset: (preset, fp) => this.importTaskPreset(preset, fp),
+      get currentPresetSource() { return self.currentPresetSource; },
+      set currentPresetSource(v) { self.currentPresetSource = v; },
     };
   }
 
@@ -79,15 +208,10 @@ export class PlanController {
   // ════════════════════════════════════════
 
   bindActions(): void {
-    document.getElementById('btn-import-plan')?.addEventListener('click', () => this.importPlan());
-    document.getElementById('btn-import-plan-2')?.addEventListener('click', () => this.importPlan());
-    document.getElementById('btn-close-plan')?.addEventListener('click', () => this.closePlan());
-    document.getElementById('btn-execute-plan')?.addEventListener('click', () => {
-      this.executePlan().catch((e) => {
-        const msg = e instanceof Error ? e.message : String(e);
-        Logger.error(`执行方案失败: ${msg}`);
-      });
-    });
+    this.planView.onNewPlan = () => void this.newPlan();
+    this.planView.onLoadPlan = () => void this.loadPlan();
+    this.planView.onSavePlan = () => void this.savePlan();
+    this.battlePlanLoader.bindActions();
 
     // 节点编辑
     this.planView.onNodeClick = (nodeId) => {
@@ -102,7 +226,7 @@ export class PlanController {
       const canDetour = this.currentMapData ? isDetourNode(this.currentMapData, nodeId) : false;
       const isEndpoint = (this.currentPlan.data.endpoint_nodes ?? []).includes(nodeId);
       const isTerminal = this.currentMapData ? isTerminalNode(this.currentMapData, nodeId) : false;
-      this.planView.showNodeEditor(nodeId, nodeType as any, {
+      this.planView.showNodeEditor(nodeId, nodeType, {
         enabled: isEnabled,
         formation: args.formation ?? 2,
         night: args.night ?? false,
@@ -110,65 +234,32 @@ export class PlanController {
         proceed: args.proceed ?? true,
         detour: args.detour ?? false,
         canDetour,
-        slWhenDetourFails: args.SL_when_detour_fails ?? false,
+        slWhenDetourFails: args.SL_when_detour_fails ?? true,
         isEndpoint,
+        result: this.currentPlan.data.result,
         isTerminal,
         enemyRules: rulesText,
       }, mapNight);
     };
 
-    document.getElementById('btn-node-editor-close')?.addEventListener('click', () => {
+    this.planView.onCloseNodeEditor = () => {
       this.editingNodeId = null;
       this.planView.hideNodeEditor();
-    });
+    };
 
-    document.getElementById('btn-node-edit-save')?.addEventListener('click', () => {
+    this.planView.onSaveNodeEditor = () => {
       if (saveNodeEditorValues(this.planView, this.currentPlan, this.editingNodeId)) {
         this.editingNodeId = null;
         this.renderPlanPreview();
       }
-    });
-
-    document.getElementById('btn-export-plan')?.addEventListener('click', () =>
-      exportPlanFlow(this.currentPlan, this.host, () => this.renderPlanPreview()));
-    document.getElementById('btn-save-plan')?.addEventListener('click', () =>
-      savePlanFlow(this.currentPlan, this.host, () => this.renderPlanPreview()));
-
-    const updateNewPlanMapOptions = (chapterVal: string): void => {
-      const mapSelect = document.getElementById('new-plan-map') as HTMLSelectElement | null;
-      if (!mapSelect) return;
-
-      const mapCountByChapter: Record<string, number> = {
-        '1': 5,
-        '2': 6,
-        '3': 4,
-        '4': 4,
-        '5': 5,
-        '6': 4,
-        '7': 5,
-        '8': 5,
-        '9': 5,
-        '10': 1,
-        Ex: 12,
-      };
-
-      const count = mapCountByChapter[chapterVal] ?? 6;
-      mapSelect.innerHTML = Array.from({ length: count }, (_, i) =>
-        `<option value="${i + 1}">${i + 1}</option>`).join('');
     };
 
-    document.getElementById('btn-new-plan')?.addEventListener('click', () => {
-      const chapterSelect = document.getElementById('new-plan-chapter') as HTMLSelectElement | null;
-      if (chapterSelect) updateNewPlanMapOptions(chapterSelect.value);
-      this.planView.showNewPlanDialog();
-    });
-    document.getElementById('btn-new-plan-confirm')?.addEventListener('click', () =>
-      confirmNewPlanFlow(this.planView, this.host, this.planSetters));
-    document.getElementById('btn-new-plan-cancel')?.addEventListener('click', () => this.planView.hideNewPlanDialog());
-
-    document.getElementById('new-plan-chapter')?.addEventListener('change', (e) => {
-      updateNewPlanMapOptions((e.target as HTMLSelectElement).value);
-    });
+    this.planView.onMapChange = (chapter, map) => {
+      void this.changeMap(chapter, map);
+    };
+    this.planView.onPresetNameChange = (name) => {
+      this.planPresetName = name;
+    };
 
     this.planView.onPlanFieldChange = (field, value) => {
       if (!this.currentPlan) return;
@@ -182,219 +273,400 @@ export class PlanController {
         this.currentPlan.data.stop_condition[field] = value as number | undefined;
         const sc = this.currentPlan.data.stop_condition;
         if (sc.loot_count_ge == null && sc.ship_count_ge == null) this.currentPlan.data.stop_condition = undefined;
-      }
-      if (this.currentPlan.fileName) {
-        window.electronBridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
+      } else if (field === 'collect_result_info') {
+        this.currentPlan.data.collect_result_info = value as boolean;
       }
     };
 
-    this.planView.onFleetPresetChange = (action, index, preset) => {
+    this.planView.onAddFleetPreset = (planId) => {
       if (!this.currentPlan) return;
-      if (!this.currentPlan.data.fleet_presets) this.currentPlan.data.fleet_presets = [];
-      const presets = this.currentPlan.data.fleet_presets;
-      if (action === 'add' && preset) presets.push({ name: preset.name, ships: preset.ships });
-      else if (action === 'edit' && preset && index >= 0 && index < presets.length) presets[index] = { name: preset.name, ships: preset.ships };
-      else if (action === 'delete' && index >= 0 && index < presets.length) presets.splice(index, 1);
-      if (this.currentPlan.fileName) window.electronBridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
-      this.planView.renderFleetPresets(presets.map(p => ({ name: p.name, ships: p.ships })));
+      const presets = this.fleetPresetController.appendPreset(
+        this.currentPlan.data.fleet_presets ?? [],
+        planId,
+      );
+      if (!presets) return;
+      this.applyFleetPresets(presets);
+      this.renderFleetPresetSelector();
     };
+    this.planView.onRemoveFleetPreset = (index) => {
+      if (!this.currentPlan) return;
+      const presets = this.fleetPresetController.removePreset(
+        this.currentPlan.data.fleet_presets ?? [],
+        index,
+      );
+      if (!presets) return;
+      this.applyFleetPresets(presets);
+      this.renderFleetPresetSelector();
+    };
+  }
 
-    this.planView.onCommentChange = (comment) => {
-      if (!this.currentPlan) return;
-      this.currentPlan.comment = comment;
-      if (this.currentPlan.fileName) window.electronBridge?.saveFile(this.currentPlan.fileName, this.currentPlan.toYaml());
-    };
+  private applyFleetPresets(presets: FleetPreset[]): void {
+    if (!this.currentPlan) return;
+    this.currentPlan.data.fleet_presets = presets.map(team => ({
+      name: team.name,
+      ships: team.ships.map(slot => (
+        slot === null || typeof slot === 'string'
+          ? slot
+          : {
+              name: slot.name,
+              candidates: slot.candidates
+                ? slot.candidates.map(candidate => ({
+                    ...candidate,
+                    ship_type: candidate.ship_type
+                      ? [...candidate.ship_type]
+                      : undefined,
+                  }))
+                : undefined,
+              search_name: slot.search_name,
+              ship_type: slot.ship_type
+                ? [...slot.ship_type]
+                : undefined,
+              min_level: slot.min_level,
+              max_level: slot.max_level,
+              relaxed: slot.relaxed,
+            }
+      )),
+    }));
+  }
+
+  private renderFleetPresetSelector(): void {
+    if (!this.currentPlan) return;
+    this.planView.renderFleetPresetSelector(
+      this.fleetPresetController.toViewObject(
+        this.currentPlan.data.fleet_presets ?? [],
+      ),
+    );
+  }
+
+  private refreshFleetPresetCatalog(): void {
+    const loading = this.fleetPresetController.load();
+    this.renderFleetPresetSelector();
+    void loading.then(() => {
+      this.renderFleetPresetSelector();
+    });
   }
 
   // ── 委托方法 ──
 
-  async importPlan(): Promise<void> {
-    return importPlanFlow(this.planView, this.host, this.planSetters);
+  async openManagedPlan(
+    file: string,
+    source: PlanPresetSource,
+    skipDiscardConfirm = false,
+  ): Promise<boolean> {
+    if (
+      !skipDiscardConfirm
+      && !(await this.confirmDiscardUnsaved())
+    ) {
+      return false;
+    }
+    if (!this.managedPlans?.readManagedCombatPlan) {
+      await showAlert('加载失败', '请完整重启 GUI 后再操作');
+      return false;
+    }
+    try {
+      const result = await this.managedPlans.readManagedCombatPlan(
+        source,
+        file,
+      );
+      if (!result.success || !result.path || result.content === undefined) {
+        await showAlert('加载失败', result.error || '无法读取出征计划');
+        return false;
+      }
+      const parsed = parseYamlRecord(result.content, '任务文件');
+      if (taskPresetCodec.isStandalone(parsed)) {
+        this.importTaskPreset(
+          taskPresetCodec.normalize(parsed),
+          result.path,
+          source,
+        );
+        return true;
+      }
+      const plan = PlanModel.fromYaml(result.content, result.path);
+      await this.ensureEventMapCatalog();
+      const { chapter, map } = plan.data;
+      const mapData = plan.isEvent
+        ? await loadEventMapData(plan.data.event ?? '', chapter, map)
+        : await loadMapData(Number(chapter), Number(map));
+      this.setCurrentPlan(plan, mapData);
+      this.currentManagedPlanFile = file;
+      this.currentPlanSource = source;
+      this.savedPlanSnapshot = this.planDraftSnapshot();
+      this.renderPlanPreview();
+      this.host.switchPage('plan');
+      if (result.missingTeamNames?.length) {
+        showWarningNotice(
+          `当前 YAML 关联的编队配置不存在：${
+            result.missingTeamNames.join('、')
+          }，请检查`,
+        );
+      }
+      return true;
+    } catch (error) {
+      await showAlert(
+        '加载失败',
+        error instanceof Error ? error.message : String(error),
+      );
+      return false;
+    }
   }
 
-  importTaskPreset(preset: TaskPreset, filePath: string): void {
-    importTaskPresetFlow(preset, filePath, this.planView, this.host, this.presetState);
+  private async newPlan(): Promise<void> {
+    if (this.hasUnsavedPlanChanges()) {
+      const confirmed = await showConfirm(
+        '新建出征预设',
+        '当前出征规划存在未保存修改，继续新建将丢失这些修改，是否继续？',
+      );
+      if (!confirmed) return;
+    }
+    this.planView.resetNodeEditorDrafts();
+    this.currentPlan = null;
+    this.currentMapData = null;
+    this.planPresetName = '';
+    this.currentManagedPlanFile = null;
+    this.currentPlanSource = 'user';
+    this.planView.hideNodeEditor();
+    this.refreshFleetPresetCatalog();
+    await this.changeMap('1', 1);
+    this.savedPlanSnapshot = this.planDraftSnapshot();
+    this.planView.focusPresetName();
+  }
+
+  private async loadPlan(): Promise<void> {
+    await this.battlePlanLoader.openForEditor();
+  }
+
+  private async confirmDiscardUnsaved(
+    action: '加载' = '加载',
+  ): Promise<boolean> {
+    if (!this.hasUnsavedPlanChanges()) return true;
+    return showConfirm(
+      '未保存修改',
+      `当前出征规划存在未保存修改，继续${action}将丢失这些修改，是否继续？`,
+    );
+  }
+
+  private planDraftSnapshot(): string {
+    if (!this.currentPlan) return '';
+    return jsonCodec.stringify({
+      name: this.planPresetName,
+      yaml: this.currentPlan.toYaml(),
+    });
+  }
+
+  private hasUnsavedPlanChanges(): boolean {
+    return this.planDraftSnapshot() !== this.savedPlanSnapshot;
+  }
+
+  private planNameFromPath(filePath: string): string {
+    const file = filePath.split(/[\\/]/).pop() ?? '';
+    return file
+      .replace(/\.ya?ml$/i, '')
+      .replace(/^bettle-/i, '');
+  }
+
+  private normalizePlanName(value: string): string {
+    return value
+      .trim()
+      .replace(/\.ya?ml$/i, '')
+      .replace(/^bettle-/i, '')
+      .replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')
+      .replace(/[. ]+$/g, '')
+      .slice(0, 100);
+  }
+
+  private async savePlan(): Promise<boolean> {
+    if (!this.currentPlan) return false;
+    if (!this.managedPlans?.saveManagedCombatPlan) {
+      await showAlert('保存失败', '当前环境不支持保存出征规划');
+      return false;
+    }
+    const name = this.normalizePlanName(this.planView.getPresetName());
+    if (!name) {
+      await showAlert('保存失败', '请先填写预设名称');
+      return false;
+    }
+
+    try {
+      const content = this.currentPlan.toYaml();
+      const copiedFromSystem = this.currentPlanSource === 'system';
+      const currentFile = copiedFromSystem
+        ? undefined
+        : this.currentManagedPlanFile ?? undefined;
+      let result = await this.managedPlans.saveManagedCombatPlan(
+        name,
+        content,
+        false,
+        currentFile,
+      );
+      if (result.exists) {
+        const conflictDetails = result.conflicts?.length
+          ? `\n\n${result.conflicts.join('\n')}`
+          : '';
+        const overwrite = await showConfirm(
+          '覆盖配置',
+          `存在同名配置，是否覆盖？${conflictDetails}`,
+        );
+        if (!overwrite) return false;
+        result = await this.managedPlans.saveManagedCombatPlan(
+          name,
+          content,
+          true,
+          currentFile,
+        );
+      }
+      if (!result.success) {
+        throw new Error(result.error || '保存失败');
+      }
+
+      this.currentPlan.fileName = result.path ?? this.currentPlan.fileName;
+      this.currentManagedPlanFile = result.file ?? `bettle-${name}.yaml`;
+      this.currentPlanSource = result.source ?? 'user';
+      this.planPresetName = name;
+      this.savedPlanSnapshot = this.planDraftSnapshot();
+      this.renderPlanPreview();
+      Logger.info(`出征规划已保存: ${this.currentManagedPlanFile}`);
+      showSaveSuccess(
+        copiedFromSystem
+          ? `出征规划「${name}」已保存为用户配置`
+          : `出征规划「${name}」保存成功`,
+      );
+      return true;
+    } catch (error) {
+      await showAlert(
+        '保存失败',
+        error instanceof Error ? error.message : String(error),
+      );
+      return false;
+    }
+  }
+
+  importTaskPreset(
+    preset: TaskPreset,
+    filePath: string,
+    source: PlanPresetSource = 'user',
+  ): void {
+    this.mapLoadVersion++;
+    importTaskPresetFlow(
+      preset,
+      filePath,
+      this.planView,
+      this.host,
+      this.presetState,
+      source,
+    );
   }
 
   closePresetDetail(): void {
     closePresetDetailFlow(this.planView, this.presetState);
   }
 
-  executePreset(): void {
-    executePresetFlow(this.planView, this.host, this.presetState);
-  }
-
-  closePlan(): void {
-    this.currentPlan = null;
-    this.currentMapData = null;
-    this.editingNodeId = null;
-    this.planView.render(null);
-    this.planView.hideNodeEditor();
-    this.planView.hidePresetDetail();
+  async executePreset(): Promise<void> {
+    let ships: Pick<ShipLibraryShip, 'name' | 'search_name'>[] = [];
+    if (
+      this.currentPreset?.task_type === 'decisive'
+      && this.currentPresetSource !== 'system'
+    ) {
+      if (!this.managedPlans?.getShipLibraryManifest) {
+        await showAlert('加入队列失败', '舰船资料库读取接口不可用');
+        return;
+      }
+      try {
+        ships = (await this.managedPlans.getShipLibraryManifest()).ships;
+      } catch (error) {
+        await showAlert(
+          '加入队列失败',
+          error instanceof Error ? error.message : String(error),
+        );
+        return;
+      }
+    }
+    executePresetFlow(
+      this.planView,
+      this.host,
+      this.presetState,
+      ships,
+    );
   }
 
   renderPlanPreview(): void {
     if (!this.currentPlan) { this.planView.render(null); return; }
-    const vo = buildPlanPreviewVO(this.currentPlan, this.currentMapData);
+    const vo = buildPlanPreviewVO(
+      this.currentPlan,
+      this.currentMapData,
+      this.eventMapCatalog,
+      this.fleetPresetController.toViewObject(
+        this.currentPlan.data.fleet_presets ?? [],
+      ),
+    );
     this.planView.render(vo);
+    this.planView.setPresetName(this.planPresetName);
     this.planView.showPlanView();
   }
 
-  // ── 执行方案 ──
-
-  private toNodeDecisionReq(args?: NodeArgs): NodeDecisionReq | undefined {
-    if (!args) return undefined;
-    const mapped: NodeDecisionReq = {};
-    if (args.formation != null) mapped.formation = args.formation;
-    if (args.night != null) mapped.night = args.night;
-    if (args.long_missile_support != null) mapped.long_missile_support = args.long_missile_support;
-    if (args.proceed != null) mapped.proceed = args.proceed;
-    if (args.detour != null) mapped.detour = args.detour;
-    if (args.proceed_stop != null) mapped.proceed_stop = args.proceed_stop;
-    if (args.SL_when_detour_fails != null) mapped.SL_when_detour_fails = args.SL_when_detour_fails;
-    if (args.enemy_rules && args.enemy_rules.length > 0) {
-      mapped.enemy_rules = args.enemy_rules.map(([cond, action]) => [String(cond), action]);
-    }
-    if (args.enemy_formation_rules && args.enemy_formation_rules.length > 0) {
-      mapped.enemy_formation_rules = args.enemy_formation_rules.map(([cond, action]) => [String(cond), action]);
-    }
-    if (args.SL_when_spot_enemy_fails != null) {
-      mapped.SL_when_spot_enemy_fails = args.SL_when_spot_enemy_fails;
-    }
-    if (args.SL_when_enter_fight != null) mapped.SL_when_enter_fight = args.SL_when_enter_fight;
-    if (args.formation_when_spot_enemy_fails != null) {
-      mapped.formation_when_spot_enemy_fails = args.formation_when_spot_enemy_fails;
-    }
-    return Object.keys(mapped).length > 0 ? mapped : undefined;
-  }
-
-  private buildInlinePlan(plan: PlanModel): CombatPlanReq {
-    const selectedNodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
-    const inlinePlan: CombatPlanReq = {
-      chapter: plan.data.chapter,
-      map: plan.data.map,
-      selected_nodes: selectedNodes,
-    };
-
-    if (plan.data.mode) inlinePlan.mode = plan.data.mode;
-    if (plan.data.event) inlinePlan.event_name = plan.data.event;
-
-    if (plan.data.fleet_id != null) inlinePlan.fleet_id = plan.data.fleet_id;
-    if (plan.data.repair_mode != null) {
-      inlinePlan.repair_mode = Array.isArray(plan.data.repair_mode)
-        ? [...plan.data.repair_mode]
-        : [plan.data.repair_mode];
-    }
-    if (plan.data.fight_condition != null) inlinePlan.fight_condition = plan.data.fight_condition;
-
-    const nodeDefaults = this.toNodeDecisionReq(plan.data.node_defaults);
-    if (nodeDefaults) inlinePlan.node_defaults = nodeDefaults;
-
-    if (plan.data.node_args) {
-      const nodeArgs: Record<string, NodeDecisionReq> = {};
-      for (const [nodeId, nodeArg] of Object.entries(plan.data.node_args)) {
-        const mapped = this.toNodeDecisionReq(nodeArg);
-        if (mapped) nodeArgs[nodeId] = mapped;
-      }
-      if (Object.keys(nodeArgs).length > 0) inlinePlan.node_args = nodeArgs;
-    }
-
-    return inlinePlan;
-  }
-
-  private buildInlinePlanFilePath(plan: PlanModel): string {
-    const safeMap = plan.mapName.replace(/[^a-zA-Z0-9_-]+/g, '_');
-    const ts = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
-    const fileName = `_ui_inline_${safeMap}_${ts}.yaml`;
-    return this.host.plansDir ? `${this.host.plansDir}\\${fileName}` : fileName;
-  }
-
-  private async ensurePlanFileForExecution(plan: PlanModel): Promise<string | null> {
-    const bridge = window.electronBridge;
-    if (!bridge) return null;
-
-    let planPath = plan.fileName?.trim();
-    if (!planPath) {
-      planPath = this.buildInlinePlanFilePath(plan);
-      plan.fileName = planPath;
-      Logger.warn(`当前方案尚未保存，已自动保存为临时文件: ${planPath}`);
+  async ensureDefaultPlan(): Promise<void> {
+    this.refreshFleetPresetCatalog();
+    if (this.currentPreset) return;
+    if (this.currentPlan) {
       this.renderPlanPreview();
+      return;
     }
-
-    await bridge.saveFile(planPath, plan.toYaml());
-    return bridge.resolveAppPath(planPath);
+    await this.changeMap('1', 1);
+    this.savedPlanSnapshot = this.planDraftSnapshot();
   }
 
-  private async executePlan(): Promise<void> {
-    if (!this.currentPlan) return;
-    const plan = this.currentPlan;
-    const times = plan.data.times ?? 1;
-    const stopCondition = plan.data.stop_condition;
-    const selectedPresets = this.planView.getSelectedPresets();
-    const firstPreset = selectedPresets.length > 0 ? selectedPresets[0] : undefined;
-    const configuredFleetId = plan.data.fleet_id ?? 1;
-    let effectiveFleetId = configuredFleetId;
+  private async changeMap(
+    chapterValue: string,
+    map: number | string,
+  ): Promise<void> {
+    await this.ensureEventMapCatalog();
+    const version = ++this.mapLoadVersion;
+    const eventMatch = chapterValue.match(/^event:([^:]+):(E|H)$/);
+    const eventName = eventMatch?.[1];
+    const eventChapter = eventMatch?.[2];
+    let chapter: number | string;
+    let mapValue: number | string;
+    let mapData: MapData | null;
 
-    const req: NormalFightReq | EventFightReq = plan.isEvent
-      ? { type: 'event_fight', times: 1, gap: plan.data.gap ?? 0, fleet_id: effectiveFleetId }
-      : { type: 'normal_fight', times: 1, gap: plan.data.gap ?? 0 };
-    const ensuredPlanPath = await this.ensurePlanFileForExecution(plan);
-
-    if (ensuredPlanPath) {
-      req.plan_id = ensuredPlanPath;
+    if (eventName && eventChapter) {
+      chapter = eventChapter;
+      mapValue = String(map).trim().toLowerCase();
+      mapData = await loadEventMapData(eventName, chapter, mapValue);
     } else {
-      req.plan = this.buildInlinePlan(plan);
-      Logger.warn('无法保存方案文件，回退为内存方案执行（部分高级规则可能不生效）');
+      chapter = Number(chapterValue);
+      mapValue = Number(map);
+      mapData = await loadMapData(Number(chapter), mapValue);
+    }
+    if (version !== this.mapLoadVersion) return;
+    if (!mapData) {
+      Logger.error(`地图 ${chapterValue}-${mapValue} 数据不存在`);
+      this.renderPlanPreview();
+      return;
     }
 
-    if (plan.data.selected_nodes.length > 0) {
-      req.plan = req.plan ?? {};
-      req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
-      // 后端 schema 会为 plan.fleet_id 注入默认值 1；
-      // 这里显式传入当前舰队，避免 selected_nodes 覆盖请求意外把舰队重置为 1。
-      req.plan.fleet_id = effectiveFleetId;
+    this.planView.resetNodeEditorDrafts();
+    const selectedNodes = initialSelectedNodesForNewPlan();
+    if (!this.currentPlan) {
+      this.currentPlan = PlanModel.create(
+        chapter,
+        mapValue,
+        selectedNodes,
+        eventName,
+      );
+    } else {
+      this.currentPlan.data.chapter = chapter;
+      this.currentPlan.data.map = mapValue;
+      this.currentPlan.data.mode = undefined;
+      this.currentPlan.data.event = eventName;
+      this.currentPlan.data.selected_nodes = selectedNodes;
+      this.currentPlan.data.endpoint_nodes = undefined;
+      this.currentPlan.data.result = undefined;
+      this.currentPlan.data.node_args = {};
     }
 
-    if (firstPreset && firstPreset.ships.length > 0) {
-      const resolved = resolveFleetPreset(firstPreset.ships);
-      if (resolved.length > 0) {
-        if (configuredFleetId === 1) {
-          // 后端不支持对第一分队自动改编，运行时自动切换到第二分队。
-          effectiveFleetId = 2;
-          Logger.warn('检测到自动编队请求且当前为第1分队，已自动切换为第2分队执行本次任务');
-        }
-        if (req.type === 'event_fight') req.fleet_id = effectiveFleetId;
-        if (!req.plan) req.plan = {};
-        req.plan.fleet = resolved.map(toBackendName);
-        req.plan.fleet_id = effectiveFleetId;
-        const fleetRules = resolveFleetPresetRules(firstPreset.ships);
-        if (fleetRules.length > 0) req.plan.fleet_rules = fleetRules;
-      }
-    }
-
-    const bathRepairConfig = this.planView.getBathRepairConfig();
-    const fleetId = effectiveFleetId;
-    const fleetPresets = selectedPresets.length > 1 ? selectedPresets : undefined;
-    const currentPresetIndex = fleetPresets ? 0 : undefined;
-
-    const taskType = plan.isEvent ? 'event_fight' : 'normal_fight';
-    this.host.scheduler.addTask(
-      plan.mapName, taskType, req, TaskPriority.USER_TASK, times,
-      stopCondition, bathRepairConfig, fleetId, fleetPresets, currentPresetIndex,
-      undefined, undefined, plan.data.endpoint_nodes,
-    );
-    const planRef = req.plan_id ?? '(inline-unsaved)';
-    Logger.debug(`executePlan: map=${plan.mapName} plan_id=${planRef} times=${times} gap=${req.gap}${firstPreset ? ' fleet=' + firstPreset.ships.map(s => shipSlotLabel(s)).join(',') : ''}${fleetPresets ? ' rotation=' + fleetPresets.length + '套' : ''}`);
-
-    this.planView.selectedFleetPresetIndices.clear();
-    this.host.switchPage('main');
-    this.host.renderMain();
-
-    if (stopCondition) {
-      const parts: string[] = [`×${times}`];
-      if (stopCondition.loot_count_ge) parts.push(`战利品≥${stopCondition.loot_count_ge}时停止`);
-      if (stopCondition.ship_count_ge) parts.push(`舰船≥${stopCondition.ship_count_ge}时停止`);
-      Logger.info(`任务「${plan.mapName}」已加入队列 (${parts.join(', ')})`);
-    }
+    this.currentMapData = mapData;
+    this.editingNodeId = null;
+    this.planView.hideNodeEditor();
+    this.renderPlanPreview();
+    Logger.info(`已切换地图 ${this.currentPlan.mapName}`);
   }
 }

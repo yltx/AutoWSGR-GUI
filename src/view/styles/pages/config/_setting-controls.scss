@@ -1,0 +1,328 @@
+.config-setting-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(300px, 1.1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 46px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.config-setting-copy {
+  display: block;
+  line-height: 1.45;
+
+  strong {
+    display: inline;
+    margin-right: 8px;
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  span {
+    display: inline;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+}
+
+.config-setting-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+
+  > .input-row {
+    width: min(100%, var(--config-row-width));
+  }
+
+  > input.input {
+    width: min(100%, var(--config-text-field-width));
+    max-width: var(--config-text-field-width);
+  }
+
+  .input {
+    padding: 6px 9px;
+    font-size: 12px;
+  }
+
+  .btn-small {
+    flex: 0 0 auto;
+  }
+}
+
+.config-cuda-path-row {
+  flex-wrap: nowrap;
+
+  .config-cuda-input-wrap {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+
+    .input {
+      width: 100%;
+      padding-right: 82px;
+    }
+
+    #cfg-cuda-status {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      max-width: 72px;
+      margin: 0;
+      padding: 2px 6px;
+      overflow: hidden;
+      font-size: 9px;
+      line-height: 1.2;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+      transform: translateY(-50%);
+    }
+  }
+}
+
+.config-setting-control-stack {
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.config-auto-task-control {
+  flex-wrap: nowrap;
+
+  > .config-switch {
+    flex: 0 0 auto;
+  }
+}
+
+.config-auto-loot-control {
+  min-width: 0;
+  gap: 6px;
+
+  .config-auto-task-options {
+    min-width: 0;
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+
+  #cfg-loot-stop-count {
+    width: 56px !important;
+    flex-basis: 56px;
+  }
+}
+
+.config-adb-controls {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+
+  .config-adb-input-wrap {
+    position: relative;
+    width: min(100%, 210px);
+    min-width: 180px;
+    max-width: 210px;
+    flex: 0 1 210px;
+
+    .input {
+      width: 100%;
+      padding-right: 66px;
+    }
+
+    .adb-status {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      margin: 0;
+      padding: 2px 6px;
+      font-size: 10px;
+      pointer-events: none;
+      transform: translateY(-50%);
+    }
+  }
+}
+
+.config-setting-control > .config-compact-path-row {
+  width: min(100%, 360px);
+}
+
+.config-setting-control > .config-backend-controls {
+  width: min(100%, 300px);
+  justify-content: flex-end;
+
+  #cfg-backend-port {
+    width: 72px !important;
+    flex-basis: 72px;
+  }
+}
+
+.config-setting-control > .config-update-controls {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+}
+
+.config-update-progress {
+  display: grid;
+  flex: 0 1 160px;
+  gap: 4px;
+  width: 160px;
+  min-width: 120px;
+
+  &[hidden] {
+    display: none;
+  }
+
+  &[data-state='complete'] {
+    .config-update-progress-copy {
+      color: var(--success);
+    }
+
+    .config-update-progress-track > span {
+      background: var(--success);
+    }
+  }
+
+  &[data-state='error'] {
+    .config-update-progress-copy {
+      color: var(--danger);
+    }
+
+    .config-update-progress-track > span {
+      background: var(--danger);
+    }
+  }
+}
+
+.config-update-progress-copy {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+
+  #gui-update-status {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
+  #gui-update-percent {
+    flex: 0 0 auto;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+.config-update-progress-track {
+  height: 4px;
+  overflow: hidden;
+  background: var(--bg-inset);
+  border-radius: var(--radius-pill);
+
+  > span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--accent);
+    border-radius: inherit;
+    transition: width 180ms ease;
+  }
+
+  &.is-indeterminate > span {
+    width: 35% !important;
+    animation: config-update-progress-slide 1.1s ease-in-out infinite;
+  }
+}
+
+@keyframes config-update-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(300%);
+  }
+}
+
+.config-inline-options {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  > span {
+    color: var(--text-muted);
+    font-size: 11px;
+    white-space: nowrap;
+  }
+}
+
+.config-auto-task-options {
+  min-width: 0;
+}
+
+.config-status-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.config-status-readonly {
+  color: var(--text-muted);
+  background: var(--bg-inset);
+}
+
+.config-prefix {
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.config-advanced-box {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 16px 12px;
+  padding: 12px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.config-range-preview {
+  width: min(100%, 345px);
+  justify-self: end;
+  flex-direction: column;
+  align-items: stretch;
+
+  label {
+    display: grid;
+    grid-template-columns: 40px minmax(90px, 1fr) 64px;
+    gap: 8px;
+    align-items: center;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  input[type='number'] {
+    width: 64px;
+  }
+}
+
+.config-confidence-preview {
+  input[type='range'] {
+    min-width: 160px;
+  }
+
+  input[type='number'] {
+    width: var(--config-short-field-width);
+    flex: 0 0 var(--config-short-field-width);
+  }
+}

@@ -1,24 +1,99 @@
 /* ═══ 统一任务区域 ═══ */
+#task-area-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px;
+}
+
+#task-area-queue {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
 .task-area-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  justify-content: flex-start;
+  gap: 5px;
+  margin-bottom: 3px;
 }
 
 .task-area-header h3 {
   margin: 0;
   font-size: 14px;
+  line-height: normal;
 }
 
 .task-area-header .queue-actions {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 3px;
+  padding: 0;
+}
+
+.task-area-header .queue-actions .btn {
+  height: 20px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  font-size: 9px;
+  line-height: 1;
+}
+
+#btn-stop-task {
+  min-width: 58px;
+  padding-right: 9px;
+  padding-left: 9px;
+  border-color: #b85c5c;
+  background: #c96b6b;
+  font-size: 10px;
+  font-weight: 700;
+  box-shadow: 0 2px 5px rgb(185 92 92 / 18%);
+}
+
+#btn-stop-task:hover {
+  background: #b85c5c;
+  border-color: #a94f4f;
+  box-shadow: 0 2px 6px rgb(185 92 92 / 25%);
+}
+
+#btn-stop-task.is-stopping,
+#btn-stop-task.is-stopping:disabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 72px;
+  border-color: #e67700;
+  background: #f08c00;
+  color: #fff;
+  cursor: wait;
+  opacity: 1;
+  box-shadow: 0 2px 7px rgb(240 140 0 / 35%);
+}
+
+#btn-stop-task.is-stopping::before {
+  width: 8px;
+  height: 8px;
+  border: 2px solid rgb(255 255 255 / 55%);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: task-stop-spin 0.8s linear infinite;
+  content: '';
+}
+
+@keyframes task-stop-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ═══ 任务队列 ═══ */
 .task-queue-list {
-  max-height: 200px;
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -26,9 +101,10 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  padding: 8px 12px;
+  padding: 4px 6px;
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 11px;
+  line-height: 1.2;
   transition: background 0.15s;
   cursor: grab;
   border-bottom: 1px solid transparent;
@@ -37,7 +113,7 @@
 .tq-main-row {
   display: flex;
   align-items: center;
-  min-height: 24px;
+  min-height: 20px;
 }
 
 .task-queue-item:hover {
@@ -56,17 +132,17 @@
 .tq-drag-handle {
   color: var(--text-muted);
   cursor: grab;
-  font-size: 14px;
+  font-size: 12px;
   flex-shrink: 0;
   user-select: none;
   line-height: 1;
-  margin-right: 8px;
+  margin-right: 5px;
 }
 
 .tq-drag-handle:active { cursor: grabbing; }
 
 .task-queue-item + .task-queue-item {
-  margin-top: 2px;
+  margin-top: 1px;
 }
 
 .task-queue-item .tq-name {
@@ -76,17 +152,17 @@
 
 .task-queue-item .tq-priority {
   color: var(--text-muted);
-  font-size: 11px;
-  padding: 2px 8px;
+  font-size: 9px;
+  padding: 1px 5px;
   background: var(--bg-inset);
   border-radius: var(--radius-pill);
-  margin-left: 10px;
+  margin-left: 6px;
 }
 
 .task-queue-item .tq-remove {
-  margin-left: 8px;
-  width: 24px;
-  height: 24px;
+  margin-left: 5px;
+  width: 20px;
+  height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -95,7 +171,7 @@
   border-radius: 50%;
   color: var(--text-muted);
   cursor: pointer;
-  font-size: 12px;
+  font-size: 10px;
   transition: all 0.15s;
 }
 
@@ -118,18 +194,18 @@
 }
 
 .tq-progress {
-  font-size: 11px;
+  font-size: 9px;
   font-family: "Cascadia Code", "Consolas", monospace;
   font-variant-numeric: tabular-nums;
   color: var(--accent);
-  margin-left: 8px;
+  margin-left: 6px;
   font-weight: 600;
   flex-shrink: 0;
 }
 
 .tq-progress-track {
-  margin-top: 6px;
-  height: 6px;
+  margin-top: 3px;
+  height: 4px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--bg-inset) 82%, transparent);
   overflow: hidden;
@@ -144,12 +220,12 @@
 
 /* 实时资源计数（后端出征面板 OCR） */
 .tq-acquisition {
-  font-size: 10px;
+  font-size: 9px;
   font-family: "Cascadia Code", "Consolas", monospace;
   font-variant-numeric: tabular-nums;
   color: var(--text-muted);
-  margin-left: 8px;
-  padding: 1px 6px;
+  margin-left: 6px;
+  padding: 1px 5px;
   background: var(--bg-inset);
   border-radius: var(--radius-pill);
   flex-shrink: 0;

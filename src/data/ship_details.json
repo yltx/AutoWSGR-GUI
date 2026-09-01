@@ -1905,7 +1905,7 @@
     },
     {
         "id": 273,
-        "name": "塞尔弗里奇",
+        "name": "赛尔弗里吉",
         "nation": "美国",
         "ship_type": "dd",
         "is_retrofit": false
@@ -2087,7 +2087,7 @@
     },
     {
         "id": 299,
-        "name": "让巴尔",
+        "name": "让·巴尔",
         "nation": "法国",
         "ship_type": "bb",
         "is_retrofit": false
@@ -2397,7 +2397,7 @@
         "id": 343,
         "name": "蔚山",
         "nation": "韩国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -2537,7 +2537,7 @@
         "id": 363,
         "name": "炽热",
         "nation": "苏联",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -2803,7 +2803,7 @@
         "id": 401,
         "name": "胆大",
         "nation": "苏联",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -3251,7 +3251,7 @@
         "id": 467,
         "name": "鞍山",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -3496,7 +3496,7 @@
         "id": 502,
         "name": "济南",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -3713,7 +3713,7 @@
         "id": 533,
         "name": "格罗兹尼",
         "nation": "苏联",
-        "ship_type": "cg",
+        "ship_type": "kp",
         "is_retrofit": false
     },
     {
@@ -4049,7 +4049,7 @@
         "id": 581,
         "name": "塞瓦斯托波尔(导弹巡洋舰)",
         "nation": "苏联",
-        "ship_type": "cg",
+        "ship_type": "kp",
         "is_retrofit": false
     },
     {
@@ -4154,7 +4154,7 @@
         "id": 596,
         "name": "九江",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -4301,7 +4301,7 @@
         "id": 617,
         "name": "南京",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -4420,14 +4420,14 @@
         "id": 634,
         "name": "自豪",
         "nation": "苏联",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
         "id": 636,
         "name": "活泼",
         "nation": "苏联",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": false
     },
     {
@@ -4567,14 +4567,14 @@
         "id": 1020,
         "name": "阿拉斯加·改",
         "nation": "美国",
-        "ship_type": "cbg",
+        "ship_type": "bg",
         "is_retrofit": true
     },
     {
         "id": 1021,
         "name": "关岛·改",
         "nation": "美国",
-        "ship_type": "cbg",
+        "ship_type": "bg",
         "is_retrofit": true
     },
     {
@@ -5050,7 +5050,7 @@
         "id": 1097,
         "name": "长春",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": true
     },
     {
@@ -5699,7 +5699,7 @@
     },
     {
         "id": 1273,
-        "name": "塞尔弗里奇·改",
+        "name": "赛尔弗里吉·改",
         "nation": "美国",
         "ship_type": "dd",
         "is_retrofit": true
@@ -5769,7 +5769,7 @@
     },
     {
         "id": 1299,
-        "name": "让巴尔·改",
+        "name": "让·巴尔·改",
         "nation": "法国",
         "ship_type": "bbg",
         "is_retrofit": true
@@ -5855,7 +5855,7 @@
         "id": 1343,
         "name": "蔚山·改",
         "nation": "韩国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": true
     },
     {
@@ -5911,7 +5911,7 @@
         "id": 1400,
         "name": "七省联盟·改",
         "nation": "荷兰",
-        "ship_type": "cgaa",
+        "ship_type": "cg",
         "is_retrofit": true
     },
     {
@@ -5925,7 +5925,7 @@
         "id": 1413,
         "name": "加里波第·改",
         "nation": "意大利",
-        "ship_type": "cgaa",
+        "ship_type": "cg",
         "is_retrofit": true
     },
     {
@@ -5960,7 +5960,7 @@
         "id": 1430,
         "name": "捷尔任斯基·改",
         "nation": "苏联",
-        "ship_type": "cgaa",
+        "ship_type": "cg",
         "is_retrofit": true
     },
     {
@@ -5981,7 +5981,7 @@
         "id": 1467,
         "name": "鞍山·改",
         "nation": "中国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": true
     },
     {
@@ -6051,7 +6051,7 @@
         "id": 1528,
         "name": "芝加哥(CA-136)·改",
         "nation": "美国",
-        "ship_type": "cgaa",
+        "ship_type": "cg",
         "is_retrofit": true
     },
     {
@@ -6107,7 +6107,7 @@
         "id": 1606,
         "name": "汉堡·改",
         "nation": "德国",
-        "ship_type": "ddg",
+        "ship_type": "asdg",
         "is_retrofit": true
     },
     {

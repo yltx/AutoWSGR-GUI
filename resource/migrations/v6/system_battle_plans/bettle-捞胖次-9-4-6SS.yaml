@@ -1,0 +1,59 @@
+# 旧版 9-4 六潜艇刷取战利品计划。
+# 该计划来自旧五项模板的索引 0，保留后才能无歧义迁移。
+chapter: 9
+map: 4
+selected_nodes: ['0', A, B, C, D, E, J, H, G, F, I]
+fleet_id: 4
+endpoint_nodes: [J, F, G, H, I]
+fight_condition: 1
+repair_mode: 2
+node_defaults:
+  formation: 2
+  night: false
+  proceed: true
+node_args:
+  E:
+    formation: 4
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  D:
+    formation: 4
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  C:
+    formation: 4
+    enemy_rules:
+      - [AP >= 1, 4]
+      - [AP < 1, detour]
+  J:
+    formation: 4
+    enemy_rules:
+      - [AP < 1, retreat]
+  H:
+    formation: 4
+    proceed: false
+    enemy_rules:
+      - [AP < 1, retreat]
+  G:
+    formation: 4
+    proceed: false
+    enemy_rules:
+      - [AP < 1, retreat]
+  F:
+    formation: 4
+    enemy_rules:
+      - [AP < 1, retreat]
+  B:
+    formation: 4
+  A:
+    formation: 4
+  I:
+    formation: 2
+    proceed: false
+    enemy_rules:
+      - [AP < 1, retreat]
+times: 500
+stop_condition:
+  loot_count_ge: 50

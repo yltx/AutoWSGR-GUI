@@ -1,0 +1,187 @@
+/* 亮色主题补充：修正固定状态色和亮色背景下的组件层次。 */
+[data-theme='light'] {
+  body {
+    background:
+      radial-gradient(circle at 15% 0%, rgba(255, 255, 255, 0.7), transparent 34%),
+      var(--bg);
+  }
+
+  .nav-bar,
+  .card,
+  .config-list-section,
+  .status-card,
+  .expedition-bar,
+  .ops-toolbar {
+    border-color: var(--border);
+  }
+
+  .nav-bar {
+    background: rgba(248, 250, 252, 0.92);
+    box-shadow: 0 2px 14px rgba(51, 65, 85, 0.08);
+  }
+
+  .modal,
+  .context-menu,
+  .ship-autocomplete,
+  .fleet-filter-popover {
+    background: var(--bg-card-solid);
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-elevated);
+  }
+
+  .input::placeholder,
+  textarea::placeholder {
+    color: #718096;
+    opacity: 0.92;
+  }
+
+  .input:disabled,
+  button:disabled,
+  select:disabled {
+    color: #718096;
+    opacity: 0.62;
+  }
+
+  .nav-tab.active,
+  .config-tab.active {
+    border: 1px solid var(--border);
+    box-shadow: 0 1px 5px rgba(51, 65, 85, 0.12);
+  }
+
+  .nav-task-state {
+    box-shadow: 0 2px 8px rgba(51, 65, 85, 0.12);
+  }
+
+  .btn-primary,
+  .fleet-filter-trigger.active,
+  .fleet-filter-option.active {
+    color: var(--accent-foreground);
+  }
+
+  #fleet-filter-count:not(:empty) {
+    color: var(--accent);
+    background: var(--bg-card-solid);
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.12);
+  }
+
+  .fleet-slot.active {
+    box-shadow:
+      0 0 0 2px rgba(30, 41, 59, 0.58),
+      0 0 16px color-mix(in srgb, var(--accent-hover) 56%, transparent);
+  }
+
+  .map-edge-line {
+    stroke: #64748b;
+    opacity: 0.62;
+  }
+
+  .map-node {
+    background: var(--bg-card-solid);
+    opacity: 0.72;
+  }
+
+  .map-node-selected {
+    opacity: 1;
+  }
+
+  .map-node.node-type-start,
+  .node-chip.node-type-start {
+    border-color: #15803d;
+  }
+
+  .map-node.node-type-start .map-node-id,
+  .node-chip.node-type-start .node-id {
+    color: #15803d;
+  }
+
+  .map-node.node-type-start .map-node-badge,
+  .node-chip.node-type-start .node-type-badge {
+    background: #15803d;
+  }
+
+  .map-node.node-type-resource .map-node-badge,
+  .node-chip.node-type-resource .node-type-badge {
+    color: #292524;
+  }
+
+  .map-node.node-type-aerial,
+  .node-chip.node-type-aerial {
+    border-color: #0e7490;
+  }
+
+  .map-node.node-type-aerial .map-node-id,
+  .node-chip.node-type-aerial .node-id {
+    color: #0e7490;
+  }
+
+  .map-node.node-type-aerial .map-node-badge,
+  .node-chip.node-type-aerial .node-type-badge {
+    background: #0e7490;
+  }
+
+  .node-info-badge.node-type-start {
+    color: #15803d;
+  }
+
+  .node-info-badge.node-type-aerial {
+    color: #0e7490;
+  }
+
+  .log-entry.level-warning,
+  .log-entry.log-detour {
+    background: var(--warning-bg);
+  }
+
+  .log-entry.level-error,
+  .log-entry.level-critical {
+    background: var(--danger-bg);
+  }
+
+  .log-entry.level-critical,
+  .log-entry.level-critical .log-icon,
+  .log-entry.level-critical .log-msg,
+  .log-entry.level-critical .log-channel {
+    color: var(--danger);
+    border-left-color: var(--danger);
+  }
+
+  .log-entry.log-ui-recognition {
+    border-left-color: #0f766e;
+    background: rgba(15, 118, 110, 0.09);
+  }
+
+  .log-entry.log-ui-recognition .log-icon,
+  .log-entry.log-ui-recognition .log-msg,
+  .log-entry.log-ui-recognition .log-channel {
+    color: #0f766e;
+  }
+
+  .log-entry.log-detour .log-msg,
+  .log-mvp {
+    color: var(--warning);
+  }
+
+  .log-entry.log-ship-drop {
+    border-left-color: var(--success);
+    background: var(--success-bg);
+  }
+
+  .log-entry.log-ship-drop .log-msg,
+  .log-ship-drop-name {
+    color: var(--success);
+  }
+
+  .log-grade.grade-ss,
+  .log-grade.grade-s {
+    color: #9a6700;
+    text-shadow: none;
+  }
+
+  .log-grade.grade-a {
+    color: #be185d;
+  }
+
+  .log-grade.grade-low {
+    color: #6d28d9;
+  }
+}

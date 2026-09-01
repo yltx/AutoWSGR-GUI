@@ -3,6 +3,8 @@
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+  scrollbar-width: thin;
 }
 
 body {
@@ -14,10 +16,17 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* 自定义滚动条 */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+/* 全局简约滚动条 */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -25,23 +34,44 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
+  min-width: 28px;
+  min-height: 28px;
+  background: color-mix(in srgb, var(--accent) 48%, var(--scrollbar-thumb));
+  background-clip: padding-box;
+  border: 1px solid transparent;
+  border-radius: var(--radius-pill);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
+  background: color-mix(in srgb, var(--accent-hover) 70%, var(--scrollbar-thumb-hover));
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 /* ═══ 页面容器 ═══ */
 .page-container {
-  padding: 16px 20px;
+  width: 100%;
+  min-width: 0;
+  padding:
+    calc(var(--nav-height) + var(--page-gutter-block))
+    var(--page-gutter-inline)
+    var(--page-gutter-block);
   margin: 0 auto;
 }
 
 .page {
   display: none;
-  animation: page-in 0.3s ease;
+  min-width: 0;
+  animation: page-in 160ms cubic-bezier(0.2, 0.72, 0.2, 1);
 }
 
 .page.active {
@@ -49,8 +79,14 @@ body {
 }
 
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translate3d(0, 4px, 0); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page {
+    animation-duration: 1ms;
+  }
 }
 
 /* ═══ 通用卡片 ═══ */

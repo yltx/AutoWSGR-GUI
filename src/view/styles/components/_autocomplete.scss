@@ -12,6 +12,8 @@
   border-radius: 6px;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   margin-top: 2px;
+  transform-origin: top center;
+  animation: floating-popover-in 140ms cubic-bezier(0.2, 0.72, 0.2, 1) both;
 }
 
 .ship-ac-item {
@@ -28,12 +30,12 @@
 .ship-ac-item:hover,
 .ship-ac-item.active {
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-foreground);
 }
 
 .ship-ac-item.active .ship-ac-meta,
 .ship-ac-item:hover .ship-ac-meta {
-  color: rgba(255, 255, 255, 0.8);
+  color: color-mix(in srgb, var(--accent-foreground) 78%, transparent);
 }
 
 .ship-ac-name {
@@ -50,7 +52,7 @@
 
 .ship-ac-item:hover .ship-ac-name b,
 .ship-ac-item.active .ship-ac-name b {
-  color: #fff;
+  color: var(--accent-foreground);
 }
 
 .ship-ac-meta {
@@ -70,6 +72,8 @@
   box-shadow: 0 4px 16px rgba(0,0,0,0.25);
   padding: 4px 0;
   min-width: 100px;
+  transform-origin: top left;
+  animation: floating-popover-in 140ms cubic-bezier(0.2, 0.72, 0.2, 1) both;
 }
 .context-menu-item {
   padding: 6px 16px;
@@ -79,6 +83,25 @@
 }
 .context-menu-item:hover {
   background: var(--bg-hover);
+}
+
+@keyframes floating-popover-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship-autocomplete,
+  .context-menu {
+    animation-duration: 1ms;
+  }
 }
 
 /* ═══ 任务列表条目详情行 ═══ */

@@ -1,0 +1,53 @@
+chapter: 10
+map: 1
+selected_nodes: ['0', O, A, I, K, N]
+endpoint_nodes: [O]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  O:
+    formation: 4
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+  A:
+    formation: 2
+    night: false
+    long_missile_support: false
+    proceed: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  I:
+    formation: 2
+    night: false
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+  K:
+    formation: 2
+    night: false
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+  N:
+    formation: 2
+    night: false
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+fleet_id: 3
+result: S
+fleet_presets:
+  - name: 重巡周常队

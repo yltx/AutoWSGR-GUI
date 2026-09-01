@@ -1,8 +1,9 @@
+/** 渲染首次启动向导并收集模拟器和 Python 配置。 */
 /**
  * SetupWizardView —— 首次运行引导向导的纯渲染组件。
  * 负责 overlay 显示/隐藏、表单预填/收集、提示信息更新。不含业务逻辑。
  */
-import type { SetupWizardVO } from '../../types/view';
+import type { SetupWizardVO } from '../../types/view.js';
 
 export class SetupWizardView {
   private overlay: HTMLElement;

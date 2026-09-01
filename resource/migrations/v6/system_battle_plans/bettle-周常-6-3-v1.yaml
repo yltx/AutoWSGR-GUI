@@ -1,0 +1,44 @@
+# 旧版周常第6章备选兼容计划：地图 6-3。
+# 该文件保留被当前周常模板删除的阶段，供已有任务组继续执行。
+chapter: 6
+map: 3
+selected_nodes: [B, E, H, J]
+endpoint_nodes: [J]
+fleet_id: 4
+fight_condition: 1
+repair_mode: 1
+node_defaults:
+  formation: 2
+  night: false
+  proceed: true
+node_args:
+  J:
+    night: true
+times: 3
+fleet_presets:
+  - name: 旧版6-3速刷
+    ships:
+      - name: 定海
+        candidates:
+          - {name: 星座}
+          - {name: 克劳塞维茨}
+      - name: 长春
+        candidates:
+          - {name: 塞瓦斯托波尔}
+          - {name: 希尔德布兰德}
+      - name: 鞍山
+        candidates:
+          - {name: 格罗兹尼}
+          - {name: 北莫尔斯克}
+      - name: 南京
+        candidates:
+          - {name: 七省联盟}
+          - {name: 汉堡}
+      - name: 济南
+        candidates:
+          - {name: 捷尔任斯基}
+          - {name: 米切尔}
+      - name: 鹰潭
+        candidates:
+          - {name: 芝加哥}
+          - {name: 炽热}

@@ -50,7 +50,7 @@ docs/           → 架构文档 & 教程
 
 ## 代码风格与规范
 
-完整、强制性的工程规范见 [docs/engineering-standards.md](docs/engineering-standards.md)。其中包括架构边界、状态所有权、数据迁移、Electron 安全、验证要求、AI Agent 规则，以及连续修补失败时的 Patch 止损和干净基线重写流程。本文仅保留快速上手摘要；发生冲突时以工程规范和可执行配置为准。
+完整、强制性的工程规范见 [AGENTS.md](AGENTS.md)。其中包括架构边界、状态所有权、数据迁移、Electron 安全、验证要求、AI Agent 规则，以及连续修补失败时的 Patch 止损和干净基线重写流程。本文仅保留快速上手摘要；发生冲突时按 `AGENTS.md` 的事实来源规则处理。
 
 ### 通用规范
 
@@ -111,4 +111,4 @@ docs: 更新架构文档
 
 - 一个 commit 对应一个逻辑变更，避免把不相关的修改混在一起
 - 如果一个功能涉及多层修改（model + controller + view），可以放在同一个 commit 中
-- 同一问题连续修补失败或开始引入额外状态源、跨层补偿时，必须按照[工程规范的 Patch 止损机制](docs/engineering-standards.md#6-patch-止损机制)暂停并升级审查，不得继续叠加 workaround
+- 同一问题连续修补失败或开始引入额外状态源、跨层补偿时，必须按照 [AGENTS.md 的修复止损机制](AGENTS.md#21-修复止损)暂停并升级审查，不得继续叠加 workaround

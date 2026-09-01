@@ -1,12 +1,20 @@
-import type { MainViewObject, TaskQueueItemVO } from '../../types/view';
+/** 把调度器和游戏状态转换为主页面 ViewObject。 */
+import type {
+  CurrentFleetShipVO,
+  MainViewObject,
+  TaskQueueItemVO,
+} from '../../types/view.js';
 import type { Scheduler } from '../../model/scheduler';
+import type { DailySortieStatsSnapshot } from '../../types/statistics.js';
 import { PRIORITY_LABELS, STATUS_TEXT } from './constants';
 
 export interface RenderingState {
   readonly scheduler: Scheduler;
+  currentFleet: CurrentFleetShipVO[];
   currentProgress: string;
   trackedLoot: string;
   trackedShip: string;
+  dailySortieStats: DailySortieStatsSnapshot;
   wsConnected: boolean;
   expeditionTimerText: string;
 }
@@ -21,9 +29,21 @@ export function buildAcquisitionText(trackedLoot: string, trackedShip: string): 
 
 /** 从调度器状态 + 追踪数据拼装 MainViewObject */
 export function buildMainViewObject(state: RenderingState): MainViewObject {
-  const { scheduler, currentProgress, trackedLoot, trackedShip, wsConnected, expeditionTimerText } = state;
+  const {
+    scheduler,
+    currentFleet,
+    currentProgress,
+    trackedLoot,
+    trackedShip,
+    dailySortieStats,
+    wsConnected,
+    expeditionTimerText,
+  } = state;
   const running = scheduler.currentRunningTask;
   const queue = scheduler.taskQueue;
+  const statusText = scheduler.status === 'idle' && queue.length > 0
+    ? '队列已暂停'
+    : (STATUS_TEXT[scheduler.status] ?? '未知');
 
   const taskQueueVo: TaskQueueItemVO[] = [];
 
@@ -43,6 +63,7 @@ export function buildMainViewObject(state: RenderingState): MainViewObject {
       priorityLabel: PRIORITY_LABELS[running.priority] ?? '用户',
       remaining: running.remainingTimes,
       totalTimes: running.totalTimes,
+      unlimited: running.unlimited,
       progress: currentProgress || undefined,
       progressPercent,
       acquisitionText: buildAcquisitionText(trackedLoot, trackedShip),
@@ -56,12 +77,29 @@ export function buildMainViewObject(state: RenderingState): MainViewObject {
       priorityLabel: PRIORITY_LABELS[t.priority] ?? '用户',
       remaining: t.remainingTimes,
       totalTimes: t.totalTimes,
+      unlimited: t.unlimited,
+    });
+  }
+
+  for (const waiting of scheduler.waitingTaskList) {
+    const t = waiting.task;
+    taskQueueVo.push({
+      id: t.id,
+      name: t.name,
+      priorityLabel: PRIORITY_LABELS[t.priority] ?? '用户',
+      remaining: t.remainingTimes,
+      totalTimes: t.totalTimes,
+      unlimited: t.unlimited,
+      waiting: true,
+      waitingText: waiting.reason === 'gap'
+        ? '等待下一轮'
+        : '等待重试',
     });
   }
 
   return {
     status: scheduler.status === 'not_connected' ? 'not_connected' : scheduler.status,
-    statusText: STATUS_TEXT[scheduler.status] ?? '未知',
+    statusText,
     currentTask: running
       ? {
           name: running.name,
@@ -70,6 +108,8 @@ export function buildMainViewObject(state: RenderingState): MainViewObject {
           startedAt: '',
         }
       : null,
+    currentFleet,
+    dailySortieStats,
     expeditionTimer: expeditionTimerText,
     taskQueue: taskQueueVo,
     wsConnected,

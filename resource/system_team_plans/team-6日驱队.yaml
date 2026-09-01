@@ -1,0 +1,80 @@
+name: 6日驱队
+ships:
+  - name: 岛风(岛风型驱逐舰)·改
+    search_name: 岛风
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 初夏·改
+    search_name: 初夏
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 高波·改
+    search_name: 高波
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 早春·改
+    search_name: 早春
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 吹雪·改
+    search_name: 吹雪
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 阳炎·改
+    search_name: 阳炎
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 不知火·改, search_name: 不知火, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 初雪·改, search_name: 初雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 深雪·改, search_name: 深雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 白雪·改, search_name: 白雪, ship_type: [dd], min_level: 100, relaxed: false}

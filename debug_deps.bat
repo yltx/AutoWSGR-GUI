@@ -6,7 +6,9 @@ set "APP_DIR=%~dp0"
 set "SITE_PKG=%APP_DIR%python\site-packages"
 set "LOCAL_PY=%APP_DIR%python\python.exe"
 set "PTH_FILE=%APP_DIR%python\python312._pth"
-set "LOG=%APP_DIR%debug_report.txt"
+set "REPORT_DIR=%APPDATA%\AutoWSGR-GUI"
+if not exist "%REPORT_DIR%" mkdir "%REPORT_DIR%" >nul 2>nul
+set "LOG=%REPORT_DIR%\debug_report.txt"
 
 :: 清空旧日志
 > "%LOG%" echo ============================================
@@ -144,11 +146,10 @@ if !errorlevel! equ 0 (
 >> "%LOG%" echo ============================================
 
 :done
-endlocal
-
 echo 诊断完成！报告已保存到:
 echo   %LOG%
 echo.
 echo 按任意键打开报告文件...
 pause >nul
 start "" "%LOG%"
+endlocal

@@ -1,231 +1,208 @@
-# 出击计划系统
+# 方案与编队系统
 
-> 涉及文件：`src/model/PlanModel.ts` · `src/controller/plan/`（PlanController · importExport · presetFlow · nodeEditor · rendering）· `src/view/plan/`（PlanPreviewView(Facade) · MapView · NodeEditorView · FleetPresetView · FleetEditDialog）· `src/model/MapDataLoader.ts` · `src/types/model.ts` · `resource/builtin_plans/` · `resource/maps/`
+> 主要目录：`src/model/PlanModel.ts`、`src/model/fleet/`、
+> `src/controller/plan/`、`electron/services/*Plan*.ts`
 
-## 概述
+## 三类受管方案
 
-出击计划（Plan）是 AutoWSGR-GUI 的核心数据结构，定义了一次战斗出击的完整策略：打哪张地图、经过哪些节点、每个节点用什么阵型、是否夜战、迂回规则、修理策略等。
+| 类型 | 系统只读目录 | 用户可写目录 |
+|---|---|---|
+| 作战方案 | `resource/system_battle_plans/` | `userData/user_battle_plans/` |
+| 编队方案 | `resource/system_team_plans/` | `userData/user_team_plans/` |
+| 日常方案 | `resource/system_daily_plans/` | `userData/user_daily_plans/` |
 
-计划以 YAML 文件存储，可通过 GUI 的可视化地图编辑器进行查看和修改。
+系统和用户方案通过同一管理 UI 展示，但来源 identity 必须保留。系统方案不能
+原地覆盖；编辑后保存为用户副本。
 
----
+## 作战方案模型
 
-## 数据结构
-
-### PlanData — 方案主体
+`PlanModel` 负责 Renderer 中的 YAML 解析、编辑和序列化。重要字段包括：
 
 ```typescript
 interface PlanData {
-  chapter: number;          // 章节号
-  map: number;              // 地图号
-  selected_nodes: string[]; // 选中的节点列表，如 ["A", "D", "G", "H"]
-  fight_condition?: 1|2|3|4|5;  // 出击条件
-  repair_mode?: number | number[]; // 修理策略（单值或按舰位数组）
-  fleet_id?: number;        // 编队号 (1-4)
-  node_defaults?: NodeArgs; // 节点默认参数
-  node_args?: Record<string, NodeArgs>; // 按节点覆盖的参数
-  fleet_presets?: FleetPreset[];  // 内嵌的编队预设
-  times?: number;           // 执行次数
-  stop_condition?: StopCondition; // 停止条件
+  chapter: number | string;
+  map: number | string;
+  selected_nodes: string[];
+  endpoint_nodes?: string[];
+  node_defaults?: NodeArgs;
+  node_args?: Record<string, NodeArgs>;
+  fleet_presets?: FleetPreset[];
+  times?: number;
+  gap?: number;
+  fleet_id?: number;
+  repair_mode?: number | number[];
 }
 ```
 
-### NodeArgs — 节点参数
+### 未建模字段保留
+
+`PlanModel.fromYaml(content, path)` 保存原始根对象 `rawRoot`。`toYaml()` 以
+`rawRoot` 为基底，仅覆盖 GUI 管理字段，因此后端扩展字段、根注释和 GUI 尚未
+认识的内容不会被整份重建丢失。
+
+修改序列化时必须保留这一行为。不要用一个只包含 TypeScript 已知字段的新对象
+替换原始 YAML 根。
+
+### 节点默认值
+
+节点执行参数必须继承 `node_defaults`：
 
 ```typescript
-interface NodeArgs {
-  formation?: 1|2|3|4|5;   // 阵型
-  night?: boolean;          // 是否夜战
-  proceed?: boolean;        // 是否继续前进
-  enemy_rules?: [string, string|number][];  // 索敌规则
+getNodeArgs(nodeId: string): NodeArgs {
+  const defaults = this.data.node_defaults ?? {};
+  const overrides = this.data.node_args?.[nodeId] ?? {};
+  const args = { ...defaults, ...overrides };
+  if (this.data.endpoint_nodes?.includes(nodeId)) {
+    args.proceed = false;
+  }
+  return args;
 }
 ```
 
-**阵型映射**：`1=单纵阵` `2=复纵阵` `3=轮形阵` `4=梯形阵` `5=单横阵`
+`node_args` 只覆盖节点特有字段；终点节点强制 `proceed = false`。
 
-**出击条件**：`1=稳步前进` `2=火力万岁` `3=全速前进` `4=跛行前进` `5=连续作战`
+### 新计划路线
 
-**索敌规则**示例：
-```yaml
-enemy_rules:
-  - [AP >= 1, 4]      # 有补给舰 → 梯形阵
-  - [AP < 1, detour]   # 无补给舰 → 迂回
+`src/controller/plan/selectedNodes.ts` 固定以下规则：
+
+- 新计划只启用节点 `0`。
+- 后端执行的节点白名单始终包含 `0`。
+- 只有 `0` 时禁止入队，提示至少开启一个路线节点。
+
+这区分“节点追踪尚未识别字母节点”和“用户尚未选择实际路线”。新增或切换地图
+时不能默认全选路线。
+
+## 地图
+
+`MapDataLoader` 从 `resource/maps/` 加载普通和活动地图，缓存读取结果。
+`controller/plan/rendering.ts` 将地图、PlanModel 和节点编辑状态组合成
+`PlanPreviewViewObject`。
+
+`MapView` 只渲染节点、连线和选择意图，不决定后端执行参数。地图同步由
+`scripts/sync-map-resources.js` 负责，修改资源后运行 `npm run check:maps`。
+
+无效空地图数据不能覆盖已有有效快照。
+
+## Renderer 方案控制器
+
+| 模块 | 所有权 |
+|---|---|
+| `PlanController` | 当前作战方案和地图 |
+| `BattlePlanLoaderController` | 受管方案选择和筛选 |
+| `PlanFleetPresetController` | 当前方案引用的编队列表 |
+| `PlanManagementController` | 管理目录、关联和删除影响 |
+| `FleetPlannerController` | 普通编队唯一草稿及文件 identity |
+| `DecisivePlanController` | 决战独立草稿 |
+| `presetFlow.ts` | 独立任务预设详情和执行 |
+| `nodeEditor.ts` | 节点编辑意图 |
+| `selectedNodes.ts` | 路线选择与执行校验 |
+
+Controller 负责 `file/source`、保存覆盖和持久化 DTO；View 只看到不透明 ID 和
+ViewObject。
+
+## 编队领域
+
+`src/model/fleet/` 是编队业务规则边界：
+
+| 文件 | 责任 |
+|---|---|
+| `FleetDraft.ts` | 普通舰队草稿、校验、与 `UserTeamPlan` 双向转换 |
+| `DecisiveFleetDraft.ts` | 决战 level1/level2 草稿 |
+| `FleetDraftEditor.ts` | 显式编辑意图的唯一应用入口 |
+| `FleetPresetIdentity.ts` | 预设身份和引用 |
+| `FleetRuleMapper.ts` | GUI 规则到 API 规则 |
+| `ShipMatcher.ts` | 舰船匹配和展示标签 |
+
+普通舰队与决战舰队不能共享同一草稿。它们只共享
+`ShipGalleryView` 的搜索、筛选、排序、增量渲染和卡片交互。
+
+### 舰位语义
+
+舰位可以是：
+
+- 空位。
+- 明确主选舰船。
+- 带国籍、舰种、等级等约束的结构化主选。
+- `candidates` 备选规则。
+- candidate-only 槽位。
+
+candidate-only 槽位没有顶层 `name`，候选项地位平等；不能把第一项自动提升为
+主选。全局唯一分配优先保留主选，主选不可用后才使用候选并重新执行全局分配。
+
+舰种只使用原生 0.3 定义的 22 个 canonical code 和业务组合
+`ss_or_ssg`。导巡 canonical code 为 `KP/kp`。舰种同步快照由：
+
+```powershell
+npm run sync:fleet-types
+npm run check:fleet-types
 ```
 
-### FleetPreset — 编队预设
+维护，API 契约测试会与 AutoWSGR 仓库交叉验证。
 
-```typescript
-interface FleetPreset {
-  name: string;
-  ships: (string | ShipFilter)[];  // 6 个舰位：具体舰名或模糊筛选
-}
+## Main 计划流水线
 
-interface ShipFilter {
-  nation?: string;     // 国籍筛选
-  ship_type?: string;  // 舰型筛选
-}
+作战方案：
+
+```text
+CombatPlanIpc
+  -> PlanManagementService / PlanExportService
+  -> CombatPlanCodec
+  -> CombatPlanRepository
+  -> AtomicFileStore / AppPaths
 ```
 
-编队预设支持**具体舰名**（如 `"85工程"`）和**模糊筛选**（如 `{nation: "苏联", ship_type: "dd"}`），后者在执行时由 `resolveFleetPreset()` 解析为实际舰船。
+编队方案：
 
----
-
-## YAML 示例
-
-```yaml
-# 捞胖次 9-2
-chapter: 9
-map: 2
-selected_nodes: [A, D, G, H, M, O, E, K]
-fight_condition: 1
-repair_mode: 2
-fleet_id: 1
-node_defaults:
-  formation: 4
-  night: false
-  proceed: true
-node_args:
-  A:
-    enemy_rules:
-      - [AP >= 1, 4]
-      - [AP < 1, detour]
-fleet_presets:
-  - name: 三响岛风
-    ships: [85工程, AIII, 岛风, 科罗廖夫, 列宁格勒, 伏尔加格勒]
+```text
+TeamPlanIpc
+  -> TeamPlanService
+  -> TeamPlanCodec
+  -> TeamPlanRepository
 ```
 
----
+日常方案：
 
-## 方案类型
-
-| 类型 | `task_type` | 说明 |
-|------|-------------|------|
-| 常规出击 | 无 / `normal_fight` | 标准章节出击 |
-| 战役 | `campaign` | 战役任务 |
-| 演习 | `exercise` | 自动演习 |
-| 决战 | `decisive` | 决战模式，含 `level1` / `level2` 目标舰队 |
-| 活动 | `event_fight` | 活动地图出击 |
-
----
-
-## 核心组件
-
-### PlanModel — 方案解析器
-
-| 方法 | 说明 |
-|------|------|
-| `fromYaml(yamlStr)` | 解析 YAML → `PlanData` 对象 |
-| `toYaml(plan)` | 序列化 `PlanData` → YAML 字符串 |
-| `getNodeArgs(plan, node)` | 获取指定节点的合并后参数（node_args 覆盖 node_defaults） |
-| `mergeFleetPreset(plan, presetIndex)` | 将编队预设合并到方案的 fleet_id 中 |
-
-### MapDataLoader — 地图数据加载
-
-地图 JSON 存放在 `resource/maps/` 目录，包含节点坐标、类型、连线等信息。
-
-| 方法 | 说明 |
-|------|------|
-| `load(chapter, map)` | 通过 IPC 加载地图 JSON，返回 `MapData`，结果缓存 |
-| `loadEx(chapter)` | 加载 Ex 章节地图 |
-
-```typescript
-interface MapData {
-  nodes: MapNode[];   // 节点列表
-  edges: MapEdge[];   // 连线列表
-}
-
-interface MapNode {
-  id: string;         // 节点标识，如 "A", "B"
-  x: number;          // 坐标 X
-  y: number;          // 坐标 Y
-  type: string;       // 节点类型（战斗、资源、Boss）
-  detour?: boolean;   // 是否可迂回
-  night?: boolean;    // 是否夜战节点
-}
+```text
+DailyPlanIpc
+  -> DailyPlanService
+  -> CombatPlanCodec / TaskPresetCodec
 ```
 
-### PlanController — 方案控制器
+IPC 不直接解析 YAML 或决定命名。Codec 负责结构和兼容，Repository 负责来源目录
+和原子文件操作，Service 负责用例。
 
-方案控制器位于 `src/controller/plan/`，拆分为多个模块：
+## 保存与执行
 
-| 文件 | 职责 |
-|------|------|
-| `PlanController.ts` | 主控制器：持有当前方案状态，协调下属模块 |
-| `importExport.ts` | 方案文件的导入/导出/新建流程 |
-| `presetFlow.ts` | 任务预设的导入/查看/关闭/执行流程 |
-| `nodeEditor.ts` | 从 UI 收集节点阵型/夜战/索敌规则并写回 PlanData |
-| `rendering.ts` | 构建 `PlanPreviewViewObject`，协调地图数据和方案数据的合并 |
+保存作战方案时，内嵌 `fleet_presets` 可拆成受管编队方案并建立引用。运行时：
 
-### PlanPreviewView — 方案预览视图 (Facade)
+1. `PlanManagementService` 读取受管方案。
+2. `CombatPlanCodec` 解析并解析编队引用。
+3. `RuntimePlanService` 展开成后端可读 YAML。
+4. 写入 `<temp>/AutoWSGR-GUI/runtime_battle_plans/<pid>/`。
+5. Scheduler 只把临时运行路径发送给后端。
 
-`PlanPreviewView` 作为 Facade 持有三个子视图，Controller 只与 Facade 交互：
+运行时临时文件序号由 `RuntimePlanService` 独占，外部用户选择路径不能直接进入
+任务队列。
 
-| 子视图 | 文件 | 职责 |
-|--------|------|------|
-| `MapView` | `view/plan/MapView.ts` | 地图节点/连线渲染、节点类型图标/名称常量 |
-| `NodeEditorView` | `view/plan/NodeEditorView.ts` | 节点详细编辑器（阵形、夜战、继续条件） |
-| `FleetPresetView` | `view/plan/FleetPresetView.ts` | 编队预设列表管理（添加、编辑、删除） |
-| `FleetEditDialog` | `view/plan/FleetEditDialog.ts` | 编队预设编辑弹窗（支持舰船自动补全） |
+## 导入、导出与删除
 
----
+- 用户显式选择的本地 YAML 通过当前 Codec 升级后导入用户目录。
+- 源文件保持不变。
+- 同名覆盖需要用户确认。
+- 删除编队前必须计算作战方案引用。
+- 删除作战方案前必须计算任务组引用。
+- 系统来源只读，导出只选择用户方案。
 
-## 数据流
+方案管理 View 不读取 Repository；关联状态统一由
+`planManagementViewObjects.ts` 推导。
 
-```mermaid
-flowchart TB
-  subgraph Input["输入"]
-    YAML["方案 YAML 文件"]
-    Builtin["内置方案<br/>resource/builtin_plans/"]
-  end
+## 验证
 
-  subgraph Parse["解析"]
-    PM["PlanModel.fromYaml()"]
-    ML["MapDataLoader.load()"]
-  end
-
-  subgraph Edit["编辑 & 预览"]
-    PC["PlanController"]
-    PV["PlanPreviewView"]
-  end
-
-  subgraph Execute["执行"]
-    REQ["构建 TaskRequest"]
-    SCHED["Scheduler.addTask()"]
-  end
-
-  YAML --> PM
-  Builtin --> PM
-  PM --> PC
-  PC --> ML
-  ML --> PC
-  PC -->|"ViewObject"| PV
-  PV -->|"用户编辑节点"| PC
-  PC -->|"更新 PlanData"| PM
-  PM -->|"toYaml()"| YAML
-
-  PC -->|"executePreset()"| REQ
-  REQ --> SCHED
-```
-
----
-
-## 内置方案
-
-`resource/builtin_plans/` 包含 18 个预制方案：
-
-| 分类 | 数量 | 示例 |
-|------|------|------|
-| 周常 | 11 | `周常1章-1-2.yaml` ~ `周常9章-9-2.yaml` |
-| 捞胖次 | 4 | `捞胖次9-2.yaml`, `捞胖次7-4.yaml` |
-| 战役 | 1 | `战役.yaml` |
-| 演习 | 1 | `自动演习.yaml` |
-| 决战 | 1 | `决战.yaml` |
-
----
-
-## 与其他系统的关系
-
-- **任务调度**：方案通过 `controller/plan/presetFlow.ts` 的 `executePresetFlow()` 构建 `TaskRequest` 后交给 `Scheduler`
-- **模板与任务组**：模板的 `planPaths` 引用方案文件；任务组 item 可以是 `kind: "plan"` 类型
-- **配置系统**：方案中的 `fleet_id` 和 `repair_mode` 可被配置页覆盖
-- **共享组件**：`view/shared/ShipAutocomplete.ts` 提供舰船名自动补全，被 `FleetEditDialog` 使用
+| 修改 | 最小验证 |
+|---|---|
+| PlanModel、路线和 YAML | `npm run test:api-contract`、`npm run test:main-services` |
+| FleetDraft/舰种/候选 | `npm run test:fleet-domain`、`npm run check:fleet-types` |
+| 方案管理删除 | `npm run test:plan-management-delete` |
+| Main Codec/Repository/Service | `npm run test:main-services` |
+| 迁移兼容 | `npm run test:migrations` |
+| 方案/编队 View | `npm run test:build`，并在 Electron 中回归交互 |

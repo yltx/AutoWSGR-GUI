@@ -1,0 +1,64 @@
+name: 85AIII4防驱队
+ships:
+  - name: 85工程
+    ship_type: [cv]
+    min_level: 100
+    relaxed: false
+  - name: AIII
+    ship_type: [bbv]
+    min_level: 100
+    relaxed: false
+  - name: 炽热·改
+    search_name: 炽热
+    ship_type: [aadg]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 米切尔·改, search_name: 米切尔, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 威武·改, search_name: 威武, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 谦逊·改, search_name: 谦逊, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 炽热·改, search_name: 炽热, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 基阿特·改, search_name: 基阿特, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 考文垂, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 不惧(防空导弹驱逐舰), search_name: 不惧, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 絮弗伦, ship_type: [aadg], min_level: 100, relaxed: false}
+  - name: 考文垂
+    ship_type: [aadg]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 米切尔·改, search_name: 米切尔, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 威武·改, search_name: 威武, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 谦逊·改, search_name: 谦逊, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 炽热·改, search_name: 炽热, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 基阿特·改, search_name: 基阿特, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 考文垂, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 不惧(防空导弹驱逐舰), search_name: 不惧, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 絮弗伦, ship_type: [aadg], min_level: 100, relaxed: false}
+  - name: 絮弗伦
+    ship_type: [aadg]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 米切尔·改, search_name: 米切尔, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 威武·改, search_name: 威武, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 谦逊·改, search_name: 谦逊, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 炽热·改, search_name: 炽热, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 基阿特·改, search_name: 基阿特, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 考文垂, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 不惧(防空导弹驱逐舰), search_name: 不惧, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 絮弗伦, ship_type: [aadg], min_level: 100, relaxed: false}
+  - name: 基阿特·改
+    search_name: 基阿特
+    ship_type: [aadg]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 米切尔·改, search_name: 米切尔, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 威武·改, search_name: 威武, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 谦逊·改, search_name: 谦逊, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 炽热·改, search_name: 炽热, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 基阿特·改, search_name: 基阿特, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 考文垂, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 不惧(防空导弹驱逐舰), search_name: 不惧, ship_type: [aadg], min_level: 100, relaxed: false}
+      - {name: 絮弗伦, ship_type: [aadg], min_level: 100, relaxed: false}

@@ -1,0 +1,22 @@
+# 20260730 激斗漩涡 H-5 α 入口 示例
+# map 写法: 数字+a/b, a=α入口 b=β入口; chapter: E(简单)/H(困难)
+event: '20260730'
+chapter: H
+map: 5a
+selected_nodes:
+  - A
+  - B
+  - C
+  - D
+  - F
+node_defaults:
+  night: true
+  proceed: true
+  formation: 4
+node_args:
+  C:
+    proceed: false
+  D:
+    proceed: false
+  F:
+    proceed: false

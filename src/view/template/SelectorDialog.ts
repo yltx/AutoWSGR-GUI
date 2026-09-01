@@ -1,4 +1,5 @@
-import type { SelectorOption } from '../../types/view';
+/** 渲染通用选项对话框并返回用户选择。 */
+import type { SelectorOption } from '../../types/view.js';
 
 /** 单选选择器：返回选中项的索引 + 次数，取消返回 null */
 export function showSelector(title: string, options: SelectorOption[], showTimes = false, defaultTimes = 1): Promise<{ index: number; times: number } | null> {

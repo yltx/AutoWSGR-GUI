@@ -1,116 +1,198 @@
-# 00 — 全局概览
+# 00：全局概览
 
-> 建议先读此文，再按顺序阅读后续章节。
+> 本章先回答三个问题：系统运行在哪里、状态由谁拥有、一次用户操作如何穿过各层。
 
----
+## 为什么需要分层
 
-## 问题出在哪里
+桌面自动化应用同时包含：
 
-重构前 `main` 分支的项目能正常运行，但存在三个核心维护痛点：
+- DOM、表单、动画和拖放。
+- 配置、方案、编队、调度等领域状态。
+- 文件系统、Python、ADB、更新和窗口生命周期。
+- AutoWSGR HTTP 与 WebSocket。
+- YAML/JSON 持久化和旧版本迁移。
 
-### 巨型文件
+如果这些能力都放进一个 Controller 或 `electron/main.ts`，常见结果是：
 
-| 文件 | 重构前 | 重构后 |
-|------|--------|--------|
-| `src/controller/AppController.ts` | **3052 行** | 430 行 + 33 个子模块 |
-| `electron/main.ts` | **1192 行** | 401 行 + 6 个子模块 |
-| `src/model/Scheduler.ts` | **单文件** | 7 个文件的 `scheduler/` 子系统 |
+- 页面刷新顺手修改业务状态。
+- 文件异常触发错误的业务 fallback。
+- 一个设置字段需要在多个对象中重复保存。
+- 单元测试必须启动 Electron、DOM 和 Python 才能运行。
+- 关闭窗口后监听器、Observer 或子进程仍然存活。
 
-一个 3000+ 行的文件意味着：
-- **定位困难** — 修 bug 要全文搜索，改动可能波及几百行外的逻辑
-- **合并冲突频繁** — 多人协作时所有改动集中在同一文件
-- **心智负担** — 需要在脑中维护几十个状态变量
+分层的目的不是增加目录，而是让每种状态和副作用只有一个明确所有者。
 
-### 隐式依赖
+## 运行时全景
 
-原始 `AppController` 中所有方法直接访问 `this` 的几十个字段，任何方法都可能读写任意状态，职责边界模糊。
+```mermaid
+flowchart TB
+  subgraph Renderer
+    View["View<br/>DOM 与局部视觉状态"]
+    Controller["Controller<br/>用例编排"]
+    Model["Model<br/>领域状态与规则"]
+    Adapter["Adapter<br/>HTTP / WS / IPC / Storage"]
+    Shared["Shared<br/>跨层纯逻辑"]
 
-### 数据流不清晰
+    View -->|"用户意图"| Controller
+    Controller -->|"ViewObject"| View
+    Controller --> Model
+    Controller --> Adapter
+    Model --> Adapter
+    Controller --> Shared
+    Model --> Shared
+  end
 
-View 可能直接读 Model 状态、调用 API，Controller 同时承担渲染和业务逻辑，数据流向是"哪里方便写在哪里"。
-
----
-
-## 重构后架构
-
-```
-╔══════════════════════════════════════════════════════╗
-║               Electron 主进程                        ║
-║  main.ts ─── 窗口 + IPC 注册                        ║
-║  ├── backend.ts ────── 后端子进程生命周期            ║
-║  ├── pythonEnv/ ────── Python 发现/安装/更新         ║
-║  └── emulatorDetect.ts 模拟器检测                    ║
-╠══════════════════════════════════════════════════════╣
-║               Renderer Process (MVC)                 ║
-║                                                      ║
-║  ┌─ View 层 ──────────────────────────────────────┐  ║
-║  │ main/    plan/    template/  config/  setup/   │  ║
-║  │ MainView PlanPreviewView ... (纯渲染,无逻辑)  │  ║
-║  └────────────────────────────────────────────────┘  ║
-║        ▲ render(ViewObject)                          ║
-║  ┌─ Controller 层 ────────────────────────────────┐  ║
-║  │ AppController (协调者)                         │  ║
-║  │ ├── PlanController                             │  ║
-║  │ ├── TaskGroupController                        │  ║
-║  │ ├── TemplateController                         │  ║
-║  │ ├── StartupController                          │  ║
-║  │ ├── ConfigController                           │  ║
-║  │ └── SchedulerBinder                            │  ║
-║  └────────────────────────────────────────────────┘  ║
-║        │ 读取 Model, 拼装 VO                         ║
-║  ┌─ Model 层 ─────────────────────────────────────┐  ║
-║  │ ConfigModel  PlanModel  TemplateModel          │  ║
-║  │ TaskGroupModel  ApiClient  MapDataLoader       │  ║
-║  │ scheduler/ (Scheduler + 5 个子模块)            │  ║
-║  └────────────────────────────────────────────────┘  ║
-║                                                      ║
-║  ┌─ Types 层 ─────────────────────────────────────┐  ║
-║  │ model.ts  view.ts  api.ts  scheduler.ts        │  ║
-║  │ electronBridge.ts                              │  ║
-║  └────────────────────────────────────────────────┘  ║
-╠══════════════════════════════════════════════════════╣
-║          Python 后端 (uvicorn + FastAPI)              ║
-╚══════════════════════════════════════════════════════╝
+  Adapter --> Preload["electron/preload.ts"]
+  Preload --> Main["Electron Main"]
+  Main --> IPC["electron/ipc"]
+  IPC --> Service["electron/services"]
+  Service --> Files["文件 / 更新 / ADB / Python"]
+  Adapter --> Backend["AutoWSGR HTTP + WebSocket"]
+  Service --> Backend
 ```
 
-## 重构后文件分布
+Renderer 有两条外部通信链路：
 
-### Controller 层 — 33 个文件分 6 个子目录
+1. 通过 `window.electronBridge` 请求 Electron 能力。
+2. 通过 `ApiClient` 请求 AutoWSGR 后端。
 
+它们不能混成一条“万能服务”，因为权限、错误语义和生命周期不同。
+
+## 当前源码边界
+
+| 边界 | 当前入口 | 所有权 |
+|---|---|---|
+| Renderer 组合根 | `src/controller/app/AppController.ts` | 创建对象并连接生命周期 |
+| Controller | `src/controller/**` | 用户用例和跨对象协调 |
+| View | `src/view/**` | DOM、浏览器事件和局部视觉状态 |
+| Model | `src/model/**` | 配置、方案、舰队和调度状态 |
+| Adapter | `src/adapter/**` | IPC、HTTP、WS、YAML、JSON 和 Storage |
+| Types | `src/types/**` | 层间契约 |
+| Shared | `src/shared/**` | 无 DOM、Electron、Node 副作用的纯逻辑 |
+| Preload | `electron/preload.ts` | 唯一 Electron Bridge 暴露点 |
+| Main IPC | `electron/ipc/**` | 通道、参数、结果和异常边界 |
+| Main Service | `electron/services/**` | 主进程业务与可测试策略 |
+| Main 组合根 | `electron/main.ts` | 服务装配、启动和退出顺序 |
+
+## 两条数据流
+
+### 展示流
+
+```text
+Repository / Model
+  -> Controller
+  -> ViewObject
+  -> View.render()
+  -> DOM
 ```
-src/controller/
-├── app/          AppController(430) + SchedulerBinder(179) + ConfigController(226)
-│                 + rendering(71) + constants(26) + theme(30)
-├── plan/         PlanController(215) + importExport(122) + presetFlow(121)
-│                 + nodeEditor(47) + rendering(109)
-├── taskGroup/    TaskGroupController(149) + queueLoader(154) + contextMenu(101)
-│                 + addItems(78) + importExport(71) + metaLoader(59)
-├── template/     TemplateController(191) + selectors(152) + wizard(113)
-│                 + crud(89) + useTemplate(80)
-├── startup/      StartupController(89) + envAndUpdates(100) + connection(64)
-└── shared/       ControllerHost(12) + DialogHelper(90)
+
+例如主页面由
+`src/controller/app/rendering.ts` 的 `buildMainViewObject()` 把 Scheduler、
+舰队、统计和连接状态转换成 `MainViewObject`，然后交给 `MainView.render()`。
+
+View 不需要知道 Scheduler 如何重试，也不需要知道后端响应结构。
+
+### 意图流
+
+```text
+DOM event
+  -> View callback / intent
+  -> Controller
+  -> Model 或 Repository
+  -> 新 snapshot / ViewObject
+  -> View.render()
 ```
 
-### Electron 主进程 — 从 1 个文件变成 4 + 6 个
+例如舰队编辑器发出 `FleetDraftEditIntent`，Controller 将意图交给 Fleet 领域
+函数，随后重新生成只读草稿快照。View 不直接修改持久化对象。
 
+## 状态所有权
+
+判断代码放哪，先问“谁能修改这个状态”：
+
+| 状态 | 权威所有者 |
+|---|---|
+| 调度队列、运行任务、等待重试 | `Scheduler` |
+| Cron 配置和触发时钟 | `CronScheduler` |
+| 普通舰队草稿 | `FleetPlannerController` + Fleet 领域对象 |
+| 决战舰队草稿 | `DecisivePlanController` + `DecisiveFleetDraft` |
+| 作战方案内容 | `PlanModel` |
+| 后端业务配置 | `ConfigModel.current` |
+| GUI 自动化配置 | `ConfigModel.currentGuiAutomation` |
+| 搜索、筛选、弹窗展开 | 对应 View |
+| 用户文件 | Main Repository / Service |
+| 窗口和子进程 | Electron Main Service |
+
+同一状态出现两个可写副本，通常不是“缓存优化”，而是潜在同步 Bug。
+
+## 一次设置保存如何流动
+
+```mermaid
+sequenceDiagram
+  participant User
+  participant View as ConfigView
+  participant Controller as ConfigController
+  participant Adapter as ConfigurationGateway
+  participant IPC as ConfigurationIpc
+  participant Service as GuiSettingsCommitService
+  participant Store as SecureFile/GuiConfiguration
+
+  User->>View: 修改并点击保存
+  View->>Controller: onSave
+  Controller->>View: 收集表单
+  Controller->>Adapter: commitGuiSettings
+  Adapter->>IPC: preload invoke
+  IPC->>Service: commitAtomic
+  Service->>Store: 保存 YAML 与 JSON
+  Store-->>Service: 成功或异常
+  Service-->>Controller: 提交结果
+  Controller->>View: 刷新展示
 ```
-electron/
-├── main.ts(401)  backend.ts(176)  emulatorDetect.ts(114)  preload.ts(104)
-└── pythonEnv/
-    ├── context.ts(33) finder.ts(90) envCheck.ts(208)
-    ├── installer.ts(225) updater.ts(178) utils.ts(101) index.ts(15)
+
+这个流程说明：
+
+- View 只知道表单。
+- Controller 知道保存用例。
+- IPC 不解析业务 YAML。
+- Service 保证跨文件事务和回滚。
+- 成功前 Renderer 不应提前更新权威内存。
+
+## 构建时和运行时要分开
+
+Renderer 开发源并不是 Electron 最终直接加载的全部文件：
+
+```text
+src/view/html/** -> scripts/build-view-html.js -> src/view/index.html
+src/view/styles/**/*.scss -> Sass -> src/view/styles/styles.css
+TypeScript -> tsc -> dist/**
+AppController.js -> esbuild -> dist/renderer.bundle.js
 ```
 
----
+因此：
 
-## 核心理念速查
+- 修改 HTML partial 后生成 `index.html`。
+- 修改 SCSS 后生成 `styles.css`。
+- 不手工编辑 `dist/**`。
+- 运行时仍然只有一个 HTML、一个 CSS 和一个 Renderer Bundle。
 
-| 序号 | 模式 | 一句话 | 详细文档 |
-|------|------|--------|----------|
-| 1 | Extract Class | 按职责边界拆，不是按行数平均分 | [01](01-extract-class.md) |
-| 2 | Host 接口 | 子控制器通过最小接口与宿主通信，禁止反向依赖 | [02](02-host-interface.md) |
-| 3 | ViewObject | Controller 拼装 VO → 单向传递 → View 纯渲染 | [03](03-viewobject-flow.md) |
-| 4 | Context 注入 | Electron 各模块通过 init() 注入运行上下文 | [04](04-electron-split.md) |
-| 5 | Facade | View 内部可拆子视图，对外保持统一 API | [05](05-view-layer.md) |
-| 6 | 领域子系统 | 相关类组成 `scheduler/` 目录，通过 index barrel 导出 | [06](06-model-layer.md) |
-| 7 | 类型隔离 | `types/view.ts` 和 `types/model.ts` 严格分离 | [07](07-type-system.md) |
+## 后续章节地图
+
+| 需要理解的问题 | 章节 |
+|---|---|
+| 一个大文件应该怎么拆 | [01](01-extract-class.md) |
+| 子模块怎样避免依赖整个宿主 | [02](02-host-interface.md) |
+| Model 数据怎样变成页面展示 | [03](03-viewobject-flow.md) |
+| Main 中的文件和进程能力放哪 | [04](04-electron-split.md) |
+| View、HTML、SCSS 和共享组件怎么组织 | [05](05-view-layer.md) |
+| 领域状态、纯策略和 Scheduler 怎么区分 | [06](06-model-layer.md) |
+| DTO、Intent、ViewObject 为什么不能混用 | [07](07-type-system.md) |
+
+## 本章检查
+
+进入一个新需求前，应能回答：
+
+1. 它改变的是视觉状态、领域状态还是外部资源？
+2. 权威状态当前由哪个对象持有？
+3. 用户意图从哪个 View 进入？
+4. 外部副作用经过哪个 Adapter、IPC 或 Service？
+5. 哪些消费者和持久化契约会受到影响？

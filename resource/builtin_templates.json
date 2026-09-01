@@ -7,10 +7,14 @@
     "createdAt": "2026-01-01T00:00:00.000Z",
     "description": "自动刷取战利品（胖次），可选择不同地图方案",
     "planPaths": [
-      "resource/builtin_plans/捞胖次9-2.yaml",
-      "resource/builtin_plans/捞胖次7-4.yaml",
-      "resource/builtin_plans/捞胖次8-5.yaml",
-      "resource/builtin_plans/捞胖次2-1.yaml"
+      "resource/system_battle_plans/bettle-old-9-2ADGHM速刷胖次.yaml",
+      "resource/system_battle_plans/bettle-old-8-5AI六潜胖次.yaml",
+      "resource/system_battle_plans/bettle-old-8-2BJ低耗胖次.yaml",
+      "resource/system_battle_plans/bettle-old-9-4六潜练级.yaml",
+      "resource/system_battle_plans/bettle-周常-9-2.yaml",
+      "resource/system_battle_plans/bettle-周常-7-4.yaml",
+      "resource/system_battle_plans/bettle-周常-8-2.yaml",
+      "resource/system_battle_plans/bettle-周常-2-1.yaml"
     ],
     "defaultTimes": 99,
     "defaultStopCondition": {
@@ -18,26 +22,24 @@
     }
   },
   {
-    "id": "builtin_weekly",
+    "id": "builtin_weekly_v2",
     "name": "周常任务",
     "type": "normal_fight",
     "builtin": true,
     "createdAt": "2026-01-01T00:00:00.000Z",
-    "description": "每周战斗任务（第1-9章），选择对应章节方案执行",
+    "description": "每周战斗任务（第1-10章），选择对应章节方案执行",
     "forceRetry": true,
     "planPaths": [
-      "resource/builtin_plans/周常1章-1-5.yaml",
-      "resource/builtin_plans/周常2章-2-1.yaml",
-      "resource/builtin_plans/周常3章-3-1.yaml",
-      "resource/builtin_plans/周常3章-3-3.yaml",
-      "resource/builtin_plans/周常4章-4-1.yaml",
-      "resource/builtin_plans/周常5章-5-5.yaml",
-      "resource/builtin_plans/周常6章-6-4.yaml",
-      "resource/builtin_plans/周常6章-6-3.yaml",
-      "resource/builtin_plans/周常7章-7-4.yaml",
-      "resource/builtin_plans/周常8章-8-2.yaml",
-      "resource/builtin_plans/周常9章-9-2.yaml",
-      "resource/builtin_plans/周常10章-10-1.yaml"
+      "resource/system_battle_plans/bettle-周常-1-1.yaml",
+      "resource/system_battle_plans/bettle-周常-2-1.yaml",
+      "resource/system_battle_plans/bettle-周常-3-1.yaml",
+      "resource/system_battle_plans/bettle-周常-4-1.yaml",
+      "resource/system_battle_plans/bettle-周常-5-5.yaml",
+      "resource/system_battle_plans/bettle-周常-6-4.yaml",
+      "resource/system_battle_plans/bettle-周常-7-4.yaml",
+      "resource/system_battle_plans/bettle-周常-8-2.yaml",
+      "resource/system_battle_plans/bettle-周常-9-2.yaml",
+      "resource/system_battle_plans/bettle-周常-10-1.yaml"
     ],
     "defaultTimes": 3
   },
@@ -49,22 +51,6 @@
     "createdAt": "2026-01-01T00:00:00.000Z",
     "description": "每日自动完成演习",
     "fleet_id": 1,
-    "defaultTimes": 1
-  },
-  {
-    "id": "builtin_event_20260730",
-    "name": "活动·激斗漩涡",
-    "type": "event_fight",
-    "builtin": true,
-    "createdAt": "2026-07-30T00:00:00.000Z",
-    "description": "2026-07-30 活动方案（简单/困难 E1、E5）",
-    "forceRetry": true,
-    "planPaths": [
-      "resource/builtin_plans/活动20260730-E1炸鱼.yaml",
-      "resource/builtin_plans/活动20260730-E5夜战.yaml",
-      "resource/builtin_plans/活动20260730-H1炸鱼.yaml",
-      "resource/builtin_plans/活动20260730-H5夜战.yaml"
-    ],
     "defaultTimes": 1
   },
   {
@@ -85,9 +71,39 @@
     "createdAt": "2026-01-01T00:00:00.000Z",
     "description": "自动完成决战",
     "chapter": 6,
-    "level1": [],
-    "level2": [],
+    "level1": [
+      "U-47",
+      "U-1405",
+      "U-1206",
+      "U-2540",
+      "U-81",
+      "U-96"
+    ],
+    "level2": [
+      "U-505",
+      "射水鱼",
+      "大青花鱼",
+      "M-296",
+      "鹦鹉螺",
+      "S-49",
+      "IIIA",
+      "K-21",
+      "U-441",
+      "潜甲",
+      "潜乙",
+      "伊-201",
+      "伊-25",
+      "鲃鱼",
+      "伊-400",
+      "激流",
+      "U-4501",
+      "U-459",
+      "U-14",
+      "U-35",
+      "K1"
+    ],
     "flagship_priority": [],
+    "use_quick_repair": true,
     "defaultTimes": 1
   }
 ]

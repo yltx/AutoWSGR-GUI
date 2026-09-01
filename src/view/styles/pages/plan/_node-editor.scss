@@ -16,51 +16,240 @@
   margin-bottom: 10px;
 }
 
+.node-editor .plan-task-hint,
+.node-editor .node-rules-textarea {
+  font-size: 11px;
+}
+
 .node-editor .form-row {
   display: flex;
   gap: 24px;
 }
 
+.node-editor .node-formation-group,
+.node-editor .node-setting-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.node-editor .node-formation-group {
+  overflow-x: auto;
+}
+
+.node-setting-label {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.node-inline-options {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 14px;
+}
+
+.node-battle-action-row {
+  overflow-x: auto;
+}
+
+.node-result-options {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+
+.node-result-options[hidden] {
+  display: none;
+}
+
+.node-result-label {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.node-formation-group label,
+.node-inline-options label,
+.node-result-options label {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-formation-group input,
+.node-inline-options input,
+.node-result-options input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.node-detour-help {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-rules-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.node-rules-heading > label {
+  flex: 0 0 auto;
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.node-rules-heading .plan-task-hint {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .node-editor .node-rules-textarea {
-  min-height: 50px;
+  min-height: 92px;
 }
 
 .node-editor-header {
   display: flex;
+  min-width: 0;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 10px;
 }
 
-.node-editor-header .btn {
-  margin-left: auto;
+.node-editor-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
 }
 
 .node-editor-title h3 {
-  margin-bottom: 0;
+  flex: 0 0 auto;
+  margin: 0;
   text-transform: none;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 26px;
   letter-spacing: 0;
 }
 
+.node-editor-toggles {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 26px;
+  white-space: nowrap;
+}
+
+.node-editor-toggles label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.node-editor-toggles input {
+  margin: 0;
+}
+
+.node-enabled-switch {
+  gap: 5px;
+  font-size: 11px;
+}
+
+.node-enabled-switch .config-switch-track {
+  flex-basis: 30px;
+  width: 30px;
+  height: 16px;
+  border-radius: 8px;
+}
+
+.node-enabled-switch .config-switch-track::after {
+  width: 10px;
+  height: 10px;
+}
+
+.node-enabled-switch
+  input[type='checkbox']:checked
+  + .config-switch-track::after {
+  transform: translateX(14px);
+}
+
+.node-enable-dependent[hidden] {
+  display: none !important;
+}
+
+.node-editor-toggle-hint {
+  margin: -4px 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-editor-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.node-editor-actions .btn {
+  height: 26px;
+  padding: 4px 8px;
+  line-height: 1;
+}
+
+#btn-node-editor-close {
+  width: 26px;
+  padding: 0;
+}
+
 .node-editor-type {
-  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
   color: var(--text-muted);
+  font-size: 11px;
+  line-height: 26px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .node-editor .node-info-badge {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
 }
+
 .node-editor .node-info-badge svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
 }
 
 .node-rules-textarea {
   resize: vertical;
   font-family: "Cascadia Code", "Consolas", "Courier New", monospace;
+  font-feature-settings: "liga" 0, "calt" 0;
+  font-variant-ligatures: none;
   min-height: 70px;
   line-height: 1.6;
 }

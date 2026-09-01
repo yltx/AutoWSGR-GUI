@@ -1,0 +1,154 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.129,
+      0.799
+    ],
+    "next": [
+      "A"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.145,
+      0.542
+    ],
+    "next": [
+      "B",
+      "C"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.394,
+      0.542
+    ],
+    "next": [
+      "D",
+      "E",
+      "G"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.249,
+      0.299
+    ],
+    "next": [
+      "F"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.226,
+      0.765
+    ],
+    "next": []
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.439,
+      0.86
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Normal",
+    "detour": true,
+    "night": false,
+    "position": [
+      0.445,
+      0.25
+    ],
+    "next": [
+      "G",
+      "H",
+      "I"
+    ]
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.532,
+      0.595
+    ],
+    "next": [
+      "K"
+    ]
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.625,
+      0.425
+    ],
+    "next": [
+      "J"
+    ]
+  },
+  "I": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.66,
+      0.178
+    ],
+    "next": []
+  },
+  "J": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.804,
+      0.583
+    ],
+    "next": [
+      "K",
+      "L"
+    ]
+  },
+  "K": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.688,
+      0.848
+    ],
+    "next": []
+  },
+  "L": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.937,
+      0.808
+    ],
+    "next": []
+  }
+}

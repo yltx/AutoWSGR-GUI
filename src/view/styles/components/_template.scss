@@ -58,7 +58,7 @@
 .wizard-step.active .wizard-step-num {
   border-color: var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-foreground);
 }
 .wizard-step.active .wizard-step-label {
   color: var(--text);
@@ -267,7 +267,7 @@
   padding: 1px 5px;
   border-radius: 3px;
   background: var(--accent);
-  color: #fff;
+  color: var(--accent-foreground);
   margin-right: 6px;
   vertical-align: middle;
   font-weight: 500;

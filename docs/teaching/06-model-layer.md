@@ -1,206 +1,251 @@
-# 06 — Model 层组织
+# 06：Model 与领域状态
 
-> **前置阅读**：[01-extract-class](01-extract-class.md)  
-> **核心原则**：Model 层分两类 — 独立领域模型 + Scheduler 子系统。Model 不依赖 View，通过回调通知 Controller。
+> 前置阅读：[01 按职责拆分类](01-extract-class.md)
 
----
+Model 层保存领域状态并执行领域规则。判断一个类是否属于 Model，不看它是否
+“处理数据”，而看它是否拥有业务含义、状态不变量和转换规则。
 
-## 目录结构
+## 当前领域分布
 
-```
+```text
 src/model/
-├── ConfigModel.ts       (91 行)   用户配置: YAML 加载/导出/局部更新
-├── PlanModel.ts                   战斗方案: 解析 YAML, 节点操作
-├── TemplateModel.ts     (146 行)  模板库: 内置 + 用户模板 CRUD
-├── TaskGroupModel.ts    (185 行)  任务组: 定义/持久化/排序
-├── ApiClient.ts                   HTTP + WebSocket 后端通信
-├── MapDataLoader.ts     (71 行)   地图数据加载 + 缓存
-└── scheduler/                     调度器子系统 (7 个文件)
-    ├── Scheduler.ts               主调度器
-    ├── TaskQueue.ts               优先级队列
-    ├── CronScheduler.ts           定时触发
-    ├── ExpeditionTimer.ts         远征倒计时
-    ├── RepairManager.ts           泡澡修理
-    ├── StopConditionChecker.ts    停止条件
-    └── index.ts                   barrel re-export
+├─ ConfigModel.ts
+├─ PlanModel.ts
+├─ TaskGroupModel.ts
+├─ TemplateModel.ts
+├─ MapDataLoader.ts
+├─ ApiClient.ts
+├─ fleet/
+├─ scheduler/
+└─ statistics/
 ```
 
----
+主要状态所有者：
 
-## 独立领域模型
+| 领域 | 权威状态 |
+|---|---|
+| 配置 | `ConfigModel` |
+| 当前作战方案 | `PlanModel` |
+| 任务组 | `TaskGroupModel` |
+| 模板 | `TemplateModel` |
+| 普通舰队草稿 | Fleet 领域 + `FleetPlannerController` |
+| 决战草稿 | `DecisiveFleetDraft` + `DecisivePlanController` |
+| 调度 | `Scheduler` |
+| 每日额度 | `CampaignDailyQuota`、`NormalFightDailyQuota` |
+| 出征统计 | `DailySortieStats` |
 
-每个 Model 类只负责一个数据领域，职责清晰：
+Controller 可以持有 Model，但不复制 Model 的可写状态。
 
-| 类 | 职责 | 关键方法 |
-|----|------|---------|
-| `ConfigModel` | 配置数据的加载/导出/更新 | `loadFromYaml()`, `toYaml()`, `update()` |
-| `PlanModel` | 方案文件解析 + 节点操作 | `parseYaml()`, `getNodeArgs()` |
-| `TemplateModel` | 模板库读写 | `loadBuiltin()`, `add()`, `remove()` |
-| `TaskGroupModel` | 任务组定义 + 持久化 | `load()`, `save()`, `reorder()` |
-| `ApiClient` | 后端 HTTP/WebSocket 通信 | `taskStart()`, `gameAcquisition()` |
-| `MapDataLoader` | 地图 JSON 加载 + 内存缓存 | `loadMapData()`, `getNodeType()` |
+## ConfigModel：两个配置域
 
-### ConfigModel 示例
+`ConfigModel` 同时维护两个明确分开的域：
 
 ```typescript
-// src/model/ConfigModel.ts
+private settings: UserSettings;
+private guiAutomation: GuiAutomationSettings;
+```
 
-export class ConfigModel {
-  private settings: UserSettings;
+- `settings` 对应 AutoWSGR `usersettings.yaml`。
+- `guiAutomation` 对应 GUI 自身自动化设置。
 
-  get current(): UserSettings { return this.settings; }
+`rawRoot` 保存 GUI 尚未建模的 YAML 字段：
 
-  loadFromYaml(yamlStr: string): void {
-    const parsed = yaml.load(yamlStr) as Record<string, unknown> | null;
-    const base = structuredClone(DEFAULT_SETTINGS);
-    if (parsed?.emulator) Object.assign(base.emulator, parsed.emulator);
-    if (parsed?.account) Object.assign(base.account, parsed.account);
-    if (parsed?.daily_automation) Object.assign(base.daily_automation, parsed.daily_automation);
-    this.settings = base;
+```typescript
+private rawRoot: Record<string, unknown> = {};
+```
+
+这样读取、编辑和写回时不会静默删除后端新增或用户手写字段。
+
+这里的教学重点是：Model 不只保存“已知字段”，还维护 round-trip 不变量和旧
+字段迁移语义。
+
+## PlanModel：继承规则属于领域
+
+节点参数由默认值和节点覆盖合并：
+
+```typescript
+getNodeArgs(nodeId: string): NodeArgs {
+  const defaults = this.data.node_defaults ?? {};
+  const overrides = this.data.node_args?.[nodeId] ?? {};
+  const args = { ...defaults, ...overrides };
+  if (this.data.endpoint_nodes?.includes(nodeId)) {
+    args.proceed = false;
   }
+  return args;
+}
+```
 
-  toYaml(): string {
-    return yaml.dump(this.settings, { lineWidth: -1, noRefs: true });
-  }
+这段逻辑属于 `PlanModel`，因为：
 
-  update(partial: Partial<UserSettings>): void {
-    if (partial.emulator) Object.assign(this.settings.emulator, partial.emulator);
-    if (partial.account) Object.assign(this.settings.account, partial.account);
-    if (partial.daily_automation) Object.assign(this.settings.daily_automation, partial.daily_automation);
+- 它解释方案字段语义。
+- Controller 和 View 都需要一致结果。
+- 持久化结构变化时只应改一处。
+
+View 不应自行合并 `node_defaults`，Controller 也不应为每个页面复制规则。
+
+`PlanModel.rawRoot` 同样保留未知 YAML 字段，保存时只覆盖 GUI 管理的字段。
+
+## 独立纯规则放在哪里
+
+有些规则属于一个领域，但不需要读取领域对象状态。例如：
+
+- `SchedulerTaskPolicy.ts`
+- `SchedulerRepairPolicy.ts`
+- Fleet 目录中的草稿变换函数
+- `src/controller/plan/selectedNodes.ts`
+
+`selectedNodes.ts` 维护路线用例规则：
+
+```typescript
+export function initialSelectedNodesForNewPlan(): string[] {
+  return ['0'];
+}
+
+export function assertPlanRouteReadyForExecution(
+  selectedNodes: readonly string[],
+): void {
+  if (selectedNodes.length === 1 && selectedNodes[0] === '0') {
+    throw new Error('出征计划只启用了起始节点，请至少开启一个路线节点');
   }
 }
 ```
 
-特点：纯数据操作，不引用任何 View 或 Controller。
+它位于 Controller 领域辅助模块，是因为“新建/执行方案”属于应用用例边界；
+`PlanModel` 仍只解释方案本身。
 
----
+位置判断取决于规则语义，不是所有纯函数都必须进入 `shared/`。
 
-## Scheduler 子系统
+## Fleet：草稿、编辑和持久化分开
 
-原始的 `Scheduler.ts` 是一个大文件，重构后拆成 7 个文件，每个负责一个调度子域。
+`src/model/fleet/**` 包含：
 
-### 职责分工
+- `FleetDraft`
+- `DecisiveFleetDraft`
+- `FleetDraftEditor`
+- `FleetPresetIdentity`
+- `FleetRuleMapper`
+- `ShipMatcher`
 
-| 类 | 职责 |
-|----|------|
-| `Scheduler` | 主调度器: 持有队列、消费循环、WebSocket 连接 |
-| `TaskQueue` | 优先级队列的增删改查、ID 生成 |
-| `CronScheduler` | 基于系统时钟的定时触发（演习/战役/刷闪） |
-| `ExpeditionTimer` | 远征检查的倒计时 + 定时触发 |
-| `RepairManager` | 泡澡修理: 检查血量、送入修理、预设轮换 |
-| `StopConditionChecker` | 判断任务是否满足停止条件（预飞检查 + 实时检查） |
+普通舰队与决战舰队共享舰船资料和部分视觉行为，但草稿状态独立。
 
-### 组合关系
+关键不变量：
 
-`Scheduler` 通过**组合**持有子模块，不是继承：
+- 主选舰优先于候选舰。
+- candidate-only 槽位不能把第一个候选自动提升为主选。
+- 全局唯一分配优先保留主选。
+- 主选失败后再用候选重新执行全局分配。
+- 舰种只接受规定的 canonical code。
 
-```typescript
-// src/model/scheduler/Scheduler.ts
+这些规则属于 Model/Fleet 领域，不应放进卡片点击事件或 Main IPC。
 
-export class Scheduler {
-  private _taskQueue: TaskQueue;
-  private expeditionTimer: ExpeditionTimer;
-  private stopChecker: StopConditionChecker;
-  private repairMgr: RepairManager;
+## Scheduler：唯一任务状态机
 
-  constructor(api: ApiClient) {
-    this._taskQueue = new TaskQueue();
-    this.expeditionTimer = new ExpeditionTimer(DEFAULT_INTERVAL, {
-      onTick: (sec) => this.callbacks.onExpeditionTimerTick?.(sec),
-      onTrigger: () => this.insertExpeditionTask(),
-    });
-    this.stopChecker = new StopConditionChecker(api, (level, msg) => { /* ... */ });
-    this.repairMgr = new RepairManager(api);
-  }
-}
+`Scheduler` 组合：
+
+- `TaskQueue`
+- `RepairManager`
+- `StopConditionChecker`
+- `ExpeditionTimer`
+- 任务和修理纯策略
+
+它拥有：
+
+- 当前物理轮次。
+- 就绪队列。
+- 延迟和等待任务。
+- 系统和停止状态。
+- 重试和后续轮次推进。
+
+任务身份分两层：
+
+```text
+id         一次物理执行轮次
+logicalId  整个多轮逻辑任务
 ```
 
-### StopConditionChecker 示例
+`buildFollowUpTask()` 创建下一物理轮次时生成新 `id`，但保留 `logicalId`。
 
-从 Scheduler 中提取的独立职责——只负责判断，不负责执行：
+这使取消、完成和每日额度可以针对整个逻辑任务，而不是误把每轮都当成独立用户
+任务。
 
-```typescript
-// src/model/scheduler/StopConditionChecker.ts
+## Model 通过事件通知，不操作页面
 
-export class StopConditionChecker {
-  trackedLootCount: number | null = null;
-  trackedShipCount: number | null = null;
+Scheduler 使用 `SchedulerCallbacks` 通知 Controller。Controller 的
+`SchedulerBinder` 再更新页面、Cron 和统计。
 
-  /** 任务执行中实时检查 */
-  checkRunning(cond: StopCondition): boolean {
-    if (cond.loot_count_ge != null
-        && this.trackedLootCount != null
-        && this.trackedLootCount >= cond.loot_count_ge) {
-      return true;
-    }
-    return false;
-  }
-
-  /** 预飞检查：发起任务前确认条件是否已满足 */
-  async preflightCheck(cond: StopCondition, taskName: string): Promise<boolean> {
-    const resp = await this.api.gameAcquisition();
-    // ...OCR 读取出征面板数量
-  }
-}
+```text
+Scheduler 状态变化
+  -> SchedulerCallbacks
+  -> SchedulerBinder
+  -> Controller 状态 / ViewObject
+  -> MainView
 ```
 
-### ExpeditionTimer 示例
+Model 不调用 `document.*`，也不 import 具体 View。
 
-从 Scheduler 中提取的纯定时逻辑：
+## Model、Shared 和 Adapter 的区别
 
-```typescript
-// src/model/scheduler/ExpeditionTimer.ts
+| 位置 | 适合内容 |
+|---|---|
+| `src/model/**` | 有领域状态、领域不变量或领域内策略 |
+| `src/shared/**` | Renderer/Main 都能用的无状态纯逻辑 |
+| `src/adapter/**` | HTTP、WS、IPC、Storage、YAML/JSON 技术边界 |
 
-export class ExpeditionTimer {
-  start(): void {
-    this.timer = setInterval(() => {
-      this.callbacks.onTrigger();       // 触发远征检查
-    }, this._intervalMs);
+例如：
 
-    this.tickTimer = setInterval(() => {
-      const remaining = this._intervalMs - (Date.now() - this.lastCheck);
-      this.callbacks.onTick?.(Math.ceil(remaining / 1000));
-    }, 1000);
-  }
+- `fleetShipTypes.ts` 在 Shared，因为 Main 和 Renderer 都需同一舰种规则。
+- `SchedulerTaskPolicy.ts` 在 Scheduler 子系统，因为规则只服务调度领域。
+- `YamlAdapter.ts` 是技术编解码边界，不拥有 Plan 业务。
 
-  stop(): void { /* 清理定时器 */ }
+`ApiClient` 当前位于 Model，但网络传输由 `ApiAdapter` 注入。新增后端字段时仍需
+保持 API DTO 与领域状态分开。
 
-  setInterval(ms: number): void {
-    this._intervalMs = ms;
-    if (this.timer) this.start();       // 运行中自动重启
-  }
-}
-```
+## Model 的持久化原则
 
----
+领域 Model 负责：
 
-## barrel re-export
+- 校验和规范化。
+- 默认值。
+- 未知字段保留。
+- 旧字段兼容。
+- 领域对象到可持久化结构的转换。
 
-外部导入不需要知道内部拆分：
+Main Repository/Service 负责：
 
-```typescript
-// src/model/scheduler/index.ts
-export { Scheduler } from './Scheduler';
-export { CronScheduler } from './CronScheduler';
-export { TaskPriority, type SchedulerTask, type SchedulerStatus } from '../../types/scheduler';
-```
+- 文件位置和来源。
+- 读写权限。
+- 原子写入。
+- 导入导出。
+- 多文件事务。
 
-```typescript
-// 外部使用
-import { Scheduler, CronScheduler, TaskPriority } from '../../model/scheduler';
-```
+Model 不应自行拼 `userData` 路径。
 
----
+## 常见反例
 
-## Model 的通信方式
+- View 持有并修改 `PlanModel.data`。
+- Controller 同时维护一份 Scheduler 队列副本。
+- Repository 决定 candidate-only 业务语义。
+- Shared 模块读取 DOM 或 Electron。
+- 一个“Manager”同时拥有配置、任务和页面状态。
+- 为了复用，把普通舰队和决战草稿合成一个可写对象。
 
-Model 不 import View，通过**回调**通知 Controller：
+## 新增领域规则的步骤
 
-```typescript
-// Scheduler 通过回调通知，不直接操作 UI
-scheduler.setCallbacks({
-  onStatusChange: (status) => { /* Controller 处理 */ },
-  onProgressUpdate: (taskId, progress) => { /* Controller 处理 */ },
-  onTaskCompleted: (taskId, success) => { /* Controller 处理 */ },
-});
+1. 确认规则属于哪个领域和状态所有者。
+2. 搜索所有现有实现和兼容分支。
+3. 判断规则需要状态还是可做纯输入输出。
+4. 在唯一所有者或领域策略中实现。
+5. 保持序列化未知字段和旧格式兼容。
+6. 通过 Controller 转换成 VO，不让 View 重复解释。
+7. 添加领域专项测试。
+
+## 验证
+
+```powershell
+npm run test:scheduler-domain
+npm run test:fleet-domain
+npm run test:settings
+npm run test:migrations
+npm run test:build
+git diff --check
 ```

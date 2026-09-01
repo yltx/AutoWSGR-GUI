@@ -1,0 +1,131 @@
+{
+  "G": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.883,
+      0.292
+    ],
+    "next": [
+      "H",
+      "I"
+    ]
+  },
+  "H": {
+    "type": "SPECIAL_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.929,
+      0.554
+    ],
+    "next": [
+      "J",
+      "K"
+    ]
+  },
+  "I": {
+    "type": "FIGTH",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.663,
+      0.291
+    ],
+    "next": [
+      "N"
+    ]
+  },
+  "J": {
+    "type": "SPECIAL_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.875,
+      0.78
+    ],
+    "next": [
+      "L",
+      "Q"
+    ]
+  },
+  "K": {
+    "type": "LITTLE_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.741,
+      0.472
+    ],
+    "next": []
+  },
+  "L": {
+    "type": "LITTLE_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.719,
+      0.904
+    ],
+    "next": []
+  },
+  "N": {
+    "type": "SPECIAL_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.485,
+      0.389
+    ],
+    "next": [
+      "O",
+      "Q"
+    ]
+  },
+  "O": {
+    "type": "SPECIAL_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.507,
+      0.707
+    ],
+    "next": [
+      "P",
+      "Q"
+    ]
+  },
+  "P": {
+    "type": "LITTLE_BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.383,
+      0.89
+    ],
+    "next": []
+  },
+  "Q": {
+    "type": "BOSS",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.687,
+      0.641
+    ],
+    "next": []
+  },
+  "β": {
+    "type": "NULL",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.749,
+      0.123
+    ],
+    "next": [
+      "G"
+    ]
+  }
+}

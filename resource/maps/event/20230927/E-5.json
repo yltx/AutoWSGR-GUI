@@ -1,0 +1,162 @@
+{
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      98,
+      443
+    ],
+    "next": []
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      111,
+      292
+    ],
+    "next": []
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      325,
+      233
+    ],
+    "next": []
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      286,
+      533
+    ],
+    "next": []
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      261,
+      374
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      433,
+      471
+    ],
+    "next": []
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      420,
+      330
+    ],
+    "next": []
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      494,
+      140
+    ],
+    "next": []
+  },
+  "W": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      584,
+      472
+    ],
+    "next": []
+  },
+  "Y": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      569,
+      345
+    ],
+    "next": []
+  },
+  "T": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      758,
+      539
+    ],
+    "next": []
+  },
+  "Z": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      726,
+      392
+    ],
+    "next": []
+  },
+  "X": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      676,
+      210
+    ],
+    "next": []
+  },
+  "P": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      923,
+      480
+    ],
+    "next": []
+  },
+  "O": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      913,
+      336
+    ],
+    "next": []
+  },
+  "Q": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      884,
+      157
+    ],
+    "next": []
+  }
+}

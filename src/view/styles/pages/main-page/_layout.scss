@@ -1,8 +1,9 @@
 /* ═══ 主页面双栏布局 ═══ */
 .main-layout {
-  display: flex;
-  gap: 20px;
-  height: calc(100vh - 52px - 32px);
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
+  gap: 5px;
+  height: calc(100vh - var(--nav-height) - var(--page-block-space));
 }
 
 .main-left {
@@ -12,17 +13,22 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 5px;
 }
 
 .main-right {
-  width: 400px;
-  max-width: 400px;
-  min-width: 300px;
-  flex-shrink: 0;
+  width: auto;
+  min-width: 0;
+  max-width: none;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .main-layout {
+    grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr);
+  }
 }
 
 .main-right .log-card {
@@ -39,6 +45,439 @@
   min-height: 0;
   max-height: none;
   overflow-y: auto;
+}
+
+/* ═══ 作战任务与舰队预览 ═══ */
+.battle-overview-grid {
+  --battle-overview-collapsed-height: 165px;
+  --battle-overview-expanded-height: 260px;
+
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(
+    var(--battle-overview-collapsed-height),
+    var(--battle-overview-expanded-height)
+  );
+  align-items: stretch;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.battle-overview-grid > .card {
+  min-width: 0;
+  margin-bottom: 0;
+  padding: 14px;
+}
+
+.battle-overview-grid > :is(#task-area-card, .fleet-preview-card) {
+  height: 100%;
+  min-height: 0;
+}
+
+.fleet-preview-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 8px !important;
+}
+
+.fleet-preview-card h3 {
+  flex: 0 0 auto;
+  margin-bottom: 5px;
+  font-size: 14px;
+  text-align: center;
+}
+
+.current-fleet-stage {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 54px;
+  align-items: flex-start;
+}
+
+.current-fleet-empty {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.current-fleet-empty[hidden] {
+  display: none;
+}
+
+.current-fleet-preview {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  width: 100%;
+  min-height: 0;
+  align-items: start;
+  justify-content: start;
+}
+
+.current-fleet-preview[hidden] {
+  display: none;
+}
+
+.current-fleet-card {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 128 / 200;
+  overflow: hidden;
+  color: #fff;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.current-fleet-card > .fleet-ship-artwork {
+  width: 100%;
+  height: 100%;
+}
+
+.current-fleet-card .fleet-ship-type-icon {
+  top: 2%;
+  right: 2%;
+  width: 30%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.current-fleet-card .fleet-ship-name {
+  right: 4%;
+  bottom: 3%;
+  left: 4%;
+  min-height: 18%;
+  padding: 1px 2px;
+}
+
+.current-fleet-card .fleet-ship-name-text {
+  font-size: clamp(6px, 0.68vw, 9px);
+}
+
+.current-fleet-card-unknown {
+  position: absolute;
+  right: 5%;
+  bottom: 5%;
+  left: 5%;
+  padding: 3px;
+  overflow: hidden;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  border-radius: 3px;
+  font-size: 8px;
+  font-weight: 700;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ═══ 今日出征统计 ═══ */
+.daily-sortie-stats {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding-top: 7px;
+  margin-top: 7px;
+  border-top: 1px solid var(--border);
+}
+
+.daily-sortie-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.daily-sortie-heading h4 {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.daily-sortie-heading > span {
+  color: var(--text-muted);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.daily-sortie-summary {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: stretch;
+  gap: 4px;
+}
+
+.daily-sortie-metric {
+  display: flex;
+  flex: 1 0 max-content;
+  width: auto;
+  max-width: 100%;
+  min-width: max-content;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px 5px;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  text-align: center;
+}
+
+.daily-sortie-metric > span {
+  flex: 0 0 auto;
+  overflow: hidden;
+  font-size: 9px;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-sortie-metric > strong {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-repair-metric > strong {
+  font-size: 9px;
+}
+
+.daily-repair-metric b {
+  color: var(--text);
+  font-size: 11px;
+}
+
+.daily-ship-toggle {
+  appearance: none;
+  width: auto;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.daily-ship-toggle:hover,
+.daily-ship-toggle[aria-expanded='true'] {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.daily-ship-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.daily-ship-toggle.has-drop-notice {
+  border-color: color-mix(in srgb, #ff5c78 55%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, #ff5c78 22%, transparent);
+}
+
+.daily-grade-row {
+  display: grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.daily-grade-row > span {
+  color: var(--text-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+.daily-grade-row b {
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-drop-notice {
+  flex: 0 0 auto;
+  padding: 5px 7px;
+  margin-top: 5px;
+  color: #ff5c78;
+  background:
+    linear-gradient(
+      color-mix(in srgb, #ff5c78 10%, var(--bg-inset)),
+      color-mix(in srgb, #ff5c78 10%, var(--bg-inset))
+    ) padding-box,
+    linear-gradient(
+      90deg,
+      #ff5c78,
+      #b45cff,
+      #36c5f0,
+      #42e6a4,
+      #ffe066,
+      #ff5c78
+    ) border-box;
+  background-size: 100% 100%, 260% 100%;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  box-shadow:
+    0 0 5px color-mix(in srgb, #ff5c78 18%, transparent),
+    0 0 8px color-mix(in srgb, #36c5f0 12%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  animation: daily-drop-led-flow 4s linear infinite;
+}
+
+.daily-drop-notice[hidden],
+.daily-ship-details[hidden] {
+  display: none;
+}
+
+.daily-ship-details {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 6px 7px;
+  margin-top: 5px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.has-drop-notice .daily-ship-details {
+  border-color: color-mix(in srgb, #ff5c78 25%, var(--border));
+}
+
+.daily-ship-details-title {
+  flex: 0 0 auto;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+}
+
+@keyframes daily-drop-led-flow {
+  from {
+    background-position: 0 0, 0 0;
+  }
+
+  to {
+    background-position: 0 0, 260% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .daily-drop-notice {
+    animation: none;
+  }
+}
+
+.daily-ship-drop-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 3px 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.daily-ship-drop-item {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 96px;
+  align-items: center;
+  gap: 3px;
+  color: var(--text-secondary);
+  font-size: 10px;
+}
+
+.daily-ship-drop-item span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.daily-ship-drop-item b {
+  flex: 0 0 auto;
+  color: #ff5c78;
+  font-variant-numeric: tabular-nums;
+}
+
+.daily-ship-drop-empty {
+  flex: 1 0 100%;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+@media (min-width: 1500px) {
+  .fleet-preview-card {
+    display: grid;
+    grid-template-columns: minmax(300px, 2fr) minmax(170px, 1fr);
+    grid-template-rows: auto 1fr;
+    column-gap: 9px;
+  }
+
+  .fleet-preview-card > h3 {
+    grid-column: 1;
+  }
+
+  .current-fleet-stage {
+    grid-column: 1;
+  }
+
+  .daily-sortie-stats {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    padding-top: 0;
+    padding-left: 9px;
+    margin-top: 0;
+    border-top: 0;
+    border-left: 1px solid var(--border);
+  }
+
+}
+
+@media (max-height: 560px) {
+  .current-fleet-preview {
+    grid-template-columns: repeat(6, minmax(34px, 48px));
+  }
+
+  .current-fleet-stage {
+    min-height: 48px;
+  }
+
+  .daily-sortie-stats {
+    padding-top: 4px;
+    margin-top: 4px;
+  }
+
+  .daily-sortie-heading {
+    margin-bottom: 3px;
+  }
+
+  .daily-sortie-metric {
+    padding-block: 3px;
+  }
 }
 
 /* ═══ 状态指示 ═══ */
@@ -85,6 +524,11 @@
   animation: pulse 1.5s infinite;
 }
 
+.status-indicator.stopping {
+  background: var(--warning);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+}
+
 .status-indicator.error {
   background: var(--danger);
   box-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
@@ -124,10 +568,13 @@
 
 /* ═══ 空闲状态 ═══ */
 .idle-text {
-  color: var(--text-muted);
+  color: var(--text-secondary);
   margin-bottom: 16px;
   text-align: center;
   font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .empty-state {

@@ -1,284 +1,235 @@
-# 后端通信
+# 通信边界
 
-> 涉及文件：`electron/preload.ts` · `electron/main.ts`（IPC handlers）· `src/model/ApiClient.ts` · `src/types/api.ts` · `src/types/electronBridge.ts`
+## 两条通信链路
 
-## 概述
+```text
+Renderer
+  -> window.electronBridge
+  -> preload / ipcRenderer
+  -> Electron Main IPC
+  -> Service
 
-AutoWSGR-GUI 的通信分为**两层**：
-
-```mermaid
-graph LR
-  subgraph Renderer["渲染进程"]
-    View["View / Controller"]
-    Api["ApiClient"]
-  end
-
-  subgraph Main["Electron 主进程"]
-    IPC["IPC Handlers"]
-  end
-
-  subgraph Py["Python 后端"]
-    REST["REST API"]
-    WS["WebSocket"]
-  end
-
-  View -->|"contextBridge"| IPC
-  IPC -->|"fs / spawn / exec"| Main
-  Api -->|"HTTP fetch"| REST
-  Api -->|"WebSocket"| WS
+Renderer
+  -> ApiClient
+  -> HTTP / WebSocket
+  -> AutoWSGR Python 后端
 ```
 
-| 层 | 路径 | 用途 |
-|----|------|------|
-| **IPC** | 渲染进程 ↔ Electron 主进程 | 文件 I/O、系统对话框、环境管理、后端进程控制 |
-| **HTTP/WS** | 渲染进程 ↔ Python 后端 | 游戏操作、任务执行、实时日志 |
+IPC 处理桌面系统能力；HTTP/WS 处理游戏自动化。不要把文件系统能力加到 Python
+API，也不要让 Main 代替 Renderer 转发所有后端请求。
 
----
+## Electron IPC
 
-## IPC 通信层
+### 契约层
 
-### 暴露机制
+`src/types/ipc.ts` 定义：
 
-`preload.ts` 通过 Electron 的 `contextBridge.exposeInMainWorld()` 安全地将 IPC 方法暴露到 `window.electronBridge` 对象上。渲染进程只能通过预定义的方法调用主进程，无法直接访问 Node.js API。
+- `ElectronBridge`
+- 配置、窗口、更新、ADB DTO
+- 作战、编队、日常方案 DTO
+- 舰船资料库 DTO
+- 通用文件操作结果
 
-### API 分类
+这是 preload、Renderer Adapter 和调用方共同依赖的类型来源。新增 IPC 需要同步：
 
-#### 文件操作
+```text
+src/types/ipc.ts
+  -> electron/preload.ts
+  -> electron/ipc/<Domain>Ipc.ts
+  -> src/adapter/IpcAdapter.ts
+  -> 调用方
+  -> scripts/tests/test-main-ipc.js
+```
 
-| 方法 | 参数 | 返回 | 说明 |
-|------|------|------|------|
-| `readFile(path)` | 文件路径 | `string` | 读取文件内容 |
-| `saveFile(path, content)` | 路径 + 内容 | `void` | 写入文件 |
-| `appendFile(path, content)` | 路径 + 内容 | `void` | 追加内容 |
-| `openFileDialog(filters, defaultDir?)` | 文件过滤器 | `{path, content} \| null` | 打开文件选择对话框 |
-| `saveFileDialog(name, content, filters)` | 默认名 + 内容 | `string \| null` | 保存文件对话框 |
-| `openDirectoryDialog(title?)` | 对话框标题 | `string \| null` | 文件夹选择 |
+### Preload
 
-#### 路径查询
-
-| 方法 | 返回 | 说明 |
-|------|------|------|
-| `getAppRoot()` | `string` | 应用工作目录 |
-| `getPlansDir()` | `string` | 方案文件目录 |
-| `getConfigDir()` | `string` | 配置文件目录 |
-| `listPlanFiles()` | `{name, file}[]` | 列出方案文件 |
-| `openFolder(path)` | `void` | 在资源管理器中打开 |
-
-#### 环境管理
-
-| 方法 | 返回 | 说明 |
-|------|------|------|
-| `checkEnvironment()` | `{pythonCmd, pythonVersion, missingPackages, allReady}` | 检查 Python 环境 |
-| `installDeps()` | `{success, output}` | 安装 Python 依赖 |
-| `installPortablePython()` | `{success}` | 安装便携版 Python |
-| `checkUpdates()` | `{gitAvailable, hasUpdates, ...}` | 检测 autowsgr 库更新 |
-| `pullUpdates()` | `{success, output}` | 拉取更新 |
-
-#### Python 路径配置
-
-| 方法 | 说明 |
-|------|------|
-| `getPythonPath()` | 同步获取用户配置的 Python 路径（`null` = 自动检测） |
-| `setPythonPath(path)` | 设置 Python 路径并清除缓存 |
-| `validatePython(path)` | 验证指定路径的 Python 版本是否兼容 |
-
-#### 后端控制
-
-| 方法 | 说明 |
-|------|------|
-| `startBackend()` | 启动 Python 后端子进程 |
-| `detectEmulator()` | 自动检测模拟器 |
-| `checkAdbDevices()` | 查询 ADB 设备列表 |
-| `runSetup()` | 运行 setup.bat 脚本 |
-
-#### GUI 自动更新
-
-| 方法 | 说明 |
-|------|------|
-| `checkGuiUpdates()` | 检查 GUI 应用更新 |
-| `downloadGuiUpdate()` | 下载更新包 |
-| `installGuiUpdate()` | 安装更新并重启 |
-| `onUpdateStatus(callback)` | 监听更新状态变化 |
-
-#### 事件监听
-
-| 方法 | 事件 | 说明 |
-|------|------|------|
-| `onBackendLog(callback)` | `backend-log` | 接收 Python 后端日志 |
-| `onSetupLog(callback)` | `setup-log` | 接收 setup.bat 输出 |
-
-#### 同步方法
-
-| 方法 | 说明 |
-|------|------|
-| `getAppVersion()` | 同步获取应用版本号 |
-| `getBackendPort()` | 同步获取后端端口 |
-| `setBackendPort(port)` | 设置后端端口 |
-
----
-
-## HTTP REST API
-
-`ApiClient` 封装与 Python 后端的所有 HTTP 通信。
-
-### 基础配置
-
-- 默认地址：`http://localhost:8438`
-- 端口可通过 `gui_settings.json` 配置
-- 所有请求/响应使用 JSON 格式
-
-### 统一响应结构
+`electron/preload.ts` 是唯一允许直接使用 `ipcRenderer` 的 Renderer 桥接文件：
 
 ```typescript
-interface ApiResponse<T = unknown> {
-  success: boolean;
-  data?: T;
-  message?: string;
-  error?: string;
-}
+contextBridge.exposeInMainWorld('electronBridge', electronBridge);
 ```
 
-### 端点列表
+Renderer 其他模块不得导入 Electron。同步 getter 使用 `sendSync`，命令和文件
+操作使用 `invoke`，Main 事件使用 `ipcRenderer.on`。
 
-#### 系统管理
+### Renderer Adapter
 
-| 方法 | 端点 | 超时 | 说明 |
-|------|------|------|------|
-| POST | `/api/system/start` | 300s | 连接模拟器 + 启动游戏 |
-| POST | `/api/system/stop` | - | 断开连接 |
-| GET | `/api/system/status` | - | 系统状态查询 |
-| GET | `/api/system/emulator/devices` | 15s | ADB 设备列表 |
+`src/adapter/IpcAdapter.ts` 不把完整 bridge 到处传播，而是按用例裁剪：
 
-#### 任务执行
+| 契约 | 用途 |
+|---|---|
+| `StartupGateway` | 路径、环境、后端和更新启动流程 |
+| `ConfigurationGateway` | 配置事务 |
+| `SettingsGateway` | 设置页系统操作 |
+| `ManagedCombatPlanRepository` | 作战方案 |
+| `ScheduledTaskRepository` | 自动任务计划 |
+| `FleetPlannerRepository` | 编队与舰船资料库 |
+| `DecisivePlanRepository` | 决战设置 |
+| `MigrationConflictRepository` | 迁移冲突 |
+| `FileRepository` | 受限文本读写 |
 
-| 方法 | 端点 | Body | 说明 |
-|------|------|------|------|
-| POST | `/api/task/start` | `TaskRequest` | 启动战斗/演习/战役/决战 |
-| POST | `/api/task/stop` | - | 停止当前任务 |
-| GET | `/api/task/status` | - | 当前任务状态 |
+Controller 依赖窄接口，View 不依赖任何 Adapter。
 
-`TaskRequest` 为联合类型，支持 5 种任务：
+### Main IPC
 
-```typescript
-type TaskRequest =
-  | NormalFightReq   // {type: 'normal_fight', plan, times, gap}
-  | EventFightReq    // {type: 'event_fight', plan, times}
-  | CampaignReq      // {type: 'campaign', campaign_name, times}
-  | ExerciseReq      // {type: 'exercise', fleet_id}
-  | DecisiveReq      // {type: 'decisive', chapter, level1, level2}
+| 文件 | 领域 |
+|---|---|
+| `FileIpc.ts` | 受限文件、对话框、目录打开 |
+| `ConfigurationIpc.ts` | GUI 设置、窗口、Python/CUDA 配置 |
+| `CombatPlanIpc.ts` | 作战方案管理、导入、导出和运行时准备 |
+| `TeamPlanIpc.ts` | 编队方案 |
+| `DailyPlanIpc.ts` | 日常方案 |
+| `ShipLibraryIpc.ts` | 舰船资料库和更新 |
+| `EnvironmentIpc.ts` | Python 环境检查和安装 |
+| `DeviceIpc.ts` | 模拟器与 ADB |
+| `BackendIpc.ts` | 后端启动和 setup |
+| `MigrationConflictIpc.ts` | 迁移冲突复核 |
+| `UpdaterIpc.ts` | GUI 更新 |
+
+IPC 文件只处理参数、结果和异常边界。路径、安全、YAML、持久化和更新策略放入
+Service/Codec/Repository。
+
+## 文件能力与安全
+
+通用文件 IPC 经过 `SafePathService` 和 `SecureFileService`：
+
+- 读取限定在 `userData` 和资源目录。
+- 写入限定在 `userData`。
+- 拒绝 `..`、UNC、盘符跳转和 NTFS ADS。
+- 检查符号链接/junction 的真实目标。
+- 文件对话框返回的外部文件是单次用户授权，不扩大通用访问根。
+- 写入使用 `AtomicFileStore`。
+
+异常应直接返回或抛出，不得因为文件/IPC/页面异常而触发业务 fallback。
+
+## HTTP 客户端
+
+`src/model/ApiClient.ts` 使用 `src/adapter/ApiAdapter.ts` 提供的传输接口。默认：
+
+```text
+http://localhost:<backend_port>
+ws://localhost:<backend_port>
 ```
 
-#### 远征
+这是 Renderer 客户端地址；Uvicorn 在 Main 启动的 Python 进程内监听
+`127.0.0.1:<backend_port>`。
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| POST | `/api/expedition/check` | 收取所有已完成的远征 |
+当前 HTTP 端点按代码分组：
 
-#### 游戏状态
+| 领域 | 端点 |
+|---|---|
+| 系统 | `/api/system/start`、`stop`、`status` |
+| 任务 | `/api/task/start`、`stop`、`status` |
+| 远征 | `/api/expedition/check` |
+| 游戏状态 | `/api/game/context`、`acquisition` |
+| 建造/奖励/食堂 | `/api/build/*`、`/api/reward/collect`、`/api/cook` |
+| 修理/解体 | `/api/repair/*`、`/api/destroy` |
+| 自动强化 | `/api/intensify` |
+| 强化只读预览 | `/api/intensify/preview`、`/api/intensify/snapshot-sessions`、`/api/intensify/snapshot-preview` |
+| 健康检查 | `/api/health` |
 
-| 方法 | 端点 | 返回数据 | 说明 |
-|------|------|----------|------|
-| GET | `/api/game/context` | 编队/资源/远征/建造槽 | 全局游戏状态 |
-| GET | `/api/game/acquisition` | 战利品/舰船 OCR 数量 | 出征面板读数 |
+具体请求类型定义在 `src/types/api.ts`。新增字段先确认 AutoWSGR 正式 API 契约，
+再修改 GUI DTO 和契约 fixture。
 
-#### 操作端点
+自动强化与手动只读预览使用不同 DTO。`AutoIntensifyRequest` 只发送
+`material_ship_types`、`max_materials` 和 `protected_ships`；主页自动强化按钮每次从
+`ConfigModel.current.intensify` 读取已保存策略，不发送手动预览专用的 `target_ship`。
+`IntensifyRequest` 继续用于 `/api/intensify/preview`。`max_materials` /
+`maximum_materials` 使用 `number | null`：正整数是有限单批上限，`null` 是明确的不限量，
+不得使用魔法数字；有限值也没有 GUI 私设的 12 艘上限。
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| POST | `/api/build/collect` | 收取建造 |
-| POST | `/api/build/start` | 开始建造 |
-| POST | `/api/reward/collect` | 收取每日奖励 |
-| POST | `/api/cook` | 食堂烹饪 |
-| POST | `/api/repair/bath` | 浴室快速修理 |
-| POST | `/api/repair/ship` | 单船泡澡修理 |
-| POST | `/api/destroy` | 解体舰船 |
+强化扫描 Session 由后端持有并设有短期 TTL。GUI 只能使用 Session 响应公开的
+opaque target/material occurrence refs，不发送设备 serial、资源路径、扫描结果、proof
+或执行授权。`SettingsController` 独占当前 Session、选择和异步代次；这些临时状态不进入
+配置、Scheduler 或浏览器存储。`snapshot-preview` 必须携带一个服务端验证的
+`selected_target_ref`，响应只包含该目标；端点固定为不可执行，Renderer 不挂载真实强化
+执行入口。
 
-#### 健康检查
+### TaskRequest
 
-| 方法 | 端点 | 说明 |
-|------|------|------|
-| GET | `/api/health` | 后端健康状态、运行时间 |
+`TaskRequest` 是联合类型：
 
----
+- `normal_fight`
+- `event_fight`
+- `campaign`
+- `exercise`
+- `decisive`
 
-## WebSocket 通信
+Scheduler 对多轮任务每轮只发送一次后端请求。GUI 的 `remainingTimes` 和
+`logicalId` 不应混入后端业务 DTO。
 
-`ApiClient` 维护两条 WebSocket 连接，支持断线自动重连（3 秒延迟）：
+`ApiClient.taskStart()` 保留必要的旧后端兼容重试。新增兼容分支时必须限定明确
+错误条件，不能对 Controller、页面导航或 OCR 引擎异常做静默 fallback。
 
-### 连接
+## WebSocket
 
-| 路径 | 用途 |
-|------|------|
-| `ws://localhost:8438/ws/logs` | 实时日志流 |
-| `ws://localhost:8438/ws/task` | 任务进度 + 完成通知 |
+| 路径 | 内容 |
+|---|---|
+| `/ws/logs` | 后端日志 |
+| `/ws/task` | 任务进度与完成 |
 
-### 消息类型
+类型位于 `src/types/api.ts`：
 
-```typescript
-// 日志消息 (/ws/logs)
-interface WsLogMessage {
-  type: 'log';
-  timestamp: string;
-  level: string;
-  channel: string;
-  message: string;
-}
+- `WsLogMessage`
+- `WsTaskUpdate`
+- `WsTaskCompleted`
 
-// 任务进度更新 (/ws/task)
-interface WsTaskUpdate {
-  type: 'task_update';
-  task_id: string;
-  status: string;
-  progress?: { current: number; total: number; node: string | null };
-}
-
-// 任务完成 (/ws/task)
-interface WsTaskCompleted {
-  type: 'task_completed';
-  task_id: string;
-  success: boolean;
-  result?: TaskResult;
-  error?: string;
-}
-```
-
-### 数据流
+`ApiClient` 负责连接、3 秒重连和消息解析；`SchedulerBinder` 与
+`SchedulerRuntimeTracker` 解释业务日志并更新 Scheduler/UI。
 
 ```mermaid
 sequenceDiagram
-  participant Backend as Python 后端
-  participant WsLog as ws/logs
-  participant WsTask as ws/task
-  participant Api as ApiClient
-  participant Sched as Scheduler
-  participant App as AppController
-  participant UI as MainView
+  participant Backend
+  participant ApiClient
+  participant Scheduler
+  participant Binder
+  participant View
 
-  Backend->>WsLog: 日志消息
-  WsLog->>Api: onLog
-  Api->>Sched: 解析 [UI] 行 → StopConditionChecker
-  Api->>App: 日志回调
-  App->>UI: appendLog()
-
-  Backend->>WsTask: 进度更新
-  WsTask->>Api: onTaskUpdate
-  Api->>Sched: onProgressUpdate
-  Sched->>App: 回调
-  App->>UI: renderMain()
-
-  Backend->>WsTask: 任务完成
-  WsTask->>Api: onTaskCompleted
-  Api->>Sched: handleTaskFinished()
-  Sched->>Sched: 后触发 / 重试 / 消费下一个
-  Sched->>App: 回调
-  App->>UI: renderMain()
+  Backend->>ApiClient: /ws/logs
+  ApiClient->>Binder: 日志
+  Binder->>Scheduler: 停止条件/节点/战果
+  Binder->>View: 日志与运行状态
+  Backend->>ApiClient: /ws/task task_completed
+  ApiClient->>Scheduler: handleTaskFinished
+  Scheduler->>Binder: 单轮/逻辑事件
+  Binder->>View: ViewObject
 ```
 
----
+WebSocket 完成事件的后端 `task_id` 与 GUI 的轮次 `id/logicalId` 是不同层的身份，
+不能混用。
 
-## 与其他系统的关系
+## 后端来源与正式契约
 
-- **任务调度**：`Scheduler` 持有 `ApiClient` 实例，通过 REST API 发起/停止任务，通过 WebSocket 接收进度和完成通知
-- **配置系统**：`backend_port` 配置决定 `ApiClient` 的连接地址
-- **环境管理**：所有环境相关操作（Python 检测/安装、后端启停）通过 IPC 层完成
-- **出击计划**：方案数据被构建为 `CombatPlanReq` 嵌入 `TaskRequest` 中
+Main 启动前由 `BackendRuntimeContract` 验证：
+
+- 实际导入的 `autowsgr` 位于声明的唯一来源。
+- `AUTOWSGR_OCR_GPU_MODE` 行为可用。
+- `AUTOWSGR_SAVE_IMAGES` 行为可用。
+- `autowsgr.server.main:app` 是可调用 ASGI 应用。
+
+通过后才使用 Uvicorn 绑定 `127.0.0.1:<port>`。GUI 不修改 AutoWSGR 私有类或
+日志实现。
+
+## 错误边界
+
+以下错误直接失败并向上报告：
+
+- preload/IPC 不可用。
+- 文件路径或结构非法。
+- Controller、页面导航或 View 生命周期异常。
+- 后端来源或 ASGI 契约不符。
+- OCR 引擎异常。
+- 方案 Codec/Repository 失败。
+
+业务 fallback 只用于已有明确语义的兼容场景，例如受控的旧 API 请求格式。
+
+## 验证
+
+```powershell
+npm run test:main-ipc
+npm run test:api-contract
+npm run test:main-services
+```
+
+修改 preload 后还应运行 `npm run test:build`，确认编译产物、桥接和打包入口仍
+正确连接。

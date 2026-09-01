@@ -1,3 +1,4 @@
+/** 跟踪泡澡舰船并编排修理、替换和状态恢复。 */
 /**
  * RepairManager —— 泡澡修理管理器
  *
@@ -13,10 +14,15 @@
  */
 
 import type { ApiClient } from '../ApiClient';
-import type { ShipData } from '../../types/api';
-import type { BathRepairConfig, RepairThreshold, ShipSlot } from '../../types/model';
+import type { ShipData } from '../../types/api.js';
+import type { BathRepairConfig, RepairThreshold, ShipSlot } from '../../types/model.js';
 import { Logger } from '../../utils/Logger';
-import { toBackendName } from '../../data/shipData';
+import {
+  browserStorageStore,
+  jsonCodec,
+  type StorageStore,
+} from '../../adapter/index.js';
+import { toBackendName } from '../../shared/shipNameNormalizer.js';
 
 /** 正在泡澡的舰船记录 */
 export interface BathingShip {
@@ -44,10 +50,12 @@ export class RepairManager {
   private api: ApiClient;
   /** 正在泡澡的舰船列表 (舰船名 → 记录) */
   private bathingShips: Map<string, BathingShip> = new Map();
+  private storage: StorageStore;
   private static readonly STORAGE_KEY = 'autowsgr_bathing_ships';
 
-  constructor(api: ApiClient) {
+  constructor(api: ApiClient, storage: StorageStore = browserStorageStore) {
     this.api = api;
+    this.storage = storage;
     this.restoreFromStorage();
   }
 
@@ -167,7 +175,7 @@ export class RepairManager {
         const entry = this.bathingShips.get(key);
         if (!entry) continue;
 
-        const rawSeconds: unknown = (resp.data as any)?.repair_seconds;
+        const rawSeconds: unknown = resp.data?.repair_seconds;
         const validatedSeconds = RepairManager.validateRepairSeconds(rawSeconds);
 
         if (validatedSeconds > 0) {
@@ -197,43 +205,6 @@ export class RepairManager {
   }
 
   /**
-   * 刷新泡澡状态: 通过 gameContext 检查舰船血量，移除已修好的记录
-   */
-  async refreshBathingStatus(fleetId: number, config: BathRepairConfig): Promise<void> {
-    if (this.bathingShips.size === 0) return;
-
-    try {
-      const resp = await this.api.gameContext();
-      if (!resp.success || !resp.data?.fleets) return;
-
-      // 收集所有编队中的舰船数据
-      const allShips = new Map<string, ShipData>();
-      for (const fleet of resp.data.fleets) {
-        for (const ship of fleet.ships) {
-          if (ship?.name) allShips.set(ship.name, ship);
-        }
-      }
-
-      // 检查泡澡中的舰船是否已修理完成
-      for (const [name] of this.bathingShips) {
-        const ship = allShips.get(name);
-        if (!ship) {
-          // 舰船不在任何编队（可能被卸下），保留记录等下次检查
-          continue;
-        }
-        const threshold = this.getThreshold(name, config);
-        if (!this.needsRepair(ship, threshold)) {
-          Logger.info(`舰船「${name}」泡澡修理完成`, 'repair');
-          this.bathingShips.delete(name);
-          this.saveToStorage();
-        }
-      }
-    } catch (e) {
-      Logger.debug(`刷新泡澡状态失败: ${e}`, 'repair');
-    }
-  }
-
-  /**
    * 从编队预设列表中找到一个所有舰船都不在泡澡中的预设
    * @param presets 编队预设列表 (name + ships[])
    * @param skipIndex 跳过的预设索引（当前正在使用的）
@@ -254,16 +225,6 @@ export class RepairManager {
     return -1;
   }
 
-  /** 是否有舰船正在泡澡 */
-  get hasBathingShips(): boolean {
-    return this.bathingShips.size > 0;
-  }
-
-  /** 获取正在泡澡的舰船列表 */
-  get bathingShipNames(): string[] {
-    return Array.from(this.bathingShips.keys());
-  }
-
   /** 获取泡澡中舰船列表（只读引用，供 TaskQueue 计算动态延迟） */
   getBathingShips(): ReadonlyMap<string, BathingShip> {
     return this.bathingShips;
@@ -276,7 +237,7 @@ export class RepairManager {
   }
 
   /**
-   * 将 bathingShips 持久化到 localStorage。
+   * 将 bathingShips 写入持久化存储。
    * 仅保存尚未完成的维修记录。
    */
   private saveToStorage(): void {
@@ -296,9 +257,9 @@ export class RepairManager {
         }));
 
       if (data.length === 0) {
-        localStorage.removeItem(RepairManager.STORAGE_KEY);
+        this.storage.remove(RepairManager.STORAGE_KEY);
       } else {
-        localStorage.setItem(RepairManager.STORAGE_KEY, JSON.stringify(data));
+        this.storage.set(RepairManager.STORAGE_KEY, jsonCodec.stringify(data));
       }
     } catch (e) {
       Logger.warn(`保存泡澡状态失败: ${e}`, 'repair');
@@ -306,12 +267,12 @@ export class RepairManager {
   }
 
   /**
-   * 从 localStorage 恢复泡澡状态。
+   * 从持久化存储恢复泡澡状态。
    * 在构造函数中调用，用于 GUI 重启后恢复维修记录。
    */
   private restoreFromStorage(): void {
     try {
-      const raw = localStorage.getItem(RepairManager.STORAGE_KEY);
+      const raw = this.storage.get(RepairManager.STORAGE_KEY);
       if (!raw) return;
 
       const data: Array<{
@@ -320,11 +281,11 @@ export class RepairManager {
         startTime: number;
         repairEndTime: number;
         requestSent: boolean;
-      }> = JSON.parse(raw);
+      }> = jsonCodec.parse(raw);
 
       if (!Array.isArray(data)) {
         Logger.warn('泡澡状态数据格式异常，已清空', 'repair');
-        localStorage.removeItem(RepairManager.STORAGE_KEY);
+        this.storage.remove(RepairManager.STORAGE_KEY);
         return;
       }
 
@@ -353,7 +314,7 @@ export class RepairManager {
     } catch (e) {
       Logger.warn(`恢复泡澡状态失败，已清空: ${e}`, 'repair');
       this.bathingShips.clear();
-      localStorage.removeItem(RepairManager.STORAGE_KEY);
+      this.storage.remove(RepairManager.STORAGE_KEY);
     }
   }
 }

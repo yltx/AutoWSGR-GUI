@@ -1,45 +1,84 @@
-/**
- * SchedulerBinder —— 调度器回调绑定子控制器。
- * 封装 Scheduler / CronScheduler 的回调绑定逻辑 + 关联的可变状态。
- */
-import { TaskPriority, type Scheduler, type SchedulerStatus, type CronScheduler } from '../../model/scheduler';
+/** 绑定 Scheduler 与 CronScheduler 回调并协调任务生命周期。 */
+import {
+  CAMPAIGN_OUT_OF_TIMES_RESULT,
+  TaskPriority,
+  type CampaignDailyQuota,
+  type CronScheduler,
+  type LogicalTaskCancelReason,
+  type NormalFightDailyQuota,
+  type Scheduler,
+  type SchedulerStatus,
+} from '../../model/scheduler';
 import type { ApiClient } from '../../model/ApiClient';
+import type { ConfigModel } from '../../model/ConfigModel';
 import type { TemplateModel } from '../../model/TemplateModel';
-import { PlanModel } from '../../model/PlanModel';
-import type { NormalFightReq } from '../../types/api';
+import type { NormalFightTaskConfig } from '../../types/model.js';
+import {
+  type LootPlanSource,
+} from '../../shared/lootPlans.js';
+import {
+  type DecisiveAutomationSource,
+} from '../../shared/decisiveAutomation.js';
 import { Logger } from '../../utils/Logger';
-import { normalizeSelectedNodesForBackend } from '../plan/selectedNodes';
+import {
+  ScheduledTaskLoader,
+} from './ScheduledTaskLoader';
+import {
+  SchedulerRuntimeTracker,
+  type SchedulerRuntimeSnapshot,
+} from './SchedulerRuntimeTracker';
 
 export interface SchedulerBinderHost {
   readonly scheduler: Scheduler;
   readonly cronScheduler: CronScheduler;
   readonly api: ApiClient;
   readonly templateModel: TemplateModel;
+  readonly configModel: ConfigModel;
+  readonly campaignDailyQuota: CampaignDailyQuota;
+  readonly normalFightDailyQuota: NormalFightDailyQuota;
   renderMain(): void;
+  refreshNormalFightRemaining(): void;
   updateOpsAvailability(connected: boolean): void;
+  updateExpeditionTimer(text: string): void;
 }
 
 export class SchedulerBinder {
-  private static readonly DEFAULT_EXERCISE_TOTAL = 5;
-  private static readonly LOG_DEDUP_WINDOW_MS = 1200;
-
-  // ── 状态（从 AppController 迁移而来） ──
   private pendingExerciseTaskId: string | null = null;
   private pendingBattleTaskId: string | null = null;
+  private pendingBattleConfig: {
+    campaignName: string;
+    target: number;
+    remainingAtStart: number;
+  } | null = null;
+  private pendingBattleResult: string | null = null;
+  private pendingDecisiveTaskId: string | null = null;
+  private pendingDecisiveResult: string | null = null;
   private pendingLootTaskId: string | null = null;
-  private exerciseTotal = SchedulerBinder.DEFAULT_EXERCISE_TOTAL;
-  private exerciseCurrent = 0;
-  private exerciseRoundInProgress = false;
-  private lastParsedLogMessage = '';
-  private lastParsedLogTaskId = '';
-  private lastParsedLogAt = 0;
-  currentProgress = '';
-  trackedLoot = '';
-  trackedShip = '';
-  wsConnected = false;
-  expeditionTimerText = '--:--';
+  private pendingNormalFightTaskIds = new Set<string>();
+  private pendingNormalFightConfigs =
+    new Map<string, NormalFightTaskConfig>();
 
-  constructor(private readonly host: SchedulerBinderHost) {}
+  constructor(
+    private readonly host: SchedulerBinderHost,
+    private readonly runtime = new SchedulerRuntimeTracker(
+      host.scheduler,
+      host.renderMain,
+    ),
+    private readonly taskLoader = new ScheduledTaskLoader(host),
+  ) {}
+
+  get runtimeState(): SchedulerRuntimeSnapshot {
+    return this.runtime.snapshot;
+  }
+
+  resetRuntimeState(): void {
+    this.runtime.reset();
+  }
+
+  /** 在 Renderer 卸载时释放运行状态监听。 */
+  dispose(): void {
+    this.runtime.dispose();
+  }
 
   /** 绑定 Scheduler 回调 */
   bindSchedulerCallbacks(): void {
@@ -49,27 +88,65 @@ export class SchedulerBinder {
       },
 
       onProgressUpdate: (_taskId, progress) => {
-        if (this.host.scheduler.currentRunningTask?.type === 'exercise') {
-          // 演习优先使用日志解析进度；若尚未解析到日志，先展示 0/默认总场次。
-          if (!this.currentProgress) {
-            this.currentProgress = `0/${this.exerciseTotal}`;
-            this.host.renderMain();
-          }
-          return;
-        }
-        this.currentProgress = `${progress.current}/${progress.total}`;
+        this.runtime.updateProgress(
+          progress.current,
+          progress.total,
+        );
         this.host.renderMain();
       },
 
-      onTaskCompleted: (taskId, success, _result, _error) => {
-        this.currentProgress = '';
-        this.resetExerciseProgress();
-        this.lastParsedLogMessage = '';
-        this.lastParsedLogTaskId = '';
-        this.lastParsedLogAt = 0;
-        this.trackedLoot = '';
-        this.trackedShip = '';
-        if (taskId === this.pendingExerciseTaskId) {
+      onTaskCompleted: (taskId, success, result, _error) => {
+        const runningTask = this.host.scheduler.currentRunningTask;
+        if (
+          runningTask?.id === taskId
+          && runningTask.logicalId === this.pendingBattleTaskId
+          && runningTask.type === 'campaign'
+        ) {
+          const details = result?.details ?? [];
+          this.pendingBattleResult = details.some(
+            detail => detail.result === CAMPAIGN_OUT_OF_TIMES_RESULT,
+          )
+            ? CAMPAIGN_OUT_OF_TIMES_RESULT
+            : (details[details.length - 1]?.result ?? null);
+          if (
+            success
+            && (result?.success_runs ?? 0) > 0
+            && this.pendingBattleConfig
+          ) {
+            const remaining = this.host.campaignDailyQuota.markCompleted(
+              this.pendingBattleConfig.campaignName,
+              this.pendingBattleConfig.target,
+            );
+            Logger.info(
+              `自动战役今日正常结算 1 次，剩余 ${remaining} 次`,
+            );
+          }
+        }
+        if (
+          runningTask?.id === taskId
+          && runningTask.logicalId === this.pendingDecisiveTaskId
+          && runningTask.type === 'decisive'
+        ) {
+          const details = result?.details ?? [];
+          const decisiveResult = details[details.length - 1]?.result;
+          this.pendingDecisiveResult =
+            typeof decisiveResult === 'string'
+              ? decisiveResult
+              : (success ? null : 'error');
+        }
+        this.runtime.reset();
+        this.host.renderMain();
+      },
+
+      onLogicalTaskCompleted: (
+        logicalId,
+        success,
+        _error,
+        countedRound,
+        completionReason,
+      ) => {
+        this.runtime.reset();
+        if (logicalId === this.pendingExerciseTaskId) {
           if (success) {
             this.host.cronScheduler.markExerciseCompleted();
           } else {
@@ -77,19 +154,97 @@ export class SchedulerBinder {
           }
           this.pendingExerciseTaskId = null;
         }
-        if (taskId === this.pendingBattleTaskId) {
-          this.host.cronScheduler.markBattleHandled();
+        if (logicalId === this.pendingBattleTaskId) {
+          const config = this.pendingBattleConfig;
+          const remaining = config
+            ? this.host.campaignDailyQuota.remaining(
+                config.campaignName,
+                config.target,
+              )
+            : 0;
+          if (remaining === 0) {
+            this.host.cronScheduler.markBattleHandled();
+          } else if (
+            this.pendingBattleResult === CAMPAIGN_OUT_OF_TIMES_RESULT
+          ) {
+            const completed = config
+              ? Math.max(0, config.target - remaining)
+              : 0;
+            Logger.warn(
+              `自动战役次数已用完，今日正常结算 ${completed}/${config?.target ?? 0} 次，剩余游戏次数 0`,
+            );
+            this.host.cronScheduler.markBattleHandled();
+          } else if (
+            config
+            && remaining < config.remainingAtStart
+          ) {
+            Logger.warn(
+              `自动战役本批已有正常结算记录，今日仍缺少 ${remaining} 次，将在下次检查时补跑`,
+            );
+            this.host.cronScheduler.clearBattlePending();
+          } else {
+            Logger.warn(
+              '自动战役本批未正常结算，单轮重试已耗尽，今日停止补跑',
+            );
+            this.host.cronScheduler.markBattleHandled();
+          }
           this.pendingBattleTaskId = null;
+          this.pendingBattleConfig = null;
+          this.pendingBattleResult = null;
         }
-        if (taskId === this.pendingLootTaskId) {
-          this.host.cronScheduler.markLootHandled();
+        if (logicalId === this.pendingDecisiveTaskId) {
+          if (
+            this.pendingDecisiveResult === 'chapter_clear'
+            || this.pendingDecisiveResult === 'leave'
+          ) {
+            this.host.cronScheduler.markDecisiveHandled();
+          } else {
+            Logger.warn('自动决战未正常结束，单轮重试已耗尽，今日停止补跑');
+            this.host.cronScheduler.markDecisiveHandled();
+          }
+          this.pendingDecisiveTaskId = null;
+          this.pendingDecisiveResult = null;
+        }
+        if (logicalId === this.pendingLootTaskId) {
+          if (completionReason === 'stop_condition') {
+            this.host.cronScheduler.markLootHandled();
+          } else {
+            Logger.warn(
+              '自动战利品本批未达到停止数量，已到达批次或重试上限，今日停止补跑',
+            );
+            this.host.cronScheduler.markLootHandled();
+          }
           this.pendingLootTaskId = null;
+        }
+        const normalFightConfig =
+          this.pendingNormalFightConfigs.get(logicalId);
+        this.pendingNormalFightConfigs.delete(logicalId);
+        if (this.pendingNormalFightTaskIds.delete(logicalId)) {
+          if (success && countedRound === true && normalFightConfig) {
+            const remaining = this.host.normalFightDailyQuota
+              .markCompleted(normalFightConfig);
+            Logger.info(
+              `自动出征今日有效完成 1 次，当前计划剩余 ${remaining} 次`,
+            );
+            this.host.refreshNormalFightRemaining();
+          }
+          if (this.pendingNormalFightTaskIds.size === 0) {
+            this.host.cronScheduler.markNormalFightHandled();
+          }
         }
         this.host.renderMain();
       },
 
+      onLogicalTaskCanceled: (logicalId, reason) => {
+        if (!this.host.scheduler.currentRunningTask) {
+          this.runtime.reset();
+        }
+        this.handleLogicalTaskCanceled(logicalId, reason);
+        this.host.renderMain();
+      },
+
       onLog: (msg) => {
-        const changed = this.consumeRuntimeLogMessage(msg.message);
+        const changed = this.runtime.consume(msg.message);
         if (changed) this.host.renderMain();
         Logger.logLevel(msg.level.toLowerCase(), msg.message, msg.channel);
       },
@@ -99,7 +254,7 @@ export class SchedulerBinder {
       },
 
       onConnectionChange: (connected) => {
-        this.wsConnected = connected;
+        this.runtime.setConnection(connected);
         this.host.updateOpsAvailability(connected);
         if (connected) {
           this.host.api.health().then(res => {
@@ -113,198 +268,75 @@ export class SchedulerBinder {
       },
 
       onExpeditionTimerTick: (seconds) => {
-        const m = Math.floor(seconds / 60);
-        const s = seconds % 60;
-        this.expeditionTimerText = `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-        const el = document.getElementById('expedition-timer');
-        if (el) el.textContent = this.expeditionTimerText;
+        this.host.updateExpeditionTimer(
+          this.runtime.updateExpeditionTimer(seconds),
+        );
       },
     });
   }
 
-  private resetExerciseProgress(): void {
-    this.exerciseCurrent = 0;
-    this.exerciseTotal = SchedulerBinder.DEFAULT_EXERCISE_TOTAL;
-    this.exerciseRoundInProgress = false;
-  }
-
   /**
-   * 后端回传战役剩余次数时，同步更新队列中战役任务的 remainingTimes。
-   * 仅当后端报告的剩余次数小于当前任务记录的剩余次数时才更新（避免覆盖用户设置）。
+   * 同步被取消的父任务。
+   * 用户删除或清空表示本时段主动放弃；系统停止则只释放 pending，
+   * 允许下次启动后重新触发。
    */
-  private updateCampaignRemains(remains: number, _total: number): void {
-    const scheduler = this.host.scheduler;
-    const running = scheduler.currentRunningTask;
-    const queue = scheduler.taskQueue;
+  private handleLogicalTaskCanceled(
+    logicalId: string,
+    reason: LogicalTaskCancelReason,
+  ): void {
+    const allowRetry = reason === 'system_stopped';
 
-    // 计算当前战役任务（运行中 + 队列中）的总待执行次数
-    let campaignRemaining = 0;
-    if (running?.type === 'campaign') {
-      campaignRemaining += running.remainingTimes;
+    if (logicalId === this.pendingExerciseTaskId) {
+      if (allowRetry) {
+        this.host.cronScheduler.clearExercisePending();
+      } else {
+        this.host.cronScheduler.markExerciseHandled();
+      }
+      this.pendingExerciseTaskId = null;
     }
-    for (const task of queue) {
-      if (task.type === 'campaign') {
-        campaignRemaining += task.remainingTimes;
+    if (logicalId === this.pendingBattleTaskId) {
+      if (allowRetry) {
+        this.host.cronScheduler.clearBattlePending();
+      } else {
+        this.host.cronScheduler.markBattleHandled();
+      }
+      this.pendingBattleTaskId = null;
+      this.pendingBattleConfig = null;
+      this.pendingBattleResult = null;
+    }
+    if (logicalId === this.pendingDecisiveTaskId) {
+      if (allowRetry) {
+        this.host.cronScheduler.clearDecisivePending();
+      } else {
+        this.host.cronScheduler.markDecisiveHandled();
+      }
+      this.pendingDecisiveTaskId = null;
+      this.pendingDecisiveResult = null;
+    }
+    if (logicalId === this.pendingLootTaskId) {
+      if (allowRetry) {
+        this.host.cronScheduler.clearLootPending();
+      } else {
+        this.host.cronScheduler.markLootHandled();
+      }
+      this.pendingLootTaskId = null;
+    }
+    this.pendingNormalFightConfigs.delete(logicalId);
+    if (this.pendingNormalFightTaskIds.delete(logicalId)) {
+      if (this.pendingNormalFightTaskIds.size !== 0) return;
+      if (allowRetry) {
+        this.host.cronScheduler.clearNormalFightPending();
+      } else {
+        this.host.cronScheduler.markNormalFightHandled();
       }
     }
-
-    // 仅当后端报告的剩余次数更小时才同步（说明有其他战役消耗了次数）
-    if (remains < campaignRemaining) {
-      const diff = campaignRemaining - remains;
-      Logger.info(`战役次数同步: 后端报告剩余 ${remains}，前端队列待执行 ${campaignRemaining}，减少 ${diff} 次`);
-
-      // 优先从队列末尾的战役任务扣减
-      for (let i = queue.length - 1; i >= 0 && diff > 0; i--) {
-        const task = queue[i];
-        if (task.type !== 'campaign') continue;
-        const deduct = Math.min(diff, task.remainingTimes);
-        task.remainingTimes -= deduct;
-        if (task.remainingTimes <= 0) {
-          scheduler.removeTask(task.id);
-        }
-      }
-      scheduler.notifyQueueChange();
-    }
   }
 
-  /**
-   * 从后端运行日志更新界面追踪状态（演习进度 + 战利品/舰船计数 + 战役次数）。
-   * 返回 true 表示有可视状态变化，需要触发 renderMain。
-   */
-  private consumeRuntimeLogMessage(message: string): boolean {
-    let changed = false;
-
-    const lootMatch = message.match(/\[UI\] 战利品数量: (\d+\/\d+)/);
-    if (lootMatch && lootMatch[1] !== this.trackedLoot) {
-      this.trackedLoot = lootMatch[1];
-      changed = true;
-    }
-
-    const shipMatch = message.match(/\[UI\] 舰船数量: (\d+\/\d+)/);
-    if (shipMatch && shipMatch[1] !== this.trackedShip) {
-      this.trackedShip = shipMatch[1];
-      changed = true;
-    }
-
-    const campaignRemainsMatch = message.match(/\[OPS\] 战役次数: (\d+)\/(\d+)/);
-    if (campaignRemainsMatch) {
-      const remains = parseInt(campaignRemainsMatch[1], 10);
-      const total = parseInt(campaignRemainsMatch[2], 10);
-      this.updateCampaignRemains(remains, total);
-      changed = true;
-    }
-
-    const running = this.host.scheduler.currentRunningTask;
-    if (running?.type !== 'exercise') return changed;
-
-    const normalized = message.trim();
-    const now = Date.now();
-    const duplicate =
-      this.lastParsedLogTaskId === running.id
-      && this.lastParsedLogMessage === normalized
-      && (now - this.lastParsedLogAt) < SchedulerBinder.LOG_DEDUP_WINDOW_MS;
-
-    if (duplicate) return changed;
-
-    const progressChanged = this.updateExerciseProgressFromLog(normalized);
-    this.lastParsedLogTaskId = running.id;
-    this.lastParsedLogMessage = normalized;
-    this.lastParsedLogAt = now;
-    return changed || progressChanged;
-  }
-
-  /**
-   * 处理后端 stdout 日志（用于 WS 日志延迟/缺失时的进度兜底）。
-   */
+  /** 处理后端 stdout 日志，作为 WebSocket 日志的进度兜底。 */
   handleBackendRuntimeLog(message: string): void {
-    if (this.consumeRuntimeLogMessage(message)) {
+    if (this.runtime.consume(message)) {
       this.host.renderMain();
     }
-  }
-
-  private updateExerciseProgressFromLog(message: string): boolean {
-    let changed = false;
-    const normalized = message.trim();
-
-    if (/(?:\[[^\]]+\]\s*)?开始演习流程/.test(normalized)) {
-      this.exerciseCurrent = 0;
-      this.exerciseRoundInProgress = false;
-      this.currentProgress = `0/${this.exerciseTotal}`;
-      return true;
-    }
-
-    const rivalMatch = normalized.match(/(?:\[[^\]]+\]\s*)?(?:当前可挑战对手|演习对手状态):\s*ExerciseRivalStatus\(\[([^\]]*)\]\)/);
-    if (rivalMatch) {
-      const flags = rivalMatch[1]
-        .split(',')
-        .map(s => s.trim().toUpperCase())
-        .filter(Boolean);
-      if (flags.length > 0) {
-        const available = flags.filter(f => f === 'Y').length;
-        const nextTotal = available > 0 ? available : flags.length;
-        if (nextTotal > 0 && nextTotal !== this.exerciseTotal) {
-          this.exerciseTotal = nextTotal;
-          changed = true;
-        }
-        if (!this.currentProgress) {
-          this.currentProgress = `0/${this.exerciseTotal}`;
-          changed = true;
-        }
-      }
-    }
-
-    // 每轮演习可能出现多条相关日志（正在挑战/选择对手/开始战斗）。
-    // 这里使用“单轮状态位”避免重复计数。
-    const hasRoundStartSignal =
-      /(?:\[[^\]]+\]\s*)?正在挑战对手\s*\d+/.test(normalized)
-      || /(?:\[[^\]]+\]\s*)?选择对手\s*\d+/.test(normalized)
-      || /(?:\[[^\]]+\]\s*)?演习\s*[->→]\s*开始战斗/.test(normalized);
-
-    if (hasRoundStartSignal && !this.exerciseRoundInProgress) {
-      this.exerciseRoundInProgress = true;
-      this.exerciseCurrent += 1;
-      if (this.exerciseCurrent > this.exerciseTotal) {
-        this.exerciseTotal = this.exerciseCurrent;
-      }
-      const next = `${this.exerciseCurrent}/${this.exerciseTotal}`;
-      if (next !== this.currentProgress) {
-        this.currentProgress = next;
-        changed = true;
-      }
-    }
-
-    if (/(?:\[[^\]]+\]\s*)?战斗结束:\s*/.test(normalized)) {
-      // 兜底：若某些后端版本缺失“挑战/选择/开始战斗”日志，则在战斗结束时补计一轮。
-      if (!this.exerciseRoundInProgress) {
-        this.exerciseCurrent += 1;
-        if (this.exerciseCurrent > this.exerciseTotal) {
-          this.exerciseTotal = this.exerciseCurrent;
-        }
-        const next = `${this.exerciseCurrent}/${this.exerciseTotal}`;
-        if (next !== this.currentProgress) {
-          this.currentProgress = next;
-          changed = true;
-        }
-      }
-      this.exerciseRoundInProgress = false;
-    }
-
-    const finishedMatch = normalized.match(/(?:\[[^\]]+\]\s*)?演习流程结束,\s*共完成\s*(\d+)\s*场/);
-    if (finishedMatch) {
-      const done = parseInt(finishedMatch[1], 10);
-      if (Number.isFinite(done) && done >= 0) {
-        this.exerciseCurrent = done;
-        this.exerciseRoundInProgress = false;
-        if (done > this.exerciseTotal) this.exerciseTotal = done;
-        const next = `${this.exerciseCurrent}/${this.exerciseTotal}`;
-        if (next !== this.currentProgress) {
-          this.currentProgress = next;
-          changed = true;
-        }
-      }
-    }
-
-    return changed;
   }
 
   /** 绑定定时调度器回调 */
@@ -324,15 +356,31 @@ export class SchedulerBinder {
       },
 
       onCampaignDue: (campaignName, times) => {
+        const remaining = this.host.campaignDailyQuota.remaining(
+          campaignName,
+          times,
+        );
+        if (remaining === 0) {
+          this.host.cronScheduler.markBattleHandled();
+          return;
+        }
         const id = this.host.scheduler.addTask(
           `自动战役·${campaignName}`,
           'campaign',
           { type: 'campaign', campaign_name: campaignName, times: 1 },
           TaskPriority.DAILY,
-          times,
+          remaining,
         );
         this.pendingBattleTaskId = id;
-        Logger.info(`自动战役已加入队列 (${campaignName} ×${times})`);
+        this.pendingBattleConfig = {
+          campaignName,
+          target: times,
+          remainingAtStart: remaining,
+        };
+        this.pendingBattleResult = null;
+        Logger.info(
+          `自动战役已加入队列 (${campaignName}，剩余结算 ${remaining} 次)`,
+        );
         this.host.scheduler.startConsuming();
       },
 
@@ -340,8 +388,28 @@ export class SchedulerBinder {
         Logger.info(`定时任务「${taskKey}」已触发`);
       },
 
-      onLootDue: (planIndex, stopCount) => {
-        this.autoLoadLootTask(planIndex, stopCount);
+      onLootDue: (source, planId, stopCount) => {
+        void this.enqueueLootTask(source, planId, stopCount);
+      },
+
+      canStartNormalFight: () => {
+        const tasks = this.host.configModel.current
+          .daily_automation
+          .normal_fight_tasks;
+        const hasRemaining = this.host.normalFightDailyQuota.hasRemaining(
+          tasks,
+        );
+        const completelyIdle = this.host.scheduler.isCompletelyIdle;
+        this.host.refreshNormalFightRemaining();
+        return completelyIdle && hasRemaining;
+      },
+
+      onNormalFightDue: () => {
+        void this.enqueueNormalFightTasks();
+      },
+
+      onDecisiveDue: (source) => {
+        void this.enqueueDecisiveTask(source);
       },
 
       onLog: (level, message) => {
@@ -350,59 +418,73 @@ export class SchedulerBinder {
     });
   }
 
-  /** 自动战利品：加载内置捞胖次方案并加入队列 */
-  private async autoLoadLootTask(planIndex: number, stopCount: number): Promise<void> {
-    const tpl = this.host.templateModel.get('builtin_farm_loot');
-    if (!tpl) {
-      Logger.error('自动战利品：未找到内置 builtin_farm_loot 模板');
-      this.host.cronScheduler.clearLootPending();
-      return;
-    }
-    const paths = tpl.planPaths ?? [];
-    const planPath = paths[planIndex] ?? paths[0];
-    if (!planPath) {
-      Logger.error('自动战利品：模板缺少方案文件');
-      this.host.cronScheduler.clearLootPending();
-      return;
-    }
-    const bridge = window.electronBridge;
-    if (!bridge) {
-      this.host.cronScheduler.clearLootPending();
-      return;
-    }
+  private async enqueueDecisiveTask(
+    source: DecisiveAutomationSource,
+  ): Promise<void> {
     try {
-      const content = await bridge.readFile(planPath);
-      const plan = PlanModel.fromYaml(content, planPath);
-      const resolvedPlanId = await bridge.resolveAppPath(plan.fileName);
-      const req: NormalFightReq = {
-        type: 'normal_fight',
-        plan_id: resolvedPlanId,
-        times: 1,
-        gap: plan.data.gap ?? 0,
-      };
-      if (plan.data.selected_nodes.length > 0) {
-        req.plan = req.plan ?? {};
-        req.plan.selected_nodes = normalizeSelectedNodesForBackend(plan.data.selected_nodes);
-        // 与普通出击一致：避免后端把 plan.fleet_id 默认成 1 覆盖 YAML 内舰队。
-        if (plan.data.fleet_id != null) {
-          req.plan.fleet_id = plan.data.fleet_id;
-        }
-      }
-      const stopCondition = { loot_count_ge: stopCount };
-      const id = this.host.scheduler.addTask(
-        `自动刷胖次·${plan.mapName}`,
-        'normal_fight',
-        req,
-        TaskPriority.DAILY,
-        99,
-        stopCondition,
+      this.pendingDecisiveTaskId = await this.taskLoader
+        .loadDecisiveTask(source);
+    } catch (error) {
+      Logger.error(
+        `自动决战加载失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
       );
-      this.pendingLootTaskId = id;
-      Logger.info(`自动战利品已加入队列 (${plan.mapName}, 战利品≥${stopCount}时停止)`);
+      this.host.cronScheduler.clearDecisivePending();
+    }
+  }
+
+  private async enqueueNormalFightTasks(): Promise<void> {
+    try {
+      const result = await this.taskLoader.loadNormalFightTasks();
+      if (result.status === 'handled') {
+        this.host.cronScheduler.markNormalFightHandled();
+        return;
+      }
+      if (result.status === 'retry') {
+        this.host.cronScheduler.clearNormalFightPending();
+        return;
+      }
+      for (const task of result.tasks) {
+        this.pendingNormalFightTaskIds.add(task.taskId);
+        this.pendingNormalFightConfigs.set(
+          task.taskId,
+          structuredClone(task.config),
+        );
+      }
       this.host.scheduler.startConsuming();
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      Logger.error(`自动战利品加载失败: ${msg}`);
+    } catch (error) {
+      Logger.error(
+        `自动出征加载失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+      this.host.cronScheduler.clearNormalFightPending();
+    }
+  }
+
+  private async enqueueLootTask(
+    source: LootPlanSource,
+    planId: string,
+    stopCount: number,
+  ): Promise<void> {
+    try {
+      const taskId = await this.taskLoader.loadLootTask(
+        source,
+        planId,
+        stopCount,
+      );
+      if (taskId) {
+        this.pendingLootTaskId = taskId;
+        return;
+      }
+      this.host.cronScheduler.clearLootPending();
+    } catch (error) {
+      Logger.error(
+        `自动战利品加载失败: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
       this.host.cronScheduler.clearLootPending();
     }
   }

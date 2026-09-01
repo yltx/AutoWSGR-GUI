@@ -1,14 +1,23 @@
+/** 提供方案、舰队和任务参数的模板选择流程。 */
 /**
  * selectors —— 模板使用时的选择弹窗逻辑。
  */
 import type { TemplateWizardView } from '../../view/template/TemplateWizardView';
 import type { TaskGroupModel } from '../../model/TaskGroupModel';
-import type { TaskTemplate } from '../../types/model';
-import type { SelectorOption } from '../../types/view';
-import { shipSlotLabel, toBackendName } from '../../data/shipData';
+import type {
+  FleetPreset,
+  PlanData,
+  TaskTemplate,
+} from '../../types/model.js';
+import type { SelectorOption } from '../../types/view.js';
+import { shipSlotLabel } from '../../model/fleet/ShipMatcher';
 import { Logger } from '../../utils/Logger';
 import { addPlanToTaskList } from './useTemplate';
-import { showAlert } from '../shared/DialogHelper';
+import { yamlCodec } from '../../adapter';
+import {
+  getTemplateRepository,
+  type TemplateRepository,
+} from '../../adapter/IpcAdapter.js';
 
 const CAMPAIGN_OPTIONS: string[] = [
   '困难潜艇', '困难航母', '困难驱逐', '困难巡洋', '困难战列',
@@ -23,65 +32,26 @@ const DECISIVE_CHAPTERS = [
 
 const NORMAL_FLEET_IDS = [1, 2, 3, 4] as const;
 
-function normalizeShipName(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  return toBackendName(trimmed);
-}
-
-/**
- * 判断编队预设是否“需要改编队内舰船”。
- * 规则：
- * 1) 含筛选对象槽位时，视为需要自动改编；
- * 2) 与方案默认 fleet 配置逐槽位不一致时，视为需要自动改编。
- */
-function presetRequiresFleetRewrite(rawPreset: unknown, planFleet: unknown): boolean {
-  const ships = Array.isArray((rawPreset as { ships?: unknown[] })?.ships)
-    ? ((rawPreset as { ships: unknown[] }).ships)
-    : [];
-  if (ships.length === 0) return false;
-
-  if (ships.some((slot) => typeof slot !== 'string')) {
-    return true;
-  }
-
-  const baseFleet = Array.isArray(planFleet) ? planFleet : [];
-  if (baseFleet.length === 0) {
-    return true;
-  }
-
-  if (ships.length !== baseFleet.length) {
-    return true;
-  }
-
-  for (let i = 0; i < ships.length; i++) {
-    const target = normalizeShipName(ships[i]);
-    const current = normalizeShipName(baseFleet[i]);
-    if (target !== current) {
-      return true;
-    }
-  }
-
-  return false;
-}
-
 async function showNormalFightFleetSelector(
   templateName: string,
   planName: string,
   defaultFleetId: number,
   wizardView: TemplateWizardView,
-): Promise<number | null> {
-  const options: SelectorOption[] = NORMAL_FLEET_IDS.map((fleetId) => ({
-    icon: '⚓',
-    label: fleetId === defaultFleetId
-      ? `第 ${fleetId} 分队（默认${fleetId === 1 ? '，不支持自动改编' : ''}）`
-      : `第 ${fleetId} 分队${fleetId === 1 ? '（不支持自动改编）' : ''}`,
-  }));
+): Promise<number | undefined | null> {
+  const options: SelectorOption[] = [
+    { icon: '📄', label: '仅使用方案，不指定编队预设' },
+    ...NORMAL_FLEET_IDS.map((fleetId) => ({
+      icon: '⚓',
+      label: fleetId === defaultFleetId
+        ? `第 ${fleetId} 分队（默认）`
+        : `第 ${fleetId} 分队`,
+    })),
+  ];
 
-  const result = await wizardView.showSelector(`「${templateName} / ${planName}」— 选择使用分队（自动改编不支持第1分队）`, options);
+  const result = await wizardView.showSelector(`「${templateName} / ${planName}」— 选择使用分队`, options);
   if (!result) return null;
-  return NORMAL_FLEET_IDS[result.index] ?? null;
+  if (result.index === 0) return undefined;
+  return NORMAL_FLEET_IDS[result.index - 1] ?? null;
 }
 
 /** 方案选择器（多方案模板） */
@@ -92,6 +62,7 @@ export async function showPlanSelector(
   wizardView: TemplateWizardView,
   taskGroupModel: TaskGroupModel,
   renderTaskGroup: () => void,
+  repository: TemplateRepository | undefined = getTemplateRepository(),
 ): Promise<void> {
   const options: SelectorOption[] = paths.map(p => ({
     icon: '📄',
@@ -105,24 +76,36 @@ export async function showPlanSelector(
   const planPath = paths[idx];
   const planName = planPath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? planPath;
 
-  let parsedPlan: Record<string, unknown> | undefined;
+  // 选完方案后直接加入任务列表（无需编队预设选择）的公共步骤
+  const addPlanDirect = (): void => {
+    addPlanToTaskList(tpl, planPath, groupName, taskGroupModel);
+    taskGroupModel.save();
+    renderTaskGroup();
+    Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}）`);
+  };
 
-  const bridge = window.electronBridge;
-  if (bridge) {
+  let parsedPlan: Partial<PlanData> | undefined;
+
+  if (repository) {
     try {
-      const content = await bridge.readFile(planPath);
-      parsedPlan = (await import('js-yaml')).load(content) as Record<string, unknown>;
-      const rawPresets = Array.isArray(parsedPlan?.fleet_presets) ? parsedPlan.fleet_presets as any[] : [];
+      const content = await repository.readFile(planPath);
+      parsedPlan = yamlCodec.parse<Partial<PlanData>>(content);
+      const rawPresets = Array.isArray(parsedPlan?.fleet_presets)
+        ? parsedPlan.fleet_presets
+        : [];
       if (rawPresets.length > 0) {
         let defaultFleetId = tpl.fleet_id ?? 1;
         const rawFleetId = Number(parsedPlan?.fleet_id);
         if (Number.isFinite(rawFleetId) && rawFleetId >= 1 && rawFleetId <= 4) {
           defaultFleetId = rawFleetId;
         }
-        const planFleet = Array.isArray(parsedPlan?.fleet) ? parsedPlan.fleet : [];
 
         const selectedFleetId = await showNormalFightFleetSelector(tpl.name, planName, defaultFleetId, wizardView);
-        if (selectedFleetId == null) return;
+        if (selectedFleetId === null) return;
+        if (selectedFleetId === undefined) {
+          addPlanDirect();
+          return;
+        }
 
         await showFleetPresetPicker(
           tpl,
@@ -133,36 +116,31 @@ export async function showPlanSelector(
           taskGroupModel,
           renderTaskGroup,
           selectedFleetId,
-          planFleet,
         );
         return;
       }
     } catch { /* 忽略读取失败 */ }
   }
 
-  addPlanToTaskList(tpl, planPath, groupName, taskGroupModel);
-  taskGroupModel.save();
-  renderTaskGroup();
-  Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}）`);
+  addPlanDirect();
 }
 
 /** 编队预设多选器 */
 export async function showFleetPresetPicker(
   tpl: TaskTemplate,
   planPath: string,
-  rawPresets: any[],
+  rawPresets: FleetPreset[],
   groupName: string,
   wizardView: TemplateWizardView,
   taskGroupModel: TaskGroupModel,
   renderTaskGroup: () => void,
   selectedFleetId: number,
-  planFleet: unknown[] = [],
 ): Promise<void> {
   const planName = planPath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? '';
-  const options: SelectorOption[] = rawPresets.map((p: any, i: number) => {
+  const options: SelectorOption[] = rawPresets.map((p, i) => {
     const pName = p.name ?? `预设${i + 1}`;
     const ships = Array.isArray(p.ships) ? p.ships : [];
-    const shipsHtml = ships.map((s: any) => {
+    const shipsHtml = ships.map((s) => {
       if (typeof s === 'string') return `<span class="ship-tag">${s}</span>`;
       const label = shipSlotLabel(s);
       return `<span class="ship-tag ship-tag-filter">${label}</span>`;
@@ -173,18 +151,9 @@ export async function showFleetPresetPicker(
   const indices = await wizardView.showMultiSelector(`「${planName}」— 选择编队（可多选）`, options);
   if (indices.length === 0) return;
 
-  const fallbackPresetNames: string[] = [];
   for (const idx of indices) {
     const preset = rawPresets[idx];
     const presetName = preset?.name ?? '';
-    const needRewrite = presetRequiresFleetRewrite(preset, planFleet);
-    const autoFleetFallback = selectedFleetId === 1 && needRewrite;
-    const effectiveFleetId = autoFleetFallback ? 2 : selectedFleetId;
-
-    if (autoFleetFallback) {
-      fallbackPresetNames.push(presetName || `预设${idx + 1}`);
-    }
-
     addPlanToTaskList(
       tpl,
       planPath,
@@ -192,25 +161,13 @@ export async function showFleetPresetPicker(
       taskGroupModel,
       idx,
       presetName,
-      effectiveFleetId,
-      autoFleetFallback,
+      selectedFleetId,
     );
   }
   taskGroupModel.save();
   renderTaskGroup();
   const names = indices.map(i => rawPresets[i]?.name ?? '').join(', ');
-  if (fallbackPresetNames.length > 0) {
-    const fallbackText = fallbackPresetNames.join('、');
-    Logger.warn(`模板「${tpl.name}」中的编队预设「${fallbackText}」需要自动改编，第1分队不支持，已自动改用第2分队并写入任务配置`);
-    await showAlert(
-      '分队已自动调整',
-      `以下预设需要自动改编，后端不支持对第1分队自动编队，已自动改为第2分队并保存到任务组配置：\n${fallbackText}`,
-    );
-  }
-  const fallbackSuffix = fallbackPresetNames.length > 0
-    ? `, 自动调整${fallbackPresetNames.length}项到第2分队`
-    : '';
-  Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}, 分队: ${selectedFleetId}${fallbackSuffix}, 编队预设: ${names}）`);
+  Logger.info(`模板「${tpl.name}」→ 已加入任务列表「${groupName}」（方案: ${planName}, 分队: ${selectedFleetId}, 编队预设: ${names}）`);
 }
 
 /** 战役类型选择器 */

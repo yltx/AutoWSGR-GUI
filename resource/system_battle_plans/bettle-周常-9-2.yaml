@@ -1,0 +1,46 @@
+chapter: 9
+map: 2
+selected_nodes: ['0', A, D, G, H, M, O]
+endpoint_nodes: [O]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  A:
+    SL_when_detour_fails: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  D:
+    SL_when_detour_fails: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  G:
+    SL_when_detour_fails: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  H:
+    SL_when_detour_fails: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  M:
+    SL_when_detour_fails: true
+    detour: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  O:
+    formation: 4
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+fleet_id: 3
+result: S
+fleet_presets:
+  - name: 85AIII4防驱队

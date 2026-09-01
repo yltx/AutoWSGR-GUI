@@ -67,6 +67,13 @@ select.input {
   cursor: pointer;
 }
 
+select,
+select option,
+select optgroup {
+  color: var(--select-text);
+  background-color: var(--select-bg);
+}
+
 .config-actions {
   margin-top: 24px;
 }
@@ -129,7 +136,7 @@ input[type="checkbox"]:checked::after {
   top: 1px;
   width: 5px;
   height: 9px;
-  border: solid #fff;
+  border: solid var(--accent-foreground);
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }

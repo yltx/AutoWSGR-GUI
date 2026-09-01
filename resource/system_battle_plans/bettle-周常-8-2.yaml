@@ -1,0 +1,27 @@
+chapter: 8
+map: 2
+selected_nodes: ['0', B, J, M]
+endpoint_nodes: [M]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  B:
+    enemy_rules:
+      - [SS >= 1, 5]
+  J:
+    enemy_rules:
+      - [SS >= 1, 5]
+  M:
+    formation: 4
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+fleet_id: 3
+result: S
+fleet_presets:
+  - name: 大淀85AIII队

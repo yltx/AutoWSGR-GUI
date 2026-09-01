@@ -1,126 +1,561 @@
 /* ═══ 编队预设选择器 ═══ */
 .fleet-preset-card {
+  flex: 0 0 auto;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 8px 10px;
-  margin-bottom: 6px;
+  margin-bottom: 0;
+  overflow: hidden;
 }
 
 .fleet-preset-header {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 0;
+}
+
+.fleet-preset-header .btn {
+  flex: 0 0 auto;
+  height: 22px;
+  padding: 2px 7px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .fleet-preset-title {
-  font-size: 13px;
-  font-weight: 600;
-  margin: 0;
+  flex: 0 0 auto;
 }
 
-.fleet-preset-actions {
+.fleet-binding-list {
   display: flex;
-  gap: 4px;
-}
-
-.fleet-preset-list {
-  display: flex;
+  min-height: 42px;
   flex-direction: column;
   gap: 4px;
-}
-
-.fleet-preset-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 5px 8px;
+  margin-top: 5px;
+  border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all 0.15s;
-  background: transparent;
-  position: relative;
+  transition: border-color 0.15s, background 0.15s;
 }
 
-.fleet-preset-item:hover {
+.fleet-binding-list.drag-active {
+  background: var(--accent-subtle);
+  border-color: var(--accent);
+}
+
+.fleet-binding-record.fleet-team-loader-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: row;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0;
+  padding: 0;
+  cursor: default;
+}
+
+.fleet-binding-record:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent);
+}
+
+.fleet-binding-preview {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 7px 5px 7px 8px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.fleet-binding-remove {
+  width: 26px;
+  flex: 0 0 26px;
+  align-self: stretch;
+  color: var(--text-muted);
+  background: transparent;
+  border: 0;
+  border-left: 1px solid var(--border);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fleet-binding-remove:hover {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+.fleet-binding-empty {
+  min-height: 32px;
+}
+
+.fleet-selector-panel {
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 8px 10px;
+  overflow: hidden;
+}
+
+.fleet-selector-panel .plan-right-header {
+  align-items: center;
+  gap: 6px;
+}
+
+.fleet-selector-panel .plan-right-header > div {
+  min-width: 0;
+}
+
+.fleet-selector-heading {
+  display: flex;
+  min-width: 130px;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.fleet-selector-panel .plan-right-header h3 {
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 26px;
+}
+
+.fleet-selector-panel .plan-right-header p {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-selector-close {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  color: var(--text-secondary);
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 17px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.fleet-selector-close:hover {
+  color: var(--text);
   background: var(--bg-hover);
   border-color: var(--border-strong);
 }
 
-.fleet-preset-item.selected {
+.fleet-selector-search-row {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+
+  .input {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  > span {
+    flex: 0 0 auto;
+    color: var(--text-secondary);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+}
+
+.fleet-selector-panel .fleet-selector-tools {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 4px;
+  margin: 0 0 6px;
+}
+
+.fleet-selector-content {
+  display: grid;
+  grid-template-columns: minmax(190px, 0.68fr) minmax(0, 1.32fr);
+  flex: 1 1 auto;
+  min-height: 0;
+  gap: 8px;
+}
+
+.fleet-selector-content > .fleet-selector-team-list.fleet-team-loader-list {
+  display: flex;
+  min-height: 0;
+  max-height: none;
+}
+
+.fleet-preset-item.fleet-team-loader-item {
+  display: flex;
+  width: 100%;
+  min-height: 54px;
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-align: left;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: grab;
+  transition: all 0.15s;
+}
+
+.fleet-preset-item.fleet-team-loader-item:active {
+  cursor: grabbing;
+}
+
+.fleet-preset-item.dragging {
+  opacity: 0.52;
+}
+
+.fleet-preset-item.fleet-team-loader-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+
+.fleet-preset-item.fleet-team-loader-item.selected {
   border-color: var(--accent);
   background: var(--accent-subtle);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
-.fleet-preset-item.unavailable {
-  opacity: 0.45;
-  cursor: not-allowed;
+.fleet-preset-item.previewing .fleet-preset-preview-button {
+  background: var(--bg-hover);
 }
 
-.fleet-preset-row {
+.fleet-preset-preview-button {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.fleet-preset-name {
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.fleet-preset-item-actions {
-  display: none;
-  gap: 2px;
-}
-
-.fleet-preset-item:hover .fleet-preset-item-actions {
-  display: flex;
-}
-
-.fleet-preset-item-actions button {
-  font-size: 12px;
-  padding: 2px 8px;
-  line-height: 20px;
-  border: none;
-  background: var(--bg-inset);
-  color: var(--text-muted);
-  border-radius: 4px;
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  padding: 6px 5px 6px 8px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
   cursor: pointer;
 }
 
-.fleet-preset-item-actions button:hover {
+.fleet-preset-preview-button .fleet-team-loader-item-heading {
+  flex: 0 0 auto;
+}
+
+.fleet-preset-preview-button:hover {
   background: var(--bg-hover);
-  color: var(--text);
 }
 
-.fleet-preset-item-actions button.btn-delete:hover {
-  color: var(--danger);
+.fleet-preset-name {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.fleet-preset-ships {
-  font-size: 11px;
+.fleet-team-meta {
+  display: block;
+  width: 100%;
+  overflow: hidden;
   color: var(--text-secondary);
+  font-size: 10px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-team-card-details {
   display: flex;
-  flex-wrap: wrap;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.fleet-team-card-details .fleet-team-meta {
+  width: auto;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.fleet-team-card-modified {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.fleet-team-empty {
+  display: grid;
+  min-height: 42px;
+  place-items: center;
+  padding: 6px 10px;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-align: center;
+}
+
+.fleet-team-preview {
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  padding: 7px 8px;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-y: auto;
+
+  h3,
+  h4 {
+    margin: 3px 0 4px;
+    color: var(--text);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}
+
+.fleet-team-preview-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.fleet-team-preview-heading h3 {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fleet-team-preview-hint {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fleet-team-main-preview {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 128px));
+  gap: 6px;
+  width: 100%;
+  max-width: 1602px;
+  min-height: 0;
+  padding: 1px 2px 5px;
+}
+
+.fleet-team-main-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
   gap: 3px;
 }
 
-.fleet-preset-ships .ship-tag {
+.fleet-team-main-card {
+  position: relative;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 128 / 200;
+  padding: 0;
+  overflow: hidden;
+  color: #fff;
   background: var(--bg-inset);
-  padding: 0 5px;
-  border-radius: var(--radius-pill);
-  font-size: 10px;
-  line-height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  appearance: none;
 }
 
-.fleet-preset-ships .ship-tag.ship-missing {
-  color: var(--danger);
-  background: var(--danger-bg);
+.fleet-team-main-card > .fleet-ship-artwork {
+  width: 100%;
+  height: 100%;
 }
 
-.fleet-preset-ships .ship-tag.ship-tag-filter {
-  background: var(--accent-subtle);
-  color: var(--accent);
-  border: 1px dashed var(--accent);
-  font-style: italic;
+.fleet-team-main-card .fleet-ship-type-icon {
+  top: 2%;
+  right: 2%;
+  width: 30%;
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.fleet-team-main-card .fleet-ship-name {
+  right: 4%;
+  bottom: 3%;
+  left: 4%;
+  min-height: 18%;
+  padding: 2px 3px;
+}
+
+.fleet-team-main-card .fleet-ship-name-text {
+  font-size: clamp(7px, 1vw, 11px);
+}
+
+.fleet-team-main-card:hover,
+.fleet-team-main-card.active {
+  border-color: var(--accent);
+}
+
+.fleet-team-main-card.active {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.fleet-team-level-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--text-secondary);
+  font-size: 9px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.fleet-team-backup-preview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 64px);
+  gap: 4px;
+  width: 100%;
+  max-width: 812px;
+  min-height: 100px;
+  padding: 1px 2px 8px;
+}
+
+.fleet-team-backup-group {
+  flex: 0 0 auto;
+}
+
+.fleet-team-backup-label {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  text-align: center;
+}
+
+.fleet-team-backup-cards {
+  display: flex;
+  gap: 4px;
+}
+
+.fleet-team-backup-card {
+  position: relative;
+  flex: 0 0 64px;
+  width: 64px;
+  height: 100px;
+  color: #fff;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+
+  > .fleet-ship-artwork {
+    width: 100%;
+    height: 100%;
+  }
+
+  .fleet-ship-type-icon {
+    top: 2%;
+    right: 2%;
+    width: 30%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+}
+
+.fleet-team-card-empty {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  padding: 6px;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+}
+
+.fleet-team-backup-card .fleet-team-card-empty {
+  font-size: 9px;
+}
+
+.fleet-team-main-card.candidate-only {
+  background:
+    linear-gradient(
+      145deg,
+      #b65b8f,
+      #4f87b9 46%,
+      #8b63b5
+    );
+}
+
+.fleet-team-placeholder-background {
+  position: absolute;
+  z-index: 0;
+  top: -8%;
+  left: 50%;
+  width: 132%;
+  height: auto;
+  max-width: none;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.fleet-team-main-card.candidate-only .fleet-team-card-empty {
+  width: auto;
+  height: auto;
+  margin: auto;
+  padding: 8px 14px;
+  color: #ffd75e;
+  background: rgba(0, 0, 0, 0.68);
+  border: 1px solid rgba(255, 215, 94, 0.3);
+  border-radius: 7px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-shadow: 0 1px 3px #000;
+}
+
+.fleet-team-backup-preview > .fleet-team-empty {
+  grid-column: 1 / -1;
 }

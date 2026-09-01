@@ -4448,8 +4448,8 @@
     },
     {
       "id": 273,
-      "name": "塞尔弗里奇",
-      "search_name": "塞尔弗里奇",
+      "name": "赛尔弗里吉",
+      "search_name": "赛尔弗里吉",
       "variant": "normal",
       "rarity": 3,
       "ship_type": "dd",
@@ -4864,8 +4864,8 @@
     },
     {
       "id": 299,
-      "name": "让巴尔",
-      "search_name": "让巴尔",
+      "name": "让·巴尔",
+      "search_name": "让·巴尔",
       "variant": "normal",
       "rarity": 5,
       "ship_type": "bb",
@@ -13360,8 +13360,8 @@
     },
     {
       "id": 1273,
-      "name": "塞尔弗里奇·改",
-      "search_name": "塞尔弗里奇",
+      "name": "赛尔弗里吉·改",
+      "search_name": "赛尔弗里吉",
       "variant": "refit",
       "rarity": 4,
       "ship_type": "dd",
@@ -13520,8 +13520,8 @@
     },
     {
       "id": 1299,
-      "name": "让巴尔·改",
-      "search_name": "让巴尔",
+      "name": "让·巴尔·改",
+      "search_name": "让·巴尔",
       "variant": "refit",
       "rarity": 6,
       "ship_type": "bbg",

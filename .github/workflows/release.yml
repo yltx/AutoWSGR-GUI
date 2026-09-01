@@ -6,9 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
     inputs:
-      prerelease:
-        description: '标记为预发布'
-        required: false
+      publish:
+        description: 'Create GitHub Releases after all gates pass'
+        required: true
         type: boolean
         default: false
 
@@ -32,8 +32,19 @@ jobs:
             $pkg = Get-Content package.json | ConvertFrom-Json
             $ver = $pkg.version
           }
+          if ($ver -match '^\d+\.\d+\.\d+$') {
+            $channel = 'latest'
+            $prerelease = 'false'
+          } elseif ($ver -match '^\d+\.\d+\.\d+-alpha(?:\.\d+)?$') {
+            $channel = 'alpha'
+            $prerelease = 'true'
+          } else {
+            throw "发布版本 $ver 必须是 X.Y.Z 或 X.Y.Z-alpha[.N]"
+          }
           echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
-          echo "Resolved version: $ver"
+          echo "CHANNEL=$channel" >> $env:GITHUB_OUTPUT
+          echo "PRERELEASE=$prerelease" >> $env:GITHUB_OUTPUT
+          echo "Resolved release version: $ver ($channel)"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -44,44 +55,223 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Sync package.json version
+      - name: Verify checked-in release version
         shell: pwsh
         run: |
           $pkg = Get-Content package.json | ConvertFrom-Json
-          $pkg.version = "${{ steps.version.outputs.VERSION }}"
-          $pkg | ConvertTo-Json -Depth 10 | Set-Content package.json -Encoding UTF8
+          $lockVersion = node -p "require('./package-lock.json').version"
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取 package-lock.json 版本"
+          }
+          $lockRootVersion = node -p "require('./package-lock.json').packages[''].version"
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取 package-lock.json 根包版本"
+          }
+          if ($pkg.version -ne "${{ steps.version.outputs.VERSION }}") {
+            throw "package.json 版本与 tag 不一致"
+          }
+          if ($lockVersion -ne $pkg.version -or $lockRootVersion -ne $pkg.version) {
+            throw "package-lock.json 版本与 package.json 不一致"
+          }
+          $expectedChannel = "${{ steps.version.outputs.CHANNEL }}"
+          if ($expectedChannel -notin @('latest', 'alpha')) {
+            throw "发布频道无效: $expectedChannel"
+          }
+
+      - name: Preflight release destinations
+        if: github.event_name != 'workflow_dispatch' || inputs.publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          $releases = gh api `
+            "repos/${{ github.repository }}/releases?per_page=100" |
+            ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) {
+            throw "无法读取当前仓库 Release 列表"
+          }
+          if ($releases.tag_name -contains "v$version") {
+            throw "当前仓库已存在 v$version Release"
+          }
+
+      - name: Verify pinned stable backend
+        id: backend
+        shell: pwsh
+        run: |
+          $manifest = Get-Content build/backend-distribution.json |
+            ConvertFrom-Json
+          if ($manifest.id -ne "stable") {
+            throw "后端发行清单必须使用 stable id"
+          }
+          if ($manifest.commit -notmatch '^[0-9a-f]{40}$') {
+            throw "后端发行清单必须固定到明确提交"
+          }
+          echo "repository=$($manifest.repository)" >> $env:GITHUB_OUTPUT
+          echo "commit=$($manifest.commit)" >> $env:GITHUB_OUTPUT
+          echo "Pinned backend: $($manifest.repository)@$($manifest.commit)"
+
+      - name: Checkout pinned AutoWSGR backend
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.backend.outputs.repository }}
+          ref: ${{ steps.backend.outputs.commit }}
+          path: AutoWSGR
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install pinned backend dependencies
+        shell: pwsh
+        run: |
+          uv sync --project AutoWSGR --no-dev
+          uv pip install `
+            --python AutoWSGR/.venv/Scripts/python.exe `
+            "requests>=2.32.5" `
+            "beautifulsoup4>=4.12.0"
+
+      - name: Run stable release gates
+        shell: pwsh
+        run: |
+          Remove-Item Env:ELECTRON_RUN_AS_NODE -ErrorAction SilentlyContinue
+          node scripts/sync-map-resources.js --backend "${{ github.workspace }}/AutoWSGR" --check
+          npm run test:build
+          node scripts/test-ship-library-contract.js
+          npm run test:migrations
+          npm run test:main-services
+          npm run test:main-ipc
+          npm run test:scheduler-domain
+          npm run test:fleet-domain
+          npm run test:settings
+          npm run test:python-environment
+          npm run test:backend-distribution
+          npm run test:event-resources
+          npm run test:plan-management-delete
+          npm run test:daily-sortie-stats
+          npm run test:ship-library-updater
+          npm run test:ocr-log-analyzer
+          npm run test:map-intel
+          $env:AUTOWSGR_REPO = "${{ github.workspace }}/AutoWSGR"
+          $env:AUTOWSGR_PYTHON = "${{ github.workspace }}/AutoWSGR/.venv/Scripts/python.exe"
+          npm run test:api-contract
 
       - name: Build & Package
         run: npm run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List release artifacts
         shell: pwsh
         run: Get-ChildItem -Path release -Recurse -File | Select-Object FullName, Length
 
-      - name: Create Release
+      - name: Verify packaged runtime and resources
+        run: npm run test:release-package
+        env:
+          AUTOWSGR_RELEASE_VERSION: ${{ steps.version.outputs.VERSION }}
+
+      - name: Verify update channel metadata
+        shell: pwsh
+        run: |
+          $channel = "${{ steps.version.outputs.CHANNEL }}"
+          $releaseRoot = Join-Path release $channel
+          $expected = Join-Path $releaseRoot "$channel.yml"
+          if (-not (Test-Path $expected)) {
+            throw "缺少 $channel 更新清单: $expected"
+          }
+          @('latest', 'alpha', 'beta', 'dev') |
+            Where-Object { $_ -ne $channel } |
+            ForEach-Object {
+              $unexpected = Join-Path $releaseRoot "$_.yml"
+              if (Test-Path $unexpected) {
+                throw "发布产物混入其他频道清单: $unexpected"
+              }
+            }
+
+      - name: Create Alpha Release
+        if: >-
+          steps.version.outputs.CHANNEL == 'alpha'
+          && (github.event_name != 'workflow_dispatch' || inputs.publish)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.version.outputs.VERSION }}
           name: AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
-          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          prerelease: true
           generate_release_notes: true
           files: |
-            release/*-Setup-*.exe
-            release/*.exe.blockmap
-            release/latest.yml
+            release/alpha/AutoWSGR-GUI-Setup-*.exe
+            release/alpha/*.exe.blockmap
+            release/alpha/alpha.yml
           body: |
             ## AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
 
-            ### 使用方法
-            1. 下载 `AutoWSGR-GUI-Setup-*.exe`（安装版）
+            本版本使用 `alpha` 更新频道。此版本为 Stable 迁移桥，默认继续接收
+            Alpha，并允许用户切换到 Stable 更新轨道。
+
+            首次运行 managed 模式会安装本版本固定的 AutoWSGR 后端，需要联网。
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Stable Release
+        if: >-
+          steps.version.outputs.CHANNEL == 'latest'
+          && (github.event_name != 'workflow_dispatch' || inputs.publish)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          name: AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
+          prerelease: false
+          draft: true
+          generate_release_notes: true
+          files: |
+            release/latest/AutoWSGR-GUI-Setup-*.exe
+            release/latest/*.exe.blockmap
+            release/latest/latest.yml
+          body: |
+            ## AutoWSGR-GUI v${{ steps.version.outputs.VERSION }}
+
+            本版本使用 `latest` 更新频道。Stable 默认不接收 Alpha；设置中开启
+            “允许测试版更新”后可接收版本号更高的 Alpha。
+
+            ### 主要变化
+            - 主导航统一为“作战 / 计划 / 设置”
+            - 新增可视化舰队规划、出征规划和计划管理
+            - 系统只读资源与用户配置、计划分离，执行前展开舰队引用
+            - 完善任务列表、执行队列、迁移、环境管理和更新边界
+
+            ### 安装与升级
+            1. 下载 `AutoWSGR-GUI-Setup-*.exe`
             2. 软件已内置 Python 3.12，无需单独安装
             3. 首次运行时程序会自动安装 Python 依赖（需联网）
-            4. 已安装用户将自动收到增量更新提示
+            4. 1.4.x 覆盖升级会先将旧用户数据备份到 `%LOCALAPPDATA%\AutoWSGR-GUI\legacy-upgrade`；确认迁移结果前不要删除该目录
+            5. 关闭“允许测试版更新”时只接收稳定版；开启后也接收版本号更高的 Alpha
+
+            ### 手动安全强化
+            设置页可发起只读库存扫描和候选预览；不会加入 Scheduler，不提供强化执行入口，也不会提交舰船操作。
+
+            ### 回退
+            如需回退，请退出 2.x，使用旧安装器重新安装，并从 `legacy-upgrade` 备份恢复旧格式数据；不要让旧版直接写入或覆盖唯一的 2.x `userData`。
 
             ### 系统要求
             - Windows 10/11 x64
             - 网络连接（首次运行需安装 pip 依赖）
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish verified Stable release
+        if: >-
+          steps.version.outputs.CHANNEL == 'latest'
+          && (github.event_name != 'workflow_dispatch' || inputs.publish)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $version = "${{ steps.version.outputs.VERSION }}"
+          gh release edit "v$version" `
+            --repo "${{ github.repository }}" `
+            --draft=false `
+            --latest

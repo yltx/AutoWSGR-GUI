@@ -1,3 +1,4 @@
+/** 把作战方案、地图和节点数据转换为预览 ViewObject。 */
 /**
  * rendering —— 方案预览 ViewObject 构建逻辑。
  */
@@ -5,9 +6,13 @@ import type {
   PlanPreviewViewObject,
   NodeViewObject,
   MapEdgeVO,
-} from '../../types/view';
+  PlanFleetPresetSelectorViewObject,
+} from '../../types/view.js';
 import type { PlanModel } from '../../model/PlanModel';
-import { FORMATION_NAMES } from '../../types/model';
+import {
+  FORMATION_NAMES,
+  type EventMapCatalogEntry,
+} from '../../types/model.js';
 import { getNodeType, isDetourNode, isNightNode } from '../../model/MapDataLoader';
 import type { MapData } from '../../model/MapDataLoader';
 
@@ -15,6 +20,8 @@ import type { MapData } from '../../model/MapDataLoader';
 export function buildPlanPreviewVO(
   currentPlan: PlanModel,
   currentMapData: MapData | null,
+  eventMaps: EventMapCatalogEntry[] = [],
+  fleetPresetSelector: PlanFleetPresetSelectorViewObject,
 ): PlanPreviewViewObject {
   const plan = currentPlan;
   const mapData = currentMapData;
@@ -39,6 +46,7 @@ export function buildPlanPreviewVO(
   // 构建地图可视化数据
   let allNodes: NodeViewObject[] | undefined;
   let edges: MapEdgeVO[] | undefined;
+  let mapAspectRatio: number | undefined;
   if (mapData) {
     const positions = new Map<string, [number, number]>();
     for (const [id, pt] of Object.entries(mapData)) {
@@ -59,13 +67,16 @@ export function buildPlanPreviewVO(
       const PAD = 6;
       const innerW = 100 - PAD * 2;
       const innerH = 100 - PAD * 2;
-      const scale = Math.min(innerW / rangeX, innerH / rangeY);
-      const offsetX = PAD + (innerW - rangeX * scale) / 2;
-      const offsetY = PAD + (innerH - rangeY * scale) / 2;
+      const scaleX = innerW / rangeX;
+      const scaleY = innerH / rangeY;
+      mapAspectRatio = rangeX / rangeY;
 
       const scaledPos = new Map<string, [number, number]>();
       for (const [id, [x, y]] of positions) {
-        scaledPos.set(id, [(x - minX) * scale + offsetX, (y - minY) * scale + offsetY]);
+        scaledPos.set(id, [
+          (x - minX) * scaleX + PAD,
+          (y - minY) * scaleY + PAD,
+        ]);
       }
 
       allNodes = Object.entries(mapData).map(([id, pt]) => {
@@ -102,6 +113,8 @@ export function buildPlanPreviewVO(
     chapter: plan.data.chapter,
     map: plan.data.map,
     mapName: plan.mapName,
+    event: plan.data.event,
+    eventMaps,
     repairModeValue: Array.isArray(plan.repairMode) ? plan.repairMode[0] ?? 1 : plan.repairMode,
     fightConditionValue: plan.fightCondition,
     fleetId: plan.data.fleet_id ?? 1,
@@ -109,10 +122,12 @@ export function buildPlanPreviewVO(
     comment: plan.comment,
     allNodes,
     edges,
-    fleetPresets: plan.data.fleet_presets?.map(p => ({ name: p.name, ships: p.ships })),
+    mapAspectRatio,
+    fleetPresetSelector,
     times: plan.data.times,
     gap: plan.data.gap,
     lootCountGe: plan.data.stop_condition?.loot_count_ge,
     shipCountGe: plan.data.stop_condition?.ship_count_ge,
+    collectResultInfo: plan.data.collect_result_info,
   };
 }

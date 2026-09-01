@@ -1,0 +1,49 @@
+# 旧版周常第3章备选兼容计划：地图 3-3。
+# 该文件保留被当前周常模板删除的阶段，供已有任务组继续执行。
+chapter: 3
+map: 3
+endpoint_nodes: [K]
+fleet_id: 3
+fight_condition: 1
+repair_mode: 1
+node_defaults:
+  formation: 2
+  night: false
+  proceed: true
+node_args:
+  K:
+    night: true
+times: 3
+fleet_presets:
+  - name: 旧版85工程德驱队
+    ships:
+      - {name: 契卡洛夫, min_level: 100}
+      - {name: T-23·改, search_name: T-23, min_level: 100}
+      - &legacy_de_dd
+        nation: 德国
+        ship_type: [dd]
+        min_level: 100
+        candidates:
+          - {name: 吕贝克·改, search_name: 吕贝克, ship_type: [dd]}
+          - {name: Z17·改, search_name: Z17, ship_type: [dd]}
+          - {name: Z16·改, search_name: Z16, ship_type: [dd]}
+          - {name: Z46·改, search_name: Z46, ship_type: [dd]}
+          - {name: Z31·改, search_name: Z31, ship_type: [dd]}
+          - {name: Z1·改, search_name: Z1, ship_type: [dd]}
+          - {name: Z22·改, search_name: Z22, ship_type: [dd]}
+          - {name: Z21·改, search_name: Z21, ship_type: [dd]}
+      - *legacy_de_dd
+  - name: 旧版85工程日驱队
+    ships:
+      - {name: 契卡洛夫, min_level: 100}
+      - {name: 岛风(岛风型驱逐舰)·改, search_name: 岛风, min_level: 100}
+      - &legacy_33_jp_dd
+        nation: 日本
+        ship_type: [dd]
+        min_level: 100
+        candidates:
+          - {name: 岛风(岛风型驱逐舰)·改, search_name: 岛风, ship_type: [dd]}
+          - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd]}
+          - {name: 阳炎·改, search_name: 阳炎, ship_type: [dd]}
+          - {name: 早春·改, search_name: 早春, ship_type: [dd]}
+      - *legacy_33_jp_dd

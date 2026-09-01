@@ -1,149 +1,220 @@
-# 01 — Extract Class：按职责拆分大文件
+# 01：按职责拆分类
 
-> **前置阅读**：[00-overview](00-overview.md)  
-> **核心原则**：一个类/模块只负责一件事；当文件超过 300-400 行时，大概率需要拆分。
+> 前置阅读：[00 全局概览](00-overview.md)
 
----
+Extract Class 的目标不是减少单文件行数，而是把不同的状态、变化原因和生命周期
+分开。拆完后如果两个文件仍共同修改同一批字段，只是多了一层转发，边界并没有
+改善。
 
-## 拆分的思路
+## 先找责任，不先找行数
 
-不是"按行数平均分"，而是**按业务职责边界切割**。判断标准：
+适合提取的信号：
 
-| 信号 | 行动 |
-|------|------|
-| 一组方法总是一起被调用 | 提取为独立模块 |
-| 一组状态变量只被少数方法读写 | 连同方法一起提取成类 |
-| 不同业务域的代码混在一起 | 拆成子控制器 |
-| `import` 列表超长 | 职责大概率太多了 |
+- 一组字段只被一组方法使用。
+- 一段逻辑有独立输入输出，可以不依赖宿主内部状态。
+- 某个区域有自己的资源生命周期，如事件监听器或 Observer。
+- 某个用例只需要宿主的少量能力。
+- 同一视觉行为被两个真实页面重复实现。
+- 一组规则可以单独测试，不需要启动 DOM、Electron 或后端。
 
----
+不适合提取的理由：
 
-## 案例 1：SchedulerBinder 的提取
+- “文件超过 N 行”。
+- “以后可能复用”。
+- “每个方法都应该有一个类”。
+- “先建 Manager/Factory，后面再接功能”。
 
-原始 `AppController` 中有一大段调度器回调绑定代码和相关状态变量。它们逻辑上是一个整体——**跟踪调度器事件、管理临时渲染状态**——和 AppController 的其他逻辑（导航、配置、任务组…）无关。
+## 案例一：AppController 只做组合
 
-### 提取了什么
+当前 Renderer 入口是：
+
+`src/controller/app/AppController.ts`
+
+它仍然持有核心对象，但细分行为由明确模块负责：
+
+```text
+src/controller/app/
+├─ AppController.ts
+├─ ConfigController.ts
+├─ CurrentFleetController.ts
+├─ NavigationController.ts
+├─ OperationsController.ts
+├─ ScheduledTaskLoader.ts
+├─ SchedulerBinder.ts
+├─ SchedulerRuntimeTracker.ts
+├─ SettingsController.ts
+└─ rendering.ts
+```
+
+拆分判断依据不是“AppController 太长”，而是变化原因不同：
+
+| 模块 | 独立变化原因 |
+|---|---|
+| `NavigationController` | 页面和标签导航 |
+| `ConfigController` | 配置加载、转换和提交 |
+| `SettingsController` | Python、CUDA、ADB、更新和资料库 |
+| `SchedulerBinder` | Scheduler/Cron/后端事件接线 |
+| `SchedulerRuntimeTracker` | 从日志派生运行状态 |
+| `rendering.ts` | 状态到 `MainViewObject` 的纯转换 |
+
+`AppController` 保留对象创建、依赖连接和启动/退出生命周期。这是组合根应承担的
+责任，不能为了“更短”再把对象创建随机搬到多个全局单例。
+
+## 案例二：有状态核心与纯策略分开
+
+Scheduler 的权威状态仍在：
+
+`src/model/scheduler/Scheduler.ts`
+
+它拥有运行任务、队列、等待任务、状态和子模块。可独立计算的规则被提取为：
+
+- `SchedulerTaskPolicy.ts`
+- `SchedulerRepairPolicy.ts`
+
+例如任务创建规则不需要访问 Scheduler 私有状态：
 
 ```typescript
-// src/controller/app/SchedulerBinder.ts
-
-export class SchedulerBinder {
-  // ── 这些状态原来散落在 AppController 的字段里 ──
-  private pendingExerciseTaskId: string | null = null;
-  private pendingBattleTaskId: string | null = null;
-  private pendingLootTaskId: string | null = null;
-  currentProgress = '';
-  trackedLoot = '';
-  trackedShip = '';
-  wsConnected = false;
-  expeditionTimerText = '--:--';
-
-  constructor(private readonly host: SchedulerBinderHost) {}
-
-  bindSchedulerCallbacks(): void {
-    this.host.scheduler.setCallbacks({
-      onProgressUpdate: (_taskId, progress) => {
-        this.currentProgress = `${progress.current}/${progress.total}`;
-        this.host.renderMain();   // 通过 Host 接口回调主控制器
-      },
-      onTaskCompleted: (taskId, success) => {
-        this.currentProgress = '';
-        this.trackedLoot = '';
-        // ...处理定时任务完成态
-      },
-    });
-  }
+export function createSchedulerTask(
+  options: SchedulerTaskOptions,
+): SchedulerTask {
+  const times = options.times ?? 1;
+  const unlimited = !Number.isFinite(times);
+  const normalizedTimes = unlimited ? 1 : Math.max(1, Math.trunc(times));
+  return {
+    id: options.id,
+    logicalId: options.id,
+    remainingTimes: normalizedTimes,
+    totalTimes: normalizedTimes,
+    maxRetries: 2,
+    retryCount: 0,
+    // 其余字段来自显式输入
+  };
 }
 ```
 
-### 为什么有效
+这种拆分有三个收益：
 
-- 这些状态（`currentProgress`、`trackedLoot`…）**只被调度器回调读写**，和 AppController 其他逻辑无关
-- 提取后，`AppController` 不再需要了解"调度器回调具体做了什么"
-- 调度器逻辑有 bug？直接看 `SchedulerBinder.ts` 一个文件
+1. 状态所有者仍然唯一。
+2. 规则可以用普通输入输出测试。
+3. Scheduler 只负责何时调用规则和如何推进状态机。
 
----
+反例是把 `currentTask`、`waitingTasks` 分别放进多个“Manager”，再让它们相互
+回调修改。那会产生多个可写状态源。
 
-## 案例 2：子控制器 + 模块委托
+## 案例三：View Facade 与职责子 View
 
-`PlanController` 自身只有 215 行，但它不是把逻辑写在自己体内——而是把**具体流程委托给独立的纯函数模块**：
+当前设置页由 `ConfigView` 对 Controller 保持统一 API，内部组合：
 
-```
-src/controller/plan/
-├── PlanController.ts   (215 行，事件绑定 + 状态持有)
-├── importExport.ts     (122 行，方案导入/导出流程)
-├── presetFlow.ts       (121 行，任务预设流程)
-├── nodeEditor.ts       (47 行，节点编辑器保存)
-└── rendering.ts        (109 行，ViewObject 拼装)
-```
+- `ConfigAutomationView`
+- `ConfigRuntimeView`
+- `settingSelectWidth.ts`
 
-```typescript
-// PlanController.ts — 只做委托
+这次拆分的边界是视觉责任：
 
-import { importPlanFlow, exportPlanFlow } from './importExport';
-import { executePresetFlow } from './presetFlow';
+- 自动任务列表和额度摘要一起变化。
+- Python、CUDA、ADB、更新状态一起变化。
+- 下拉框宽度计算是独立纯 DOM 辅助。
 
-export class PlanController {
-  async importPlan(): Promise<void> {
-    return importPlanFlow(this.planView, this.host, this.planSetters);
-  }
+Controller 仍只依赖 `ConfigView`，没有因为视觉拆分而获得三个新依赖。
 
-  closePresetDetail(): void {
-    closePresetDetailFlow(this.planView, this.presetState);
-  }
-}
+这种结构是 Facade：
+
+```text
+Controller -> ConfigView
+                  ├─ ConfigAutomationView
+                  ├─ ConfigRuntimeView
+                  └─ settingSelectWidth
 ```
 
-**模式**：控制器是"调度员"，具体"干活"的是独立函数。
+Facade 的价值是保持外部契约稳定，而不是把每个 DOM 元素包装成一个类。
 
-好处：
-- 控制器只关注"谁来做"，不关注"怎么做"
-- 流程函数可以独立测试，不需要实例化整个控制器
-- 同一模式在 `taskGroup/`、`template/` 中复用
+## 案例四：共享组件必须有真实复用
 
----
+普通舰队页和决战页原本都需要：
 
-## 案例 3：Scheduler 子系统拆分
+- 舰船搜索和筛选。
+- 排序和批量渲染。
+- 卡片交互和拖拽。
+- 滚动位置恢复。
 
-原始 `Scheduler.ts` 是单一大文件。重构后按职责拆成 7 个文件：
+这些完整视觉行为进入：
 
-```
-src/model/scheduler/
-├── Scheduler.ts             主调度器，持有队列 + 消费循环
-├── TaskQueue.ts             优先级队列的增删改查
-├── CronScheduler.ts         基于系统时钟的定时触发
-├── ExpeditionTimer.ts       远征检查倒计时
-├── RepairManager.ts         泡澡修理管理
-├── StopConditionChecker.ts  停止条件判断
-└── index.ts                 barrel re-export
-```
+`src/view/plan/ShipGalleryView.ts`
 
-`Scheduler` 本体通过组合持有子模块：
+页面差异通过 `ShipGalleryViewHost` 注入。普通舰队的主选/候选规则和决战的
+level1/level2 草稿仍留在各自领域，不进入共享图库。
 
-```typescript
-// Scheduler.ts
-export class Scheduler {
-  private _taskQueue: TaskQueue;
-  private expeditionTimer: ExpeditionTimer;
-  private stopChecker: StopConditionChecker;
-  // ...
-}
-```
+共享边界成立是因为：
 
-外部导入不需要关心内部拆分细节：
+1. 已有两个真实消费者。
+2. 共享的是完整视觉行为，不是相似名称。
+3. 页面业务差异仍由 Host 隔离。
+4. 共享组件拥有完整 `dispose()` 生命周期。
 
-```typescript
-// 外部使用 — 导入路径没变
-import { Scheduler, CronScheduler } from '../../model/scheduler';
+如果只有一个调用方，或提取后充满 `if (page === ...)`，就不应创建共享组件。
+
+## 案例五：源文件拆分不能改变运行结构
+
+HTML 和 SCSS 也按职责拆分：
+
+```text
+src/view/html/**                  # HTML 开发源
+src/view/styles/pages/config/**  # 设置页 SCSS partial
+src/view/styles/pages/plan/**    # 方案页 SCSS partial
 ```
 
----
+构建后 Electron 仍加载：
 
-## 速查：拆分前后对比
+```text
+src/view/index.html
+src/view/styles/styles.css
+```
 
-| 区域 | 重构前 | 重构后 | 拆分依据 |
-|------|--------|--------|---------|
-| Controller | 1 个 3052 行文件 | 6 个子目录 33 个文件 | 按业务域（Plan/TaskGroup/Template/Startup） |
-| Scheduler | 1 个大文件 | 7 个文件 | 按调度子职责（队列/定时/修理/停止条件） |
-| Electron | 1 个 1192 行文件 | 4 + 6 个文件 | 按关注点（窗口/后端/Python/模拟器） |
-| View | 混在一起 | 6 个子目录 16 个文件 | 按功能页面（main/plan/template/config…） |
+机械拆分必须保持：
+
+- DOM 顺序和 ID。
+- CSS 选择器、属性和加载顺序。
+- 事件绑定时机。
+- 页面行为和视觉效果。
+
+因此源文件拆分和功能修改应分批进行。
+
+## 安全提取步骤
+
+1. 用 `rg` 找字段、方法、调用方、DOM ID、类型和测试。
+2. 写清楚待提取责任，以及仍留在宿主的责任。
+3. 确认状态唯一所有者不变。
+4. 先定义最小输入输出或 Host。
+5. 移动一条完整责任，不顺手改业务规则。
+6. 保持原公共 API，或同步修改所有消费者。
+7. 补齐监听器、Observer、定时器等释放链。
+8. 跑专项测试并检查 diff。
+
+## 拆分完成的判断
+
+一次有效拆分应满足：
+
+- 提取模块能用一句话描述责任。
+- 不需要访问宿主大部分私有字段。
+- 没有新增第二份可写业务状态。
+- 错误仍在原来的业务边界报告。
+- 外部调用方没有被迫理解内部拆分。
+- 测试能更直接地验证该责任。
+
+## 验证
+
+Renderer 类和 View 拆分至少执行：
+
+```powershell
+npm run test:architecture-boundaries
+npm run test:renderer-contract
+npm run test:build
+git diff --check
+```
+
+涉及 Scheduler 或 Fleet 时再执行：
+
+```powershell
+npm run test:scheduler-domain
+npm run test:fleet-domain
+```

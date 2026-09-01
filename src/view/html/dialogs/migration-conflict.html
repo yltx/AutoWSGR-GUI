@@ -1,0 +1,78 @@
+  <!-- 旧配置迁移完成后的 YAML 冲突确认 -->
+  <div
+    id="migration-conflict-dialog"
+    class="modal-overlay"
+    style="display:none"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="migration-conflict-title"
+  >
+    <div class="modal card migration-conflict-dialog">
+      <div class="migration-conflict-heading">
+        <div>
+          <h3 id="migration-conflict-title">处理迁移配置冲突</h3>
+          <p>勾选卡片后使用中间按钮移动；最终位于删除侧的 YAML 会直接删除。</p>
+        </div>
+        <span id="migration-conflict-count">0 项冲突</span>
+      </div>
+      <div class="migration-conflict-warning">
+        <strong>数据丢失风险</strong>
+        <span>删除操作无法撤销。请确认文件内容和冲突原因后再提交。</span>
+      </div>
+      <div class="migration-conflict-columns">
+        <section class="migration-conflict-column delete">
+          <div class="migration-conflict-column-heading">
+            <h4 id="migration-conflict-delete-title">删除（0）</h4>
+            <button
+              class="btn btn-small"
+              id="btn-select-all-migration-delete"
+              type="button"
+            >全选</button>
+          </div>
+          <div
+            id="migration-conflict-delete-list"
+            class="migration-conflict-list"
+          ></div>
+        </section>
+        <div class="migration-conflict-transfer">
+          <button
+            class="btn btn-small"
+            id="btn-migration-move-keep"
+            type="button"
+          >保留 →</button>
+          <button
+            class="btn btn-small migration-delete-button"
+            id="btn-migration-move-delete"
+            type="button"
+          >← 删除</button>
+        </div>
+        <section class="migration-conflict-column keep">
+          <div class="migration-conflict-column-heading">
+            <h4 id="migration-conflict-keep-title">保留（0）</h4>
+            <button
+              class="btn btn-small"
+              id="btn-select-all-migration-keep"
+              type="button"
+            >全选</button>
+          </div>
+          <div
+            id="migration-conflict-keep-list"
+            class="migration-conflict-list"
+          ></div>
+        </section>
+      </div>
+      <p id="migration-conflict-status" class="fleet-dialog-status" hidden></p>
+      <div class="modal-actions">
+        <button
+          class="btn"
+          id="btn-migration-keep-all"
+          type="button"
+        >全部保留</button>
+        <button
+          class="btn btn-primary"
+          id="btn-confirm-migration-conflicts"
+          type="button"
+        >确认处理</button>
+      </div>
+    </div>
+  </div>

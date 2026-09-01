@@ -9,11 +9,33 @@
 <body>
   <!-- ═══ 顶部导航栏 ═══ -->
   <nav class="nav-bar">
-    <div class="nav-title">WSGR GUI <span class="nav-version" id="app-version"></span></div>
-    <div class="nav-tabs">
-      <button class="nav-tab active" data-page="main">主页</button>
-      <button class="nav-tab" data-page="plan">方案预览</button>
-      <button class="nav-tab" data-page="config">配置</button>
+    <div class="nav-primary">
+      <div class="nav-title">WSGR GUI <span class="nav-version" id="app-version"></span></div>
+      <div class="nav-tabs">
+        <span class="nav-tab-indicator" aria-hidden="true"></span>
+        <button class="nav-tab active" data-page="main">作战</button>
+        <button class="nav-tab" data-page="plan">计划</button>
+        <button class="nav-tab" data-page="config">设置</button>
+      </div>
+    </div>
+    <div class="nav-task-state" id="nav-task-state" title="当前无运行任务">
+      <div class="nav-task-meta">
+        <span class="nav-task-name" id="nav-task-name">当前无任务</span>
+        <span class="nav-task-remaining" id="nav-task-remaining">剩余 0/0</span>
+      </div>
+      <div class="nav-task-progress" id="nav-task-progress" role="progressbar" aria-label="当前任务进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <span class="nav-task-progress-fill" id="nav-task-progress-fill"></span>
+      </div>
+    </div>
+    <div class="nav-runtime">
+      <div class="nav-expedition" title="距离下次自动远征检查的时间">
+        <span class="nav-runtime-label">远征</span>
+        <span id="expedition-timer">--:--</span>
+      </div>
+      <div class="nav-status" title="当前运行状态">
+        <span class="status-indicator" id="status-dot"></span>
+        <span id="status-text">未连接</span>
+      </div>
     </div>
   </nav>
 
@@ -25,71 +47,152 @@
       <div class="main-layout">
         <!-- 左侧：状态 & 任务 -->
         <div class="main-left">
-          <div class="status-row">
-            <div class="status-card">
-              <div class="status-indicator" id="status-dot"></div>
-              <span id="status-text">未连接</span>
-            </div>
-            <div class="expedition-bar">
-              <span>远征检查倒计时：</span>
-              <span id="expedition-timer">--:--</span>
-            </div>
-            <div class="ops-toolbar" id="ops-card">
-              <button class="btn btn-small ops-btn" id="btn-ops-expedition" title="收取所有已完成的远征">收取远征</button>
-              <button class="btn btn-small ops-btn" id="btn-ops-reward" title="收取每日奖励">收取奖励</button>
-              <button class="btn btn-small ops-btn" id="btn-ops-build-collect" title="收取已完成的建造">收取建造</button>
-              <button class="btn btn-small ops-btn" id="btn-ops-cook" title="食堂烹饪">食堂烹饪</button>
-              <button class="btn btn-small ops-btn" id="btn-ops-repair" title="浴室快速修理">浴室修理</button>
-              <span class="ops-status" id="ops-status"></span>
-            </div>
-          </div>
-
-          <!-- 统一任务区域：空闲 / 队列 / 运行 合并 -->
-          <div class="card" id="task-area-card">
-            <div id="task-area-idle">
-              <p class="idle-text">当前无运行任务</p>
-              <div class="idle-actions">
-                <button class="btn btn-primary" id="btn-import-plan">导入战斗方案 (.yaml)</button>
-              </div>
-            </div>
-            <div id="task-area-queue" style="display:none">
-              <div class="task-area-header">
-                <h3>任务队列</h3>
-                <div class="queue-actions">
-                  <button class="btn btn-primary btn-small" id="btn-start-queue">开始执行</button>
-                  <button class="btn btn-small" id="btn-clear-queue">清空队列</button>
-                  <button class="btn btn-danger btn-small" id="btn-stop-task" style="display:none">停止</button>
+          <div class="battle-overview-grid">
+            <!-- 统一任务区域：空闲 / 队列 / 运行 合并 -->
+            <div class="card" id="task-area-card">
+              <div id="task-area-idle">
+                <p class="idle-text">当前无运行任务</p>
+                <div class="idle-actions">
+                  <button class="btn btn-primary" id="btn-import-plan">导入战斗方案 (.yaml)</button>
                 </div>
               </div>
-              <div class="task-queue-list" id="task-queue-list"></div>
+              <div id="task-area-queue" style="display:none">
+                <div class="task-area-header">
+                  <h3>执行队列</h3>
+                  <div class="queue-actions">
+                    <button class="btn btn-primary btn-small" id="btn-start-queue">开始执行</button>
+                    <button class="btn btn-small" id="btn-clear-queue">清空队列</button>
+                    <button class="btn btn-danger btn-small" id="btn-stop-task" style="display:none">停止</button>
+                  </div>
+                </div>
+                <div class="task-queue-list" id="task-queue-list"></div>
+              </div>
+            </div>
+            <div
+              class="card fleet-preview-card"
+              id="current-fleet-preview-card"
+              aria-label="任务编队预览"
+            >
+              <h3>任务编队预览</h3>
+              <div class="current-fleet-stage">
+                <div
+                  class="current-fleet-empty"
+                  id="current-fleet-empty"
+                >当前无任务执行</div>
+                <div
+                  class="current-fleet-preview"
+                  id="current-fleet-preview"
+                  role="list"
+                  aria-label="当前运行任务的舰队"
+                  hidden
+                ></div>
+              </div>
+              <section
+                class="daily-sortie-stats"
+                id="daily-sortie-stats"
+                aria-label="今日出征统计"
+              >
+                <div class="daily-sortie-heading">
+                  <h4>今日出征统计</h4>
+                  <span>每日 00:00 清空</span>
+                </div>
+                <div class="daily-sortie-summary">
+                  <div class="daily-sortie-metric">
+                    <span>战斗</span>
+                    <strong id="daily-battle-count">-</strong>
+                  </div>
+                  <div class="daily-sortie-metric daily-repair-metric">
+                    <strong>
+                      快修 <b id="daily-quick-repair-count">-</b>
+                      · 泡澡 <b id="daily-bath-repair-count">-</b>
+                    </strong>
+                  </div>
+                  <div class="daily-sortie-metric">
+                    <span>战利品</span>
+                    <strong id="daily-loot-count">-</strong>
+                  </div>
+                  <button
+                    class="daily-sortie-metric daily-ship-toggle"
+                    id="daily-ship-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="daily-ship-details"
+                  >
+                    <span>捞船</span>
+                    <strong id="daily-ship-count">-</strong>
+                  </button>
+                  <div class="daily-sortie-metric">
+                    <span>远征</span>
+                    <strong id="daily-expedition-count">-</strong>
+                  </div>
+                </div>
+                <div class="daily-grade-row" aria-label="战果等级统计">
+                  <span>SS <b id="daily-grade-ss">-</b></span>
+                  <span>S <b id="daily-grade-s">-</b></span>
+                  <span>A <b id="daily-grade-a">-</b></span>
+                  <span>B <b id="daily-grade-b">-</b></span>
+                  <span>C <b id="daily-grade-c">-</b></span>
+                  <span>D <b id="daily-grade-d">-</b></span>
+                </div>
+                <div
+                  class="daily-drop-notice"
+                  id="daily-drop-notice"
+                  role="status"
+                  aria-live="polite"
+                  hidden
+                ></div>
+                <div
+                  class="daily-ship-details"
+                  id="daily-ship-details"
+                  hidden
+                >
+                  <div class="daily-ship-details-title">今日舰船掉落</div>
+                  <div
+                    class="daily-ship-drop-list"
+                    id="daily-ship-drop-list"
+                  ></div>
+                </div>
+              </section>
             </div>
           </div>
 
           <!-- 任务组 -->
           <div class="card task-group-card" id="task-group-card">
             <div class="task-group-header">
-              <h3>任务列表</h3>
-              <div class="task-group-selector">
-                <select class="input input-sm" id="task-group-select"></select>
-                <button class="btn btn-small tg-icon-btn" id="btn-tg-new" title="新建组">
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M8 2a.5.5 0 0 1 .5.5v5h5a.5.5 0 0 1 0 1h-5v5a.5.5 0 0 1-1 0v-5h-5a.5.5 0 0 1 0-1h5v-5A.5.5 0 0 1 8 2z"/></svg>
-                </button>
-                <button class="btn btn-small tg-icon-btn" id="btn-tg-rename" title="重命名">
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M12.146.854a.5.5 0 0 1 .708 0l2.292 2.292a.5.5 0 0 1 0 .708l-9.5 9.5a.5.5 0 0 1-.168.11l-4 1.5a.5.5 0 0 1-.632-.632l1.5-4a.5.5 0 0 1 .11-.168l9.5-9.5zM11.207 2L2 11.207l-.94 2.507.466.466 2.507-.94L13.207 4.067 11.207 2z"/></svg>
-                </button>
-                <button class="btn btn-small btn-danger tg-icon-btn" id="btn-tg-delete" title="删除组">
-                  <svg width="18" height="18" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H5.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1h2a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg>
-                </button>
+              <div class="task-group-heading">
+                <h3>任务列表</h3>
+                <span class="task-group-count" id="task-group-count">0 项</span>
+                <button class="btn btn-small ops-btn" id="btn-ops-expedition" title="收取所有已完成的远征">收取远征</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-reward" title="收取每日奖励">收取奖励</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-build-collect" title="收取已完成的建造">收取建造</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-cook" title="食堂烹饪">食堂烹饪</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-repair" title="浴室快速修理">浴室修理</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-intensify" title="自动强化">自动强化</button>
+                <span class="ops-status" id="ops-status"></span>
+              </div>
+            </div>
+            <div class="task-group-toolbar">
+              <div class="task-group-actions">
+                <button class="btn btn-primary btn-small" id="btn-tg-add-managed-plan">加载计划</button>
+                <button class="btn btn-small" id="btn-tg-add-daily-plan">加载日常任务</button>
+                <button class="btn btn-small" id="btn-tg-load-all">全部加入队列</button>
+              </div>
+              <div class="task-list-management">
+                <span>列表管理：</span>
+                <input
+                  class="input input-sm"
+                  id="task-group-name"
+                  type="text"
+                  maxlength="60"
+                  placeholder="输入任务列表名称"
+                >
+                <button class="btn btn-small" id="btn-tg-new" type="button">新建</button>
+                <button class="btn btn-primary btn-small" id="btn-tg-save" type="button">保存</button>
+                <button class="btn btn-small" id="btn-tg-open-loader" type="button">队列管理</button>
               </div>
             </div>
             <div class="task-group-items" id="task-group-items">
-              <p class="tg-empty">暂无任务。可从方案预览页的模板库「加入列表」，或点击下方「从文件添加」。</p>
-            </div>
-            <div class="task-group-actions">
-              <button class="btn btn-primary btn-small" id="btn-tg-load-all">全部加入队列</button>
-              <button class="btn btn-small" id="btn-tg-add-file">从文件添加</button>
-              <button class="btn btn-small" id="btn-tg-export" title="导出任务列表为文件">导出列表</button>
-              <button class="btn btn-small" id="btn-tg-import" title="从文件导入任务列表">导入列表</button>
+              <p class="tg-empty">暂无任务，可通过「加载计划」或「加载日常任务」添加。</p>
             </div>
           </div>
 
@@ -99,7 +202,7 @@
         <div class="main-right">
           <div class="card log-card">
             <div class="log-header">
-              <h3>日志</h3>
+              <h3>日志预览</h3>
               <div class="log-filters" id="log-filters">
                 <button class="log-filter-btn active" data-level="debug" title="调试">
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 0-.5.5v1.02a4.5 4.5 0 0 0-1.87 1.16L.94 2.94a.5.5 0 1 0-.38.92l1.2.5A4.5 4.5 0 0 0 1.5 5.5H.5a.5.5 0 0 0 0 1h1.05a4.5 4.5 0 0 0 .55 1.53l-1.16.48a.5.5 0 1 0 .38.92l1.19-.49a4.5 4.5 0 0 0 1.99 1.56v.5a.5.5 0 0 0 1 0v-.16A4.5 4.5 0 0 0 8 11.5a4.5 4.5 0 0 0 2-.44v.44a.5.5 0 0 0 1 0v-.78a4.5 4.5 0 0 0 1.69-1.28l1.19.49a.5.5 0 1 0 .38-.92l-1.16-.48A4.5 4.5 0 0 0 13.5 7h.5a.5.5 0 0 0 0-1h-1a4.5 4.5 0 0 0-.26-1.14l1.2-.5a.5.5 0 1 0-.38-.92l-1.19.74A4.5 4.5 0 0 0 11 2.52V1.5a.5.5 0 0 0-1 0v.68A4.5 4.5 0 0 0 8 1.5a4.5 4.5 0 0 0-2 .68V1.5a.5.5 0 0 0-.5-.5zM8 3a3.5 3.5 0 0 1 3.5 3.5v1A3.5 3.5 0 0 1 8 11a3.5 3.5 0 0 1-3.5-3.5v-1A3.5 3.5 0 0 1 8 3z"/></svg>
@@ -129,59 +232,185 @@
       </div>
     </section>
 
-    <!-- 方案预览页面 -->
+    <!-- 计划页面 -->
     <section id="page-plan" class="page">
-      <div class="plan-page-layout">
-        <div class="plan-page-main">
-          <div id="plan-empty" class="card plan-empty-card">
-            <div class="empty-state">
-              <p>尚未导入方案</p>
-              <div class="empty-state-actions">
-                <button class="btn btn-primary" id="btn-import-plan-2">选择 yaml 文件</button>
-                <button class="btn" id="btn-new-plan">新建方案</button>
-              </div>
-              <p class="plans-dir-hint">内置方案目录：<span id="plans-dir-hint" class="hint-path">加载中…</span></p>
-              <button class="btn btn-small btn-link" id="btn-open-plans-dir">打开方案文件夹</button>
-            </div>
-          </div>
+      <div class="plan-subtabs" role="tablist" aria-label="计划分类">
+        <button class="plan-subtab active" type="button" data-plan-tab="fleet">舰队规划</button>
+        <button class="plan-subtab" type="button" data-plan-tab="scheme">出征规划</button>
+        <button class="plan-subtab" type="button" data-plan-tab="decisive">决战计划（旧）</button>
+        <button class="plan-subtab" type="button" data-plan-tab="manage">计划管理</button>
+      </div>
 
-      <!-- 新建方案：选择地图对话框 -->
-      <div id="new-plan-dialog" class="modal-overlay" style="display:none">
-        <div class="modal card">
-          <h3>新建方案 — 选择地图</h3>
-          <div class="form-group">
-            <label>海域</label>
-            <select id="new-plan-chapter" class="input">
-              <option value="1">第 1 章</option>
-              <option value="2">第 2 章</option>
-              <option value="3">第 3 章</option>
-              <option value="4">第 4 章</option>
-              <option value="5">第 5 章</option>
-              <option value="6">第 6 章</option>
-              <option value="7">第 7 章</option>
-              <option value="8">第 8 章</option>
-              <option value="9">第 9 章</option>
-              <option value="10">第 10 章</option>
-              <option value="Ex">Ex 系列</option>
-            </select>
-          </div>
-          <div class="form-group" id="new-plan-map-group">
-            <label>地图</label>
-            <select id="new-plan-map" class="input">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-            </select>
-          </div>
-          <div class="modal-actions">
-            <button class="btn btn-primary" id="btn-new-plan-confirm">确定</button>
-            <button class="btn" id="btn-new-plan-cancel">取消</button>
-          </div>
+      <div class="plan-tab-panel active" data-plan-panel="fleet">
+        <div class="fleet-planner-layout">
+          <section class="fleet-planner-fleet card">
+            <div class="fleet-formation-heading fleet-planner-toolbar">
+              <h3 class="fleet-formation-tag fleet-queue-badge is-primary">主选队列</h3>
+              <label class="fleet-preset-name-field">
+                <span>预设名称</span>
+                <input
+                  class="input"
+                  id="fleet-preset-name"
+                  type="text"
+                  maxlength="80"
+                  placeholder="输入舰队预设名称"
+                >
+              </label>
+              <div class="fleet-preset-actions">
+                <button class="btn btn-small" id="btn-new-team-plan" type="button">新建</button>
+                <button class="btn btn-small btn-primary" id="btn-save-team-plan" type="button">保存</button>
+                <button class="btn btn-small" id="btn-load-team-plan" type="button">加载</button>
+                <button class="btn btn-small" id="btn-clear-fleet" type="button">清空</button>
+              </div>
+              <div class="fleet-toolbar-level">
+                <div class="fleet-primary-rule-controls">
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-relaxed-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>宽泛校验</span>
+                  </label>
+                  <label class="config-switch fleet-level-switch">
+                    <input type="checkbox" id="fleet-level-enabled">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>等级限制</span>
+                  </label>
+                  <div class="fleet-level-fields" id="fleet-level-fields" hidden>
+                    <label>
+                      <span>最小</span>
+                      <input class="input" id="fleet-min-level" type="number" min="1" step="1">
+                    </label>
+                    <label>
+                      <span>最大</span>
+                      <input class="input" id="fleet-max-level" type="number" min="1" step="1">
+                    </label>
+                  </div>
+                </div>
+                <p class="fleet-validation-note">
+                  宽泛校验：指在编队识别时仅要求名称一致，等级和舰船类型会校验但不做强制性要求
+                </p>
+              </div>
+            </div>
+            <section class="fleet-formation-section">
+              <div class="fleet-slot-scroll">
+                <div class="fleet-slot-list" id="fleet-slot-list" aria-label="编队槽位"></div>
+              </div>
+            </section>
+
+            <div class="fleet-formation-heading fleet-backup-heading">
+              <h3 class="fleet-formation-tag fleet-queue-badge is-backup" id="fleet-backup-title">位置 1 的备选队列</h3>
+              <div class="fleet-backup-actions">
+                <button class="btn btn-small" id="btn-backup-follow-mode" type="button" aria-pressed="false">舰船跟随</button>
+                <button class="btn btn-small btn-primary" id="btn-add-fleet-backup" type="button">增加备选</button>
+                <button class="btn btn-small" id="btn-copy-fleet-backup" type="button">复制备选</button>
+                <label class="config-switch fleet-level-switch">
+                  <input type="checkbox" id="fleet-backup-relaxed-enabled">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>宽泛校验</span>
+                </label>
+                <label class="config-switch fleet-level-switch">
+                  <input type="checkbox" id="fleet-backup-level-enabled">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>等级限制</span>
+                </label>
+                <div class="fleet-level-fields" id="fleet-backup-level-fields" hidden>
+                  <label>
+                    <span>最小</span>
+                    <input class="input" id="fleet-backup-min-level" type="number" min="1" step="1">
+                  </label>
+                  <label>
+                    <span>最大</span>
+                    <input class="input" id="fleet-backup-max-level" type="number" min="1" step="1">
+                  </label>
+                </div>
+              </div>
+            </div>
+            <section class="fleet-formation-section fleet-backup-section">
+              <div class="fleet-backup-scroll">
+                <div class="fleet-backup-slot-list" id="fleet-backup-slot-list" aria-label="备选编队槽位"></div>
+              </div>
+            </section>
+          </section>
+
+          <section class="fleet-planner-library card">
+            <div class="fleet-library-header">
+              <div class="fleet-library-title">
+                <h2>舰娘图鉴</h2>
+                <span id="fleet-library-count">正在读取资料库…</span>
+              </div>
+              <div class="fleet-library-search-actions">
+                <label class="fleet-search">
+                  <span aria-hidden="true">⌕</span>
+                  <input id="fleet-ship-search" type="search" placeholder="搜索舰名或编号" autocomplete="off">
+                </label>
+                <div class="fleet-library-filter-triggers">
+                  <button class="btn btn-small fleet-filter-trigger" type="button" data-fleet-filter-trigger="filter" aria-expanded="false">
+                    <span class="fleet-filter-trigger-name">筛选</span>
+                    <span id="fleet-filter-count"></span>
+                  </button>
+                  <button class="btn btn-small" id="btn-reset-fleet-filter" type="button">恢复默认</button>
+                </div>
+              </div>
+              <div class="fleet-filter-popover" id="fleet-filter-popover" hidden>
+                <div class="fleet-filter-popover-header">
+                  <div class="fleet-filter-popover-heading">
+                    <strong>综合筛选</strong>
+                    <label class="config-switch fleet-refit-filter">
+                      <span>过滤改造</span>
+                      <input id="fleet-filter-refit-only" type="checkbox">
+                      <span class="config-switch-track" aria-hidden="true"></span>
+                    </label>
+                  </div>
+                  <div class="fleet-filter-popover-actions">
+                    <button class="btn btn-small btn-primary" id="btn-confirm-fleet-filter" type="button">确定</button>
+                  </div>
+                </div>
+                <div class="fleet-filter-section">
+                  <span class="fleet-filter-label">舰型分组</span>
+                  <div class="fleet-filter-options" id="fleet-filter-groups">
+                    <button class="fleet-filter-option active" type="button" data-filter-kind="group" data-filter-value="all">全部</button>
+                    <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="large">大型舰</button>
+                    <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="medium">中型舰</button>
+                    <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="small">小型舰</button>
+                    <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="main_force">主力舰</button>
+                    <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="escort">护卫舰</button>
+                  </div>
+                </div>
+                <div class="fleet-filter-section">
+                  <span class="fleet-filter-label">类型</span>
+                  <div class="fleet-filter-options fleet-filter-options-scroll" id="fleet-filter-types"></div>
+                </div>
+                <div class="fleet-filter-section">
+                  <span class="fleet-filter-label">国籍</span>
+                  <div class="fleet-filter-options" id="fleet-filter-countries"></div>
+                </div>
+                <div class="fleet-filter-section fleet-filter-sort-section">
+                  <span class="fleet-filter-label">排序规则</span>
+                  <div class="fleet-filter-sort-controls">
+                    <div class="fleet-filter-options">
+                      <button class="fleet-filter-option" type="button" data-sort-field="type">类型</button>
+                      <button class="fleet-filter-option" type="button" data-sort-field="name">名称</button>
+                      <button class="fleet-filter-option active" type="button" data-sort-field="id">编号</button>
+                    </div>
+                    <label class="fleet-sort-direction">
+                      <span>正序</span>
+                      <input type="checkbox" id="fleet-sort-desc">
+                      <span class="fleet-sort-track" aria-hidden="true"></span>
+                      <span>倒序</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="fleet-ship-gallery" id="fleet-ship-gallery">
+              <div class="fleet-library-empty">正在加载本地舰船资料库…</div>
+            </div>
+          </section>
         </div>
       </div>
 
+      <div class="plan-tab-panel" data-plan-panel="scheme" hidden>
+      <div class="plan-page-layout">
+        <div class="plan-page-main">
       <!-- ═══ 方案选择器弹窗（多方案模板选择具体方案） ═══ -->
       <div id="plan-selector-dialog" class="modal-overlay" style="display:none">
         <div class="modal card" style="max-width:420px">
@@ -308,40 +537,59 @@
       </div>
 
       <div id="plan-detail" class="plan-layout" style="display:none">
-        <!-- 左列：方案信息 + 节点编辑 + 操作 -->
         <div class="plan-left">
-          <div class="card plan-header">
-            <div class="plan-header-top">
-              <h2 id="plan-map-name"></h2>
-              <button class="btn btn-small btn-close-plan" id="btn-close-plan" title="关闭方案">✕</button>
-            </div>
-            <span class="badge" id="plan-file-name"></span>
-            <div class="plan-meta">
-              <label class="plan-meta-item">修理策略：
-                <select id="plan-edit-repair" class="input input-inline">
-                  <option value="1">中破就修</option>
-                  <option value="2">大破才修</option>
+          <section id="plan-task-config" class="card plan-config-card plan-task-config">
+            <div class="plan-module-header plan-config-primary-row">
+              <h3>出征配置</h3>
+              <label class="plan-preset-name">
+                <input
+                  type="text"
+                  id="plan-preset-name"
+                  class="input input-inline"
+                  maxlength="100"
+                  placeholder="当前配置名称"
+                  aria-label="出征配置名称"
+                >
+              </label>
+              <label class="plan-map-picker">
+                <select id="plan-edit-chapter" class="input input-inline" aria-label="章节">
+                  <option value="1">第 1 章</option>
+                  <option value="2">第 2 章</option>
+                  <option value="3">第 3 章</option>
+                  <option value="4">第 4 章</option>
+                  <option value="5">第 5 章</option>
+                  <option value="6">第 6 章</option>
+                  <option value="7">第 7 章</option>
+                  <option value="8">第 8 章</option>
+                  <option value="9">第 9 章</option>
+                  <option value="10">第 10 章</option>
+                </select>
+                <select id="plan-edit-map" class="input input-inline" aria-label="关卡">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
                 </select>
               </label>
-              <label class="plan-meta-item">战况：
-                <select id="plan-edit-fight-cond" class="input input-inline">
-                  <option value="1">稳步前进</option>
-                  <option value="2">火力万岁</option>
-                  <option value="3">全力以赴</option>
-                  <option value="4">深入敌阵</option>
-                  <option value="5">以退为进</option>
-                </select>
-              </label>
             </div>
-            <p class="plan-comment" id="plan-comment"></p>
-          </div>
-
-          <!-- 编队预设选择器 (方案含 fleet_presets 时显示) -->
-          <div id="fleet-preset-section" class="card fleet-preset-card" style="display:none">
-            <div class="fleet-preset-header">
-              <h3 class="fleet-preset-title">编队配置</h3>
-              <div class="fleet-preset-actions">
-                <label class="fleet-select-label">编队：
+            <div class="plan-task-config-grid">
+              <div class="plan-config-pair">
+                <label class="plan-task-config-row">
+                  <span>执行次数</span>
+                  <input type="number" id="plan-edit-times" class="input input-inline input-small" value="1" min="1" max="99999">
+                </label>
+                <label class="plan-task-config-row">
+                  <span>轮次间隔</span>
+                  <span class="plan-task-input-unit">
+                    <input type="number" id="plan-edit-gap" class="input input-inline input-small" value="0" min="0" max="9999">
+                    <span>秒</span>
+                  </span>
+                </label>
+              </div>
+              <div class="plan-config-pair">
+                <label class="plan-config-row">
+                  <span>使用舰队</span>
                   <select id="plan-edit-fleet" class="input input-inline">
                     <option value="1">第 1 舰队</option>
                     <option value="2">第 2 舰队</option>
@@ -349,142 +597,529 @@
                     <option value="4">第 4 舰队</option>
                   </select>
                 </label>
-                <button id="fleet-preset-add" class="btn btn-xs btn-outline" title="新增编队">＋</button>
-              </div>
-            </div>
-            <p class="plan-task-hint" style="margin:0 0 6px">提示：后端暂不支持对第1分队自动改编。仅当所选预设确实需要改编队时，系统会自动改用第2分队并写入任务组配置。</p>
-            <div id="fleet-preset-list" class="fleet-preset-list"></div>
-          </div>
-
-          <!-- 任务配置（次数、间隔、终止条件） -->
-          <div id="plan-task-config" class="card plan-task-config">
-            <h3 class="plan-task-config-title">任务配置</h3>
-            <div class="plan-task-config-grid">
-              <span class="plan-task-label">执行次数</span>
-              <input type="number" id="plan-edit-times" class="input input-inline input-small" value="1" min="1" max="99999">
-              <span class="plan-task-label">间隔(秒)</span>
-              <input type="number" id="plan-edit-gap" class="input input-inline input-small" value="0" min="0" max="9999">
-              <span class="plan-task-label">战利品≥</span>
-              <input type="number" id="plan-edit-loot-ge" class="input input-inline input-small" value="-1" min="-1" max="50">
-              <span class="plan-task-label">掉落舰船≥</span>
-              <input type="number" id="plan-edit-ship-ge" class="input input-inline input-small" value="-1" min="-1" max="500">
-            </div>
-            <span class="plan-task-hint">终止条件: -1为不启用</span>
-
-            <!-- 泡澡修理设置 -->
-            <div class="bath-repair-section">
-              <label class="bath-repair-toggle">
-                <input type="checkbox" id="plan-bath-repair-enable">
-                泡澡修理（不使用快修）
-              </label>
-              <div id="bath-repair-config" class="bath-repair-config" style="display:none">
-                <p class="plan-task-hint" style="margin:4px 0 6px">舰船血量低于阈值时自动送入泡澡，等待修理完成后再执行。选中多个编队预设时自动轮换。</p>
-
-                <!-- 默认修理阈值 -->
-                <div class="bath-default-threshold">
-                  <span class="bath-rotation-label">默认阈值:</span>
-                  <select class="input input-inline bath-default-th-type" id="bath-default-th-type">
-                    <option value="percent">百分比</option>
-                    <option value="absolute">绝对值</option>
+                <label class="plan-config-row">
+                  <span>战况处理</span>
+                  <select id="plan-edit-fight-cond" class="input input-inline">
+                    <option value="1">稳步前进</option>
+                    <option value="2">火力万岁</option>
+                    <option value="3">全力以赴</option>
+                    <option value="4">深入敌阵</option>
+                    <option value="5">以退为进</option>
                   </select>
-                  <input type="number" class="input input-inline input-small" id="bath-default-th-value" value="50" min="0" max="999">
-                </div>
-
-                <!-- 按舰船名设定阈值（根据选中预设动态生成） -->
-                <div id="bath-ship-thresholds" class="bath-ship-thresholds" style="display:none"></div>
-                <p class="plan-task-hint" style="margin:4px 0 0">点击上方编队预设（可多选）后，此处显示具体舰船阈值设置。</p>
+                </label>
+              </div>
+              <div class="plan-config-pair">
+                <label class="plan-config-row">
+                  <span>维修策略</span>
+                  <select id="plan-edit-repair" class="input input-inline">
+                    <option value="1">中破就修</option>
+                    <option value="2">大破才修</option>
+                  </select>
+                </label>
+                <label class="plan-config-row">
+                  <span>维修方式</span>
+                  <select
+                    id="plan-edit-repair-method"
+                    class="input input-inline"
+                    title="泡澡维修会将血量达到 50% 或更低的舰船送入浴室"
+                  >
+                    <option value="quick">快速维修</option>
+                    <option value="bath">泡澡维修</option>
+                  </select>
+                </label>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>战利品检测</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-loot-enabled" aria-label="启用战利品检测">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value" id="plan-edit-loot-fields" hidden>
+                  今日战利品达到
+                  <input type="number" id="plan-edit-loot-ge" class="input input-inline input-small" value="1" min="1" max="50" disabled>
+                  个后停止
+                </span>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>完整采集战果</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-collect-result" aria-label="完整采集战果">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value">
+                  完整读取经验页 / 战绩页（关闭则快速穿行，节省时间）
+                </span>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>掉落检测</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-ship-enabled" aria-label="启用掉落检测">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value" id="plan-edit-ship-fields" hidden>
+                  今日获得舰船达到
+                  <input type="number" id="plan-edit-ship-ge" class="input input-inline input-small" value="1" min="1" max="500" disabled>
+                  艘后停止
+                </span>
               </div>
             </div>
-          </div>
+          </section>
 
-          <!-- 节点详细设置（可滚动区域） -->
-          <div class="plan-editor-area">
-            <div id="node-editor-placeholder" class="card node-editor-placeholder">
-              <p>点击右侧地图节点查看/编辑设置</p>
+          <section id="fleet-preset-section" class="card fleet-preset-card" style="display:none">
+            <div class="plan-module-header fleet-preset-header">
+              <h3 class="fleet-preset-title">编队配置</h3>
+              <button class="btn btn-small btn-primary" id="btn-open-fleet-selector" type="button">选择预设队伍</button>
             </div>
-            <div id="node-info" class="card node-info" style="display:none"></div>
-            <div id="node-editor" class="card node-editor" style="display:none">
-              <div class="node-editor-header">
-                <div class="node-info-badge"></div>
-                <div class="node-editor-title">
-                  <h3>节点 <span id="node-editor-id"></span></h3>
-                  <span class="node-editor-type"></span>
-                </div>
-                <button class="btn btn-small" id="btn-node-editor-close">✕</button>
-              </div>
-              <div class="form-group form-row">
-                <label><input type="checkbox" id="node-edit-enabled" checked> 启用节点</label>
-                <label><input type="checkbox" id="node-edit-endpoint"> 终点节点</label>
-              </div>
-              <p class="plan-task-hint" style="margin:-4px 0 8px">关闭"启用"会从路线中移除。勾选"终点"后，经过此节点即认定本轮执行完成。</p>
-              <div id="node-edit-detour-group" class="form-group form-row" style="display:none">
-                <label><input type="checkbox" id="node-edit-detour"> 迂回</label>
-                <label><input type="checkbox" id="node-edit-sl-when-detour-fails"> 迂回失败SL</label>
-                <span class="plan-task-hint">仅在可迂回节点生效</span>
-              </div>
-              <p id="node-edit-detour-help" class="plan-task-hint" style="display:none;margin:-4px 0 8px"></p>
-              <p id="node-editor-non-combat-note" class="plan-task-hint" style="display:none;margin:0 0 8px">该节点无战斗配置，仅支持启用/关闭。</p>
-              <div id="node-editor-combat-fields">
-              <div class="form-group">
-                <label>阵型</label>
-                <select id="node-edit-formation" class="input">
-                  <option value="1">单纵阵</option>
-                  <option value="2">复纵阵</option>
-                  <option value="3">轮型阵</option>
-                  <option value="4">梯形阵</option>
-                  <option value="5">单横阵</option>
-                </select>
-              </div>
-              <div class="form-group form-row">
-                <label id="node-edit-proceed-label"><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
-                <label><input type="checkbox" id="node-edit-night"> 夜战</label>
-                <label><input type="checkbox" id="node-edit-long-missile-support"> 远程打击</label>
-              </div>
-              <div class="form-group">
-                <label>索敌规则</label>
-                <textarea id="node-edit-rules" class="input node-rules-textarea" rows="2"
-                  placeholder="每行一条，如: DD >= 1, 4&#10;多条件用 and 连接: DD >= 1 and CL >= 2, 4"></textarea>
-                <p class="plan-task-hint" style="margin:4px 0 0">
-                  动作支持: <code>detour</code>（迂回）, <code>retreat</code>（撤退）, <code>1-5</code>（指定阵型）。
-                  分隔符支持英文/中文逗号或箭头: <code>,</code> <code>，</code> <code>=></code> <code>-></code>。
-                </p>
-                <p class="plan-task-hint" style="margin:2px 0 0">示例: <code>BB &gt;= 1, detour</code> 或 <code>CV &gt;= 2 => retreat</code></p>
-              </div>
-              </div>
-              <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
-            </div>
-          </div>
-
+            <div id="fleet-binding-list" class="fleet-binding-list"></div>
+          </section>
         </div>
 
-        <!-- 右列：节点路线地图 -->
         <div class="plan-right">
-          <div class="plan-right-header">
-            <h3>节点路线 <span style="font-size:12px;color:var(--text-muted);font-weight:normal">（点击节点可编辑）</span></h3>
-            <div class="plan-actions plan-actions-top">
-              <button class="btn btn-primary btn-small" id="btn-execute-plan">加入队列</button>
-              <button class="btn btn-small" id="btn-add-to-group">加入任务组</button>
-              <button class="btn btn-small" id="btn-save-plan">保存 YAML</button>
-              <button class="btn btn-small" id="btn-export-plan">另存为</button>
+          <section id="plan-node-route-panel" class="card plan-right-mode plan-node-workspace">
+            <div class="plan-node-preview-frame">
+              <div class="plan-module-header plan-node-preview-header">
+                <h3 class="plan-node-preview-title">节点路线</h3>
+                <div class="plan-actions plan-actions-top">
+                  <button class="btn btn-small" id="btn-new-battle-plan">新建</button>
+                  <button class="btn btn-primary btn-small" id="btn-save-plan">保存</button>
+                  <button class="btn btn-small" id="btn-load-battle-plan">加载</button>
+                </div>
+              </div>
+              <div class="plan-node-preview-body">
+                <div class="node-list" id="node-list"></div>
+                <div
+                  class="plan-editor-area plan-node-info-area"
+                  id="plan-node-info-drawer"
+                  aria-hidden="true"
+                >
+                  <div id="node-editor-placeholder" class="node-editor-placeholder">
+                    <h3>节点信息</h3>
+                    <p>点击地图上的节点查看和编辑</p>
+                  </div>
+                  <div id="node-editor" class="node-editor" style="display:none">
+                <div class="node-editor-header">
+                  <div class="node-info-badge"></div>
+                  <div class="node-editor-title">
+                    <h3>节点 <span id="node-editor-id"></span></h3>
+                    <span class="node-editor-type"></span>
+                  </div>
+                  <div class="node-editor-toggles">
+                    <label class="config-switch node-enabled-switch">
+                      <input type="checkbox" id="node-edit-enabled" checked>
+                      <span class="config-switch-track" aria-hidden="true"></span>
+                      <span>启用节点</span>
+                    </label>
+                    <label class="node-enable-dependent">
+                      <input type="checkbox" id="node-edit-endpoint">
+                      终点节点
+                    </label>
+                  </div>
+                  <div class="node-editor-actions">
+                    <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
+                    <button class="btn btn-small" id="btn-node-editor-close">✕</button>
+                  </div>
+                </div>
+                <p class="plan-task-hint node-editor-toggle-hint node-enable-dependent">关闭“启用”会从路线中移除；终点的战果判断选择“无”时，经过该节点即认定本轮完成。</p>
+                <div class="form-group node-setting-row node-enable-dependent">
+                  <span class="node-setting-label">迂回规则</span>
+                  <div id="node-edit-detour-group" class="node-inline-options" style="display:none">
+                    <label><input type="checkbox" id="node-edit-detour"> 迂回</label>
+                    <label><input type="checkbox" id="node-edit-sl-when-detour-fails"> 迂回失败 S/L</label>
+                  </div>
+                  <span id="node-edit-detour-help" class="plan-task-hint node-detour-help" style="display:none"></span>
+                </div>
+                <p id="node-editor-non-combat-note" class="plan-task-hint node-enable-dependent" style="display:none;margin:0 0 8px">该节点无战斗配置，仅支持启用或关闭。</p>
+                <div id="node-editor-combat-fields" class="node-enable-dependent">
+                  <div class="form-group node-formation-group" id="node-edit-formation" role="radiogroup" aria-label="阵型">
+                    <span class="node-setting-label">阵型选择</span>
+                    <label><input type="radio" name="node-edit-formation" value="1"> 单纵阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="2" checked> 复纵阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="3"> 轮型阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="4"> 梯形阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="5"> 单横阵</label>
+                  </div>
+                  <div class="form-group node-setting-row node-battle-action-row">
+                    <span class="node-setting-label">战斗动作</span>
+                    <div class="node-inline-options">
+                      <label id="node-edit-proceed-label"><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
+                      <label><input type="checkbox" id="node-edit-night"> 夜战</label>
+                      <label><input type="checkbox" id="node-edit-long-missile-support"> 远程打击</label>
+                      <span class="node-result-options node-enable-dependent" id="node-edit-result-group" role="radiogroup" aria-label="最低战果" hidden>
+                        <span class="node-result-label">战果判断：</span>
+                        <label><input type="radio" name="node-edit-result" value="" checked> 无</label>
+                        <label><input type="radio" name="node-edit-result" value="D"> D</label>
+                        <label><input type="radio" name="node-edit-result" value="C"> C</label>
+                        <label><input type="radio" name="node-edit-result" value="B"> B</label>
+                        <label><input type="radio" name="node-edit-result" value="A"> A</label>
+                        <label><input type="radio" name="node-edit-result" value="S"> S</label>
+                        <label><input type="radio" name="node-edit-result" value="SS"> SS</label>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <div class="node-rules-heading">
+                      <label for="node-edit-rules">索敌规则</label>
+                      <span class="plan-task-hint">
+                        动作支持: <code>detour</code>（迂回）, <code>retreat</code>（撤退）, <code>1-5</code>（指定阵型）；
+                        分隔符支持 <code>,</code> <code>，</code> <code>=></code> <code>-></code>。
+                      </span>
+                    </div>
+                    <textarea id="node-edit-rules" class="input node-rules-textarea" rows="4"
+                      placeholder="格式: 舰种代码 比较符 数量, 动作&#10;比较符: &gt; &gt;= &lt; &lt;= == !=（仅支持英文半角符号，不支持 ≥ ≤）&#10;动作: retreat（撤退）、detour（迂回）、1-5（指定阵型）&#10;示例: CV &gt;= 1, retreat&#10;多条件: DD &gt;= 1 and CL &gt;= 2, 4"></textarea>
+                  </div>
+                </div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="node-list" id="node-list"></div>
+          </section>
+
+          <section id="fleet-selector-panel" class="card plan-right-mode fleet-selector-panel" hidden>
+            <div class="plan-right-header">
+              <div class="fleet-selector-heading">
+                <h3>选择队伍</h3>
+                <p>拖拽预设卡片到编队管理列表</p>
+              </div>
+              <button
+                class="fleet-selector-close"
+                id="btn-close-fleet-selector"
+                type="button"
+                aria-label="关闭选择队伍"
+                title="关闭"
+              >×</button>
+            </div>
+            <div class="fleet-selector-search-row">
+              <input
+                class="input"
+                id="plan-team-selector-search"
+                type="search"
+                placeholder="搜索预设名称"
+                autocomplete="off"
+              >
+              <span id="plan-team-selector-count">共读取 0 个舰队预设</span>
+            </div>
+            <div class="fleet-team-loader-tools fleet-selector-tools">
+              <div class="fleet-team-loader-system-filter">
+                <span>过滤系统预设</span>
+                <label class="config-switch">
+                  <input type="checkbox" id="plan-team-selector-filter-system" checked>
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div class="fleet-team-loader-sort">
+                <span>排序方式</span>
+                <div class="fleet-team-loader-sort-controls">
+                  <div class="fleet-team-loader-sort-fields">
+                    <button
+                      class="fleet-team-loader-sort-option"
+                      data-plan-team-sort-field="name"
+                      type="button"
+                    >名称</button>
+                    <button
+                      class="fleet-team-loader-sort-option active"
+                      data-plan-team-sort-field="modifiedAt"
+                      type="button"
+                    >修改时间</button>
+                  </div>
+                  <label class="fleet-sort-direction">
+                    <span>倒序</span>
+                    <input type="checkbox" id="plan-team-selector-sort-asc">
+                    <span class="fleet-sort-track" aria-hidden="true"></span>
+                    <span>正序</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="fleet-selector-content">
+              <div
+                id="fleet-preset-list"
+                class="fleet-team-loader-list fleet-selector-team-list"
+                aria-label="编队预设列表"
+              ></div>
+              <div class="fleet-team-preview">
+                <div class="fleet-team-preview-heading">
+                  <h3 id="fleet-team-preview-title">编队预览</h3>
+                  <p class="fleet-team-preview-hint">点击主编队位置，查看该位置对应的备选队列。</p>
+                </div>
+                <div id="fleet-team-main-preview" class="fleet-team-main-preview"></div>
+                <h4 id="fleet-team-backup-title">【位置1】的备选队列</h4>
+                <div id="fleet-team-backup-preview" class="fleet-team-backup-preview"></div>
+              </div>
+            </div>
+            <p class="fleet-dialog-status" id="plan-team-selector-status"></p>
+          </section>
         </div>
       </div>
 
         </div>
-        <!-- 模板库侧栏（始终可见） -->
-        <div class="card template-library-card" id="template-library-card">
-          <div class="template-library-header">
-            <h3>模板库</h3>
-            <div class="template-library-actions">
-              <button class="btn btn-small" id="btn-import-template" title="从 JSON 文件导入模板">导入</button>
-              <button class="btn btn-small btn-primary" id="btn-create-template">创建模板</button>
+      </div>
+      </div>
+
+      <div class="plan-tab-panel" data-plan-panel="decisive" hidden>
+        <div class="fleet-planner-layout decisive-plan-layout">
+        <section class="fleet-planner-fleet card decisive-plan-card">
+          <div class="fleet-formation-heading fleet-planner-toolbar decisive-plan-heading">
+            <div class="decisive-plan-title-line">
+              <h2>决战计划（旧）</h2>
+              <p>主选队列优先加入编队，不足六艘时按备选队列顺序补充。</p>
+            </div>
+            <div class="decisive-plan-actions">
+              <button class="btn btn-small" id="btn-reset-decisive-plan" type="button" disabled>恢复默认</button>
+              <button class="btn btn-small btn-primary" id="btn-save-decisive-plan" type="button">保存配置</button>
             </div>
           </div>
-          <p class="config-hint" style="margin:0 0 8px;font-size:11px">保存可复用的任务参数预设。点击「加入列表」将模板添加到主页任务列表。</p>
-          <div class="template-library-items" id="template-library-items">
-            <p class="tpl-empty">暂无模板，点击「创建模板」添加</p>
+
+          <div class="decisive-plan-controls">
+            <label class="decisive-plan-field">
+              <span>章节选择</span>
+              <select class="input" id="decisive-plan-chapter">
+                <option value="1">第 1 章</option>
+                <option value="2">第 2 章</option>
+                <option value="3">第 3 章</option>
+                <option value="4">第 4 章</option>
+                <option value="5">第 5 章</option>
+                <option value="6">第 6 章</option>
+              </select>
+            </label>
+            <label class="config-switch">
+              <input type="checkbox" id="decisive-plan-quick-repair" checked>
+              <span class="config-switch-track" aria-hidden="true"></span>
+              <span>启用快速修理</span>
+            </label>
+            <label class="config-switch">
+              <input type="checkbox" id="decisive-plan-edit-enabled">
+              <span class="config-switch-track" aria-hidden="true"></span>
+              <span>允许修改队伍</span>
+            </label>
+            <span class="decisive-plan-status" id="decisive-plan-status">正在读取配置…</span>
+          </div>
+
+          <div class="fleet-formation-heading decisive-tier-heading">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-primary">主选队列</h3>
+            <strong class="decisive-automation-note">
+              该页面最后保存配置即系统设置中自动决战选择“用户计划”时所执行配置；选择“系统预设”时不使用此配置。
+            </strong>
+          </div>
+          <section class="fleet-formation-section">
+            <div class="fleet-slot-scroll">
+              <div class="fleet-slot-list" id="decisive-level1-list" aria-label="决战主选编队槽位"></div>
+            </div>
+          </section>
+
+          <div class="fleet-formation-heading fleet-backup-heading decisive-tier-heading">
+            <h3 class="fleet-formation-tag fleet-queue-badge is-backup">备选队列</h3>
+            <div class="fleet-backup-actions">
+              <strong id="decisive-level2-count">0 艘</strong>
+                <button class="btn btn-small btn-primary" id="btn-add-decisive-backup" type="button" disabled>增加备选</button>
+            </div>
+          </div>
+          <section class="fleet-formation-section fleet-backup-section">
+            <div class="fleet-backup-scroll">
+              <div class="fleet-backup-slot-list" id="decisive-level2-list" aria-label="决战备选编队槽位"></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="fleet-planner-library card decisive-plan-library">
+          <div class="fleet-library-header">
+            <div class="fleet-library-title">
+              <h2>舰娘图鉴</h2>
+              <span id="decisive-gallery-count">正在读取图鉴…</span>
+            </div>
+            <div class="fleet-library-search-actions">
+              <label class="fleet-search">
+                <span aria-hidden="true">⌕</span>
+                <input
+                  id="decisive-gallery-search"
+                  type="search"
+                  placeholder="搜索舰名或编号"
+                  autocomplete="off"
+                >
+              </label>
+              <div class="fleet-library-filter-triggers">
+                <button class="btn btn-small fleet-filter-trigger" type="button" data-decisive-filter-trigger="filter" aria-expanded="false">
+                  <span class="fleet-filter-trigger-name">筛选</span>
+                  <span id="decisive-filter-count"></span>
+                </button>
+                <button class="btn btn-small" id="btn-reset-decisive-filter" type="button">恢复默认</button>
+              </div>
+            </div>
+            <div class="fleet-filter-popover" id="decisive-filter-popover" hidden>
+              <div class="fleet-filter-popover-header">
+                <div class="fleet-filter-popover-heading">
+                  <strong>综合筛选</strong>
+                  <label class="config-switch fleet-refit-filter">
+                    <span>过滤改造</span>
+                    <input id="decisive-filter-refit-only" type="checkbox">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                  </label>
+                </div>
+                <div class="fleet-filter-popover-actions">
+                  <button class="btn btn-small btn-primary" id="btn-confirm-decisive-filter" type="button">确定</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">舰型分组</span>
+                <div class="fleet-filter-options" id="decisive-filter-groups">
+                  <button class="fleet-filter-option active" type="button" data-filter-kind="group" data-filter-value="all">全部</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="large">大型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="medium">中型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="small">小型舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="main_force">主力舰</button>
+                  <button class="fleet-filter-option" type="button" data-filter-kind="group" data-filter-value="escort">护卫舰</button>
+                </div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">类型</span>
+                <div class="fleet-filter-options fleet-filter-options-scroll" id="decisive-filter-types"></div>
+              </div>
+              <div class="fleet-filter-section">
+                <span class="fleet-filter-label">国籍</span>
+                <div class="fleet-filter-options" id="decisive-filter-countries"></div>
+              </div>
+              <div class="fleet-filter-section fleet-filter-sort-section">
+                <span class="fleet-filter-label">排序规则</span>
+                <div class="fleet-filter-sort-controls">
+                  <div class="fleet-filter-options">
+                    <button class="fleet-filter-option" type="button" data-sort-field="type">类型</button>
+                    <button class="fleet-filter-option" type="button" data-sort-field="name">名称</button>
+                    <button class="fleet-filter-option active" type="button" data-sort-field="id">编号</button>
+                  </div>
+                  <label class="fleet-sort-direction">
+                    <span>正序</span>
+                    <input type="checkbox" id="decisive-sort-desc">
+                    <span class="fleet-sort-track" aria-hidden="true"></span>
+                    <span>倒序</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div
+            class="fleet-ship-gallery decisive-ship-gallery"
+            id="decisive-ship-gallery"
+            aria-label="决战舰娘图鉴"
+          >
+            <div class="fleet-library-empty">正在加载本地舰船资料库…</div>
+          </div>
+        </section>
+        </div>
+      </div>
+
+      <div class="plan-tab-panel" data-plan-panel="manage" hidden>
+        <div class="plan-management-layout">
+          <div class="card plan-team-management-card">
+            <div class="plan-management-heading">
+              <div class="plan-management-title">
+                <h3>YAML 计划管理</h3>
+                <p>查看出征计划、舰队方案及其关联状态。系统文件只读，用户文件可管理。</p>
+              </div>
+              <button class="btn btn-small" id="btn-refresh-plan-management" type="button">刷新</button>
+            </div>
+
+            <div class="plan-management-summary" aria-label="计划统计">
+              <div class="plan-management-stat">
+                <span>出征计划</span>
+                <strong id="plan-management-battle-count">0</strong>
+              </div>
+              <div class="plan-management-stat">
+                <span>舰队方案</span>
+                <strong id="plan-management-team-count">0</strong>
+              </div>
+              <div class="plan-management-stat is-linked">
+                <span>关联正常</span>
+                <strong id="plan-management-linked-count">0</strong>
+              </div>
+              <div class="plan-management-stat is-warning">
+                <span>关联异常</span>
+                <strong id="plan-management-attention-count">0</strong>
+              </div>
+            </div>
+
+            <div class="plan-management-toolbar">
+              <div class="plan-management-subtabs" role="tablist" aria-label="计划来源">
+                <button
+                  class="plan-management-subtab active"
+                  type="button"
+                  data-plan-management-source="all"
+                >全部</button>
+                <button
+                  class="plan-management-subtab"
+                  type="button"
+                  data-plan-management-source="system"
+                >系统</button>
+                <button
+                  class="plan-management-subtab"
+                  type="button"
+                  data-plan-management-source="user"
+                >用户</button>
+                <button
+                  class="btn btn-small btn-primary plan-management-export"
+                  id="btn-export-user-plans"
+                  type="button"
+                  disabled
+                >批量导出</button>
+                <button
+                  class="btn btn-small plan-management-export"
+                  id="btn-export-legacy-143-plans"
+                  type="button"
+                >导出 1.4.3 降级备份</button>
+                <button
+                  class="btn btn-small btn-danger plan-management-delete"
+                  id="btn-delete-user-plans"
+                  type="button"
+                  disabled
+                >批量删除</button>
+              </div>
+              <div class="plan-management-filters">
+                <input
+                  class="input plan-management-search"
+                  id="plan-management-search"
+                  type="search"
+                  placeholder="搜索计划、舰队或文件名"
+                >
+                <div class="plan-management-kind-filter" role="group" aria-label="YAML 类型">
+                  <button class="active" type="button" data-plan-management-kind="all">全部 YAML</button>
+                  <button type="button" data-plan-management-kind="battle">出征计划</button>
+                  <button type="button" data-plan-management-kind="team">舰队方案</button>
+                </div>
+                <label class="config-switch plan-management-attention-filter">
+                  <input id="plan-management-attention-only" type="checkbox">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                  <span>过滤非异常</span>
+                </label>
+              </div>
+            </div>
+
+            <p class="plan-management-warning" id="plan-management-warning" hidden></p>
+
+            <div class="plan-team-management-table-wrap">
+              <table class="plan-team-management-table">
+                <thead>
+                  <tr>
+                    <th class="plan-management-selection-column">
+                      <input
+                        id="plan-management-select-all"
+                        type="checkbox"
+                        aria-label="全选当前筛选结果中的用户配置"
+                        title="全选当前筛选结果中的用户配置"
+                      >
+                    </th>
+                    <th>YAML 配置</th>
+                    <th>来源</th>
+                    <th>关联关系</th>
+                    <th>任务分组</th>
+                    <th>状态</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="plan-team-management-body">
+                  <tr>
+                    <td colspan="7">正在读取计划…</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -492,263 +1127,720 @@
 
     <!-- 配置页面 -->
     <section id="page-config" class="page">
-      <div class="config-header">
-        <h2 class="config-page-title">配置</h2>
+      <div class="config-navigation-row">
+        <div class="config-tabs" role="tablist" aria-label="设置分类">
+          <button class="config-tab active" type="button" data-config-tab="system">系统设置</button>
+          <button class="config-tab" type="button" data-config-tab="behavior">脚本行为</button>
+        </div>
+        <p class="config-tab-description" id="config-tab-description">管理运行环境、自动任务、日志和界面设置。</p>
         <div class="config-header-actions">
-          <button class="btn btn-link" id="btn-open-config-dir">打开配置目录</button>
-          <button class="btn btn-primary" id="btn-save-config">保存配置</button>
-        </div>
-      </div>
-      <div class="config-grid">
-
-      <!-- ═══ 左列：基础设置 ═══ -->
-      <div class="config-col-left">
-
-      <div class="card config-card-emu">
-        <h3>模拟器配置</h3>
-        <div class="form-group">
-          <label>模拟器类型</label>
-          <select id="cfg-emu-type" class="input">
-            <option value="雷电">雷电</option>
-            <option value="蓝叠">蓝叠</option>
-            <option value="MuMu">MuMu</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label>模拟器路径</label>
-          <div class="input-row">
-            <input type="text" id="cfg-emu-path" class="input" placeholder="留空自动检测">
-            <button class="btn btn-small" id="btn-browse-emu">浏览</button>
-          </div>
-        </div>
-        <div class="form-group">
-          <label>ADB 端口 (serial)</label>
-          <div class="input-row">
-            <input type="text" id="cfg-emu-serial" class="input" placeholder="如 127.0.0.1:16384，留空自动检测">
-            <button class="btn btn-small" id="btn-check-adb">检测 ADB</button>
-            <span id="cfg-adb-status" class="adb-status adb-status-unknown">未检测</span>
-          </div>
+          <button class="btn btn-link" id="btn-open-config-dir">打开 AutoWSGR-GUI 根目录</button>
+          <button class="btn btn-primary" id="btn-save-config">保存设置</button>
         </div>
       </div>
 
-      <div class="card config-card-auto">
-        <h3>自动化设置 <span class="config-tip" title="每日自动调度的任务开关。启用后，后端启动时自动执行对应任务。">?</span></h3>
-
-        <div class="auto-list">
-          <div class="auto-item">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-expedition" checked> 自动远征</label>
-            <div class="auto-item-body" id="cfg-auto-expedition-body">
-              <label>检查间隔（分钟）</label>
-              <input type="number" id="cfg-expedition-interval" class="input" min="1" max="120" value="15">
+      <div class="config-list-panels">
+        <div class="config-list-panel" data-config-panel="system">
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>模拟器与账号</h3>
+              <p>连接游戏模拟器并选择游戏渠道。</p>
             </div>
-          </div>
-
-          <div class="auto-item">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-battle"> 自动战役</label>
-            <div class="auto-item-body" id="cfg-auto-battle-body">
-              <div class="auto-item-row">
-                <label>战役类型</label>
-                <select id="cfg-battle-type" class="input">
-                  <option value="困难潜艇">困难潜艇</option>
-                  <option value="困难航母">困难航母</option>
-                  <option value="困难驱逐">困难驱逐</option>
-                  <option value="困难巡洋">困难巡洋</option>
-                  <option value="困难战列">困难战列</option>
-                  <option value="简单航母">简单航母</option>
-                  <option value="简单潜艇">简单潜艇</option>
-                  <option value="简单驱逐">简单驱逐</option>
-                  <option value="简单巡洋">简单巡洋</option>
-                  <option value="简单战列">简单战列</option>
-                </select>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>模拟器类型</strong>
+                  <span>选择当前使用的安卓模拟器。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-emu-type" class="input">
+                    <option value="雷电">雷电</option>
+                    <option value="蓝叠">蓝叠</option>
+                    <option value="MuMu">MuMu</option>
+                    <option value="云手机">云手机</option>
+                    <option value="其他">其他</option>
+                  </select>
+                </div>
               </div>
-              <div class="auto-item-row">
-                <label>次数</label>
-                <input type="number" id="cfg-battle-times" class="input" min="1" max="10" value="3">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>允许测试版更新</strong>
+                  <span>关闭时只接收稳定版；开启后也可接收版本号更高的 Alpha 测试版。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-allow-test-updates">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>允许 Alpha</span>
+                  </label>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div class="auto-item">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-exercise"> 自动演习</label>
-            <div class="auto-item-body" id="cfg-auto-exercise-body">
-              <label>演习舰队</label>
-              <select id="cfg-exercise-fleet" class="input">
-                <option value="1">第 1 舰队</option>
-                <option value="2">第 2 舰队</option>
-                <option value="3">第 3 舰队</option>
-                <option value="4">第 4 舰队</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="auto-item auto-item-inline">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-normal-fight"> 自动常规出击 <span class="config-tip" title="每日自动执行任务列表中的所有任务。">?</span></label>
-          </div>
-
-          <div class="auto-item">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-decisive"> 自动决战</label>
-            <div class="auto-item-body" id="cfg-auto-decisive-body">
-              <div class="auto-item-row">
-                <label>保留票数</label>
-                <input type="number" id="cfg-decisive-ticket-reserve" class="input" min="0" value="0" style="width:80px">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>模拟器路径</strong>
+                  <span>模拟器程序路径，留空时由后端自动检测。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row">
+                    <input type="text" id="cfg-emu-path" class="input" placeholder="留空自动检测">
+                    <button class="btn btn-small" id="btn-browse-emu">浏览</button>
+                  </div>
+                </div>
               </div>
-              <div class="auto-item-row">
-                <label>模板</label>
-                <select id="cfg-decisive-template" class="input">
-                  <option value="">未选择</option>
-                </select>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>ADB 端口</strong>
+                  <span>模拟器的 ADB 地址，例如 127.0.0.1:16384。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-adb-controls">
+                    <div class="config-adb-input-wrap">
+                      <input type="text" id="cfg-emu-serial" class="input" placeholder="如 127.0.0.1:16384">
+                      <span id="cfg-adb-status" class="adb-status adb-status-unknown">未检测</span>
+                    </div>
+                    <button class="btn btn-small btn-primary" id="btn-connect-adb" type="button">主动连接</button>
+                    <button class="btn btn-small" id="btn-disconnect-adb" type="button">断开连接</button>
+                    <button class="btn btn-small" id="btn-check-adb" type="button">自动检测</button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
-
-          <div class="auto-item">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-auto-loot"> 每日自动刷战利品</label>
-            <div class="auto-item-body" id="cfg-auto-loot-body">
-              <div class="auto-item-row">
-                <label>地图方案</label>
-                <select id="cfg-loot-plan" class="input">
-                  <option value="0">9-2</option>
-                  <option value="1">7-4</option>
-                  <option value="2">8-5</option>
-                  <option value="3">2-1</option>
-                </select>
-              </div>
-              <div class="auto-item-row">
-                <label>战利品达到</label>
-                <div class="input-row" style="align-items:center;gap:8px">
-                  <input type="number" id="cfg-loot-stop-count" class="input" min="1" max="50" value="50" style="width:80px">
-                  <span style="font-size:12px;color:var(--text-muted)">个时停止</span>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>游戏账号</strong>
+                  <span>选择账号所属渠道，用于确定游戏包名。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-game-app" class="input">
+                    <option value="官服">官服</option>
+                    <option value="小米">小米</option>
+                    <option value="应用宝">应用宝</option>
+                  </select>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
+          </section>
 
-      <div class="card" style="display:none">
-        <h3>游戏账号</h3>
-        <div class="form-group">
-          <label>渠道服</label>
-          <select id="cfg-game-app" class="input">
-            <option value="官服">官服</option>
-            <option value="小米服">小米服</option>
-            <option value="应用宝服">应用宝服</option>
-          </select>
-        </div>
-      </div>
-
-      </div><!-- /config-col-left -->
-
-      <!-- ═══ 右列：环境与界面设置 ═══ -->
-      <div class="config-col-right">
-
-      <div class="card config-card-runtime">
-        <h3>环境配置</h3>
-        <div class="form-group">
-          <label>Python 解释器路径 <span class="config-tip" title="需 Python 3.12/3.13；留空将按内置 → 系统顺序检测。修改后重启生效。">?</span></label>
-          <div class="input-row">
-            <input type="text" id="cfg-python-path" class="input" placeholder="留空自动检测">
-            <button class="btn btn-small" id="btn-browse-python">浏览</button>
-            <button class="btn btn-small" id="btn-validate-python">检测</button>
-            <span id="cfg-python-status" class="adb-status adb-status-unknown"></span>
-          </div>
-        </div>
-
-        <hr class="card-divider">
-
-        <div class="form-group">
-          <label>后端端口</label>
-          <div class="input-row config-runtime-row">
-            <input type="number" id="cfg-backend-port" class="input config-inline-number" min="1" max="65535" value="8438">
-            <span class="config-tip config-inline-note" title="修改后需重启生效">?</span>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>OCR 加速模式 <span class="config-tip" title="自动模式会在后端启动时检测 CUDA 可用性，避免默认落到 CPU。">?</span></label>
-          <div class="input-row config-runtime-row">
-            <select id="cfg-ocr-gpu-mode" class="input">
-              <option value="auto">自动检测 CUDA（推荐）</option>
-              <option value="cuda">强制使用 CUDA</option>
-              <option value="cpu">强制使用 CPU</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>CUDA 路径 <span class="config-tip" title="可指定 CUDA Toolkit 根目录/bin，或 PyTorch CUDA Runtime DLL 目录。留空时使用系统环境。路径本身不能把 CPU 版 PyTorch 转换为 CUDA 版。修改后重启生效。">?</span></label>
-          <div class="input-row">
-            <input type="text" id="cfg-cuda-path" class="input" placeholder="Toolkit 根目录，或 ...\torch\lib">
-            <button class="btn btn-small" id="btn-browse-cuda">浏览</button>
-            <button class="btn btn-small" id="btn-validate-cuda">检测</button>
-            <span id="cfg-cuda-status" class="adb-status adb-status-unknown"></span>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="auto-toggle"><input type="checkbox" id="cfg-debug-mode"> 调试模式 <span class="config-tip" title="开启后输出完整log，并且可启用调试用功能">?</span></label>
-        </div>
-
-        <div id="cfg-debug-advanced" style="display:none">
-          <div class="form-group">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-save-backend-screenshots"> 保存识别异常截图到本地 <span class="config-tip" title="勾选后自动保存识别异常的截图到本地">?</span></label>
-          </div>
-
-          <hr class="card-divider">
-
-          <div class="form-group">
-            <label class="auto-toggle"><input type="checkbox" id="cfg-use-external-backend"> 使用本地后端 <span class="config-tip" title="使用本地后端代码代替默认拉取的后端代码">?</span></label>
-          </div>
-
-          <div class="form-group" id="cfg-backend-repo-wrap" style="display:none">
-            <label>本地后端仓库路径 <span class="config-tip" title="启用本地后端后必须填写，用于加载本地 autowsgr 源码。">?</span></label>
-            <div class="input-row">
-              <input type="text" id="cfg-backend-repo-path" class="input" placeholder="如 E:\autowsgr-fork">
-              <button class="btn btn-small" id="btn-browse-backend-repo">浏览</button>
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>日志与调试</h3>
+              <p>控制后端日志详细程度和 GUI 调试功能。</p>
             </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>日志等级</strong>
+                  <span>统一控制普通日志和模块调试信息；模块独立等级后续在此展开。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-log-level" class="input">
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>日志目录</strong>
+                  <span>后端保存日志文件和调试截图的根目录。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-compact-path-row">
+                    <input type="text" id="cfg-log-root" class="input" placeholder="logs">
+                    <button class="btn btn-small" id="btn-browse-log-root" type="button">选择</button>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>调试模式</strong>
+                  <span>显示 GUI 调试日志，并开放本地后端和异常截图等开发者功能。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-debug-mode">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>环境配置</h3>
+              <p>管理 GUI 启动后端时使用的 Python 和本地源码。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>Python 路径</strong>
+                  <span>需要 Python 3.12 或 3.13，留空时按内置、系统顺序检测。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row">
+                    <input type="text" id="cfg-python-path" class="input" placeholder="留空自动检测">
+                    <button class="btn btn-small" id="btn-browse-python">浏览</button>
+                    <button class="btn btn-small" id="btn-validate-python">检测</button>
+                    <span id="cfg-python-status" class="adb-status adb-status-unknown"></span>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>后端接口</strong>
+                  <span>当前 GUI 连接本机后端，修改端口后需要重启。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-backend-controls">
+                    <span class="config-prefix">127.0.0.1:</span>
+                    <input type="number" id="cfg-backend-port" class="input config-inline-number" min="1" max="65535" value="8438">
+                    <button class="btn btn-small" id="btn-check-backend" type="button">检测</button>
+                    <span id="cfg-backend-status" class="adb-status adb-status-unknown"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div id="cfg-debug-advanced" class="config-advanced-box" style="display:none">
+              <label class="config-switch">
+                <input type="checkbox" id="cfg-save-backend-screenshots">
+                <span class="config-switch-track" aria-hidden="true"></span>
+                <span>保存识别异常截图到本地</span>
+              </label>
+              <label class="config-switch">
+                <input type="checkbox" id="cfg-use-external-backend">
+                <span class="config-switch-track" aria-hidden="true"></span>
+                <span>使用本地后端源码</span>
+              </label>
+              <div id="cfg-backend-repo-wrap" style="display:none">
+                <div class="input-row">
+                  <input type="text" id="cfg-backend-repo-path" class="input" placeholder="本地 AutoWSGR 仓库路径">
+                  <button class="btn btn-small" id="btn-browse-backend-repo">浏览</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>更新与界面</h3>
+              <p>保留原有更新、颜色主题和主色调设置。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>默认窗口大小</strong>
+                  <span>设置软件每次启动时的默认宽度和高度，最小为 854 × 480。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row window-size-control">
+                    <label>宽 <input type="number" id="cfg-window-width" class="input" min="854" step="1" value="1280"></label>
+                    <span>×</span>
+                    <label>高 <input type="number" id="cfg-window-height" class="input" min="480" step="1" value="720"></label>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>记录退出时的窗口</strong>
+                  <span>启用后保存退出时的窗口大小和位置，下次启动优先恢复；显示器变化时自动回到默认大小。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-remember-window-bounds">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>更新模式</strong>
+                  <span>自动模式会在启动时检查更新，手动模式仅在点击按钮时检查。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-update-controls">
+                    <select id="cfg-update-mode" class="input">
+                      <option value="auto">自动更新</option>
+                      <option value="manual">手动更新</option>
+                    </select>
+                    <button class="btn btn-small" id="btn-check-updates">立即检查</button>
+                    <div id="gui-update-progress" class="config-update-progress" hidden>
+                      <div class="config-update-progress-copy">
+                        <span id="gui-update-status">准备检查更新</span>
+                        <span id="gui-update-percent">0%</span>
+                      </div>
+                      <div
+                        id="gui-update-progress-track"
+                        class="config-update-progress-track"
+                        role="progressbar"
+                        aria-label="GUI 更新进度"
+                        aria-valuemin="0"
+                        aria-valuemax="100"
+                        aria-valuenow="0"
+                      >
+                        <span id="gui-update-progress-fill"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>更新舰船数据库</strong>
+                  <span>从舰R百科获取最新舰船资料，只下载新增、变化或缺失的数据；点击“同步后端”会把 GUI 新增舰名增量写入本地后端船库。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row ship-library-update-control">
+                    <span id="ship-library-status" class="adb-status adb-status-unknown">尚未检查</span>
+                    <button class="btn btn-small" id="btn-update-ship-library">更新舰船数据库</button>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>主色调</strong>
+                  <span>选择暗色、柔和亮色或跟随系统，并设置按钮、选中状态和强调信息的颜色。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-accent-row config-theme-accent-row">
+                    <select id="cfg-theme-mode" class="input" aria-label="界面主题">
+                      <option value="dark">暗色</option>
+                      <option value="light">亮色（柔和）</option>
+                      <option value="system">跟随系统</option>
+                    </select>
+                    <input type="color" id="cfg-accent-color" value="#0f7dff" class="color-picker">
+                    <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
+                    <button class="btn btn-small" id="btn-reset-accent">重置</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="config-compat-controls" aria-hidden="true">
+            <div id="cfg-auto-expedition-body"><input type="number" id="cfg-expedition-interval" value="15"></div>
+            <input type="number" id="cfg-battle-times" value="8">
           </div>
         </div>
-      </div>
 
-      <div class="card config-card-ui">
-        <h3>更新与界面</h3>
+        <div class="config-list-panel" data-config-panel="behavior" hidden>
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>全局延迟</h3>
+              <p>可以调节脚本操作的全局间隔，如果出现页面卡顿可以尝试拉高。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>操作等待区间</strong>
+                  <span>每次操作后，在最小值和最大值之间随机等待，范围为 0 到 10 秒。</span>
+                </div>
+                <div class="config-setting-control config-range-preview">
+                  <label>最小值 <input type="range" id="cfg-delay-min-range" min="0" max="10" step="0.1" value="0"><input type="number" id="cfg-delay-min" class="input" min="0" max="10" step="0.1" value="0"></label>
+                  <label>最大值 <input type="range" id="cfg-delay-max-range" min="0" max="10" step="0.1" value="0"><input type="number" id="cfg-delay-max" class="input" min="0" max="10" step="0.1" value="0"></label>
+                </div>
+              </div>
+            </div>
+          </section>
 
-        <div class="form-group">
-          <label>更新模式 <span class="config-tip" title="手动模式下，不会在启动时自动检查或自动下载更新。">?</span></label>
-          <div class="input-row config-runtime-row">
-            <select id="cfg-update-mode" class="input">
-              <option value="auto">自动更新（启动时自动检查）</option>
-              <option value="manual">手动更新（仅在点击按钮时检查）</option>
-            </select>
-            <button class="btn btn-small" id="btn-check-updates">立即检查更新</button>
-          </div>
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>手动安全强化</h3>
+              <p>不加入 Scheduler。当前只扫描库存、选择 occurrence 并展示收益投影，不提供强化执行入口。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>强化目标舰</strong><span>目标舰必须明确；输入框支持舰名补全。</span></div>
+                <div class="config-setting-control">
+                  <input type="text" id="cfg-intensify-target" class="input" placeholder="输入舰名，例如 胡德">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>素材策略</strong><span>限制每批素材数量，或明确设为不限制；自动强化与本页只读预览都会使用这里保存的策略。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <select id="cfg-intensify-material-types" class="input intensify-material-types" multiple size="5">
+                    <option value="AP">补给 AP</option><option value="AV">装母 AV</option>
+                    <option value="CV">航母 CV</option><option value="BB">战列 BB</option>
+                    <option value="BBG">导战 BBG</option><option value="BBV">航战 BBV</option>
+                    <option value="BC">战巡 BC</option><option value="BG">大巡 BG</option>
+                    <option value="BM">重炮 BM</option><option value="CA">重巡 CA</option>
+                    <option value="CAV">航巡 CAV</option><option value="CG">防巡 CG</option>
+                    <option value="CL">轻巡 CL</option><option value="CLT">雷巡 CLT</option>
+                    <option value="CVL">轻母 CVL</option><option value="DD">驱逐 DD</option>
+                    <option value="ASDG">导驱 ASDG</option><option value="AADG">防驱 AADG</option>
+                    <option value="KP">导巡 KP</option><option value="SC">炮潜 SC</option>
+                    <option value="SS">潜艇 SS</option><option value="SSG">导潜 SSG</option>
+                  </select>
+                  <label>单批素材上限 <input type="number" id="cfg-intensify-max-materials" class="input config-inline-number" min="1" step="1" value="4"></label>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-intensify-unlimited-materials">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>不限制每批素材数量（保存为 null）</span>
+                  </label>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-intensify-reuse-target-baseline">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>复用目标舰扫描基线（会话内跳过全量目标重扫）</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>显式保护舰</strong><span>每行一个舰名，也可用逗号分隔；当前只读预览不会消耗舰船，该名单保留给未来经确认的执行契约。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <textarea id="cfg-intensify-protected-ships" class="input intensify-protected-ships" rows="3" placeholder="每行一个舰名"></textarea>
+                  <div class="intensify-actions">
+                    <button class="btn btn-small" id="btn-intensify-scan" type="button">扫描只读库存</button>
+                    <button class="btn btn-small" id="btn-intensify-preview" type="button" disabled>生成候选预览</button>
+                  </div>
+                  <div id="cfg-intensify-status" class="intensify-status intensify-status-unknown">尚未扫描库存，不会选择、操作或消耗舰船。</div>
+                  <div id="cfg-intensify-occurrences" class="intensify-occurrences" aria-live="polite" hidden>
+                    <p id="cfg-intensify-occurrence-summary" class="config-hint"></p>
+                    <div class="intensify-occurrence-group">
+                      <strong>目标 occurrence</strong>
+                      <div id="cfg-intensify-target-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                    <div class="intensify-occurrence-group">
+                      <strong>素材 occurrences</strong>
+                      <div id="cfg-intensify-material-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                  </div>
+                  <div id="cfg-intensify-candidate-preview" class="intensify-candidate-preview" aria-live="polite" hidden></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>自动化设置</h3>
+              <p>自动任务最终以后端日常调度配置为准。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动远征</strong>
+                  <span>定期检查并收取已完成远征，然后重新派遣。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-expedition" checked>
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动战役</strong>
+                  <span>每日完成8次战役，C、D结算同样计入。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-battle-body">
+                    <span>战役类型</span>
+                    <select id="cfg-battle-type" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="困难潜艇">困难潜艇</option>
+                      <option value="困难航母">困难航母</option>
+                      <option value="困难驱逐">困难驱逐</option>
+                      <option value="困难巡洋">困难巡洋</option>
+                      <option value="困难战列">困难战列</option>
+                      <option value="简单航母">简单航母</option>
+                      <option value="简单潜艇">简单潜艇</option>
+                      <option value="简单驱逐">简单驱逐</option>
+                      <option value="简单巡洋">简单巡洋</option>
+                      <option value="简单战列">简单战列</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-battle">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动演习</strong>
+                  <span>每日空闲时完成剩余演习次数。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-exercise-body">
+                    <span>出征舰队</span>
+                    <select id="cfg-exercise-fleet" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="1">第 1 舰队</option>
+                      <option value="2">第 2 舰队</option>
+                      <option value="3">第 3 舰队</option>
+                      <option value="4">第 4 舰队</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-exercise">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动出征</strong>
+                  <span>每分钟检查任务队列，空闲时执行配置计划各一次。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-normal-fight-editor" id="cfg-auto-normal-fight-body">
+                    <button class="btn btn-small" id="btn-add-normal-fight-task" type="button">加载</button>
+                    <div class="config-task-list" id="cfg-normal-fight-tasks"></div>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-normal-fight">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动决战</strong>
+                  <span>每日空闲时执行一轮；可使用计划页面方案或系统预设。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-decisive-body">
+                    <span>决战方案</span>
+                    <select id="cfg-decisive-template" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="user_plan">用户计划</option>
+                      <option value="system_preset">系统预设</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-decisive">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动胖次</strong>
+                  <span>配置一个胖次任务，每日空闲时执行。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control config-auto-loot-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-loot-body">
+                    <button class="btn btn-small" id="btn-load-loot-plans" type="button">加载</button>
+                    <span>任务预设</span>
+                    <select id="cfg-loot-plan" class="input"></select>
+                    <span>停止数量</span>
+                    <input type="number" id="cfg-loot-stop-count" class="input config-inline-number" min="1" max="50" value="50">
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-loot">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>舰队设置</h3>
+              <p>集中管理与游戏内舰队、修理、船坞和解装操作有关的配置。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>船坞满处理</strong><span>船坞已满时的自动化策略：解装、强化或自动混合（部分强化、部分解装）。</span></div>
+                <div class="config-setting-control">
+                  <select id="cfg-dock-full-mode" class="input"
+                          data-animated-select-width="source">
+                    <option value="0">关闭（不处理）</option>
+                    <option value="1">自动解装</option>
+                    <option value="2">自动强化</option>
+                    <option value="3">自动（先强化后解装）</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>维修方式</strong><span>选择脚本自动维修，或等待用户手动处理。</span></div>
+                <div class="config-setting-control">
+                  <select id="cfg-repair-manually" class="input"
+                          data-animated-select-width="source">
+                    <option value="false">脚本自动维修</option>
+                    <option value="true">手动处理</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>浴室数量</strong><span>账号已开放的浴室位置数量，后端允许最大 12 个。</span></div>
+                <div class="config-setting-control">
+                  <input type="number" id="cfg-bathroom-count" class="input config-inline-number" min="1" max="12" value="2">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>解装规则</strong><span>配置工作模式、舰种范围以及是否先拆下装备。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <div class="config-inline-options">
+                    <select id="cfg-destroy-ship-mode" class="input"
+                            data-animated-select-width="source">
+                      <option value="0">不启用</option>
+                      <option value="1">黑名单</option>
+                      <option value="2">白名单</option>
+                    </select>
+                    <label class="config-switch">
+                      <input type="checkbox" id="cfg-remove-equipment-mode">
+                      <span class="config-switch-track" aria-hidden="true"></span>
+                      <span>卸下装备</span>
+                    </label>
+                  </div>
+                  <div class="config-chip-list" id="cfg-destroy-ship-types">
+                    <label><input type="checkbox" value="航母">航母</label>
+                    <label><input type="checkbox" value="轻母">轻母</label>
+                    <label><input type="checkbox" value="装母">装母</label>
+                    <label><input type="checkbox" value="战列">战列</label>
+                    <label><input type="checkbox" value="航战">航战</label>
+                    <label><input type="checkbox" value="战巡">战巡</label>
+                    <label><input type="checkbox" value="重巡">重巡</label>
+                    <label><input type="checkbox" value="航巡">航巡</label>
+                    <label><input type="checkbox" value="雷巡">雷巡</label>
+                    <label><input type="checkbox" value="轻巡">轻巡</label>
+                    <label><input type="checkbox" value="重炮">重炮</label>
+                    <label><input type="checkbox" value="驱逐">驱逐</label>
+                    <label><input type="checkbox" value="导潜">导潜</label>
+                    <label><input type="checkbox" value="潜艇">潜艇</label>
+                    <label><input type="checkbox" value="炮潜">炮潜</label>
+                    <label><input type="checkbox" value="补给">补给</label>
+                    <label><input type="checkbox" value="导驱">导驱</label>
+                    <label><input type="checkbox" value="防驱">防驱</label>
+                    <label><input type="checkbox" value="导巡">导巡</label>
+                    <label><input type="checkbox" value="防巡">防巡</label>
+                    <label><input type="checkbox" value="大巡">大巡</label>
+                    <label><input type="checkbox" value="导战">导战</label>
+                    <label><input type="checkbox" value="其他">其他</label>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>作战方案目录</strong><span>后端查找普通战和活动战 YAML 的自定义目录。</span></div>
+                <div class="config-setting-control">
+                  <div class="input-row config-compact-path-row">
+                    <input type="text" id="cfg-plan-root" class="input" placeholder="留空使用后端内置目录">
+                    <button class="btn btn-small" id="btn-browse-plan-root" type="button">选择</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>识别设置</h3>
+              <p>管理文字 OCR、WSG-NCC 舰船识别、运行硬件和舰名匹配规则。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>模型下载源</strong>
+                  <span>首次下载 EasyOCR 模型时使用的镜像来源。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-ocr-mirror" class="input">
+                    <option value="modelscope">ModelScope</option>
+                    <option value="origin">EasyOCR 原始地址</option>
+                    <option value="github">GitHub</option>
+                    <option value="tencent">腾讯云</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>识别加速</strong>
+                  <span>统一控制 EasyOCR 与 WSG-NCC：自动模式分别检测 CUDA 与 WebGPU，CPU 模式关闭两者的 GPU 加速。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-ocr-gpu-mode" class="input">
+                    <option value="auto">自动检测可用 GPU（推荐）</option>
+                    <option value="cuda">强制 EasyOCR 使用 CUDA</option>
+                    <option value="cpu">全部强制使用 CPU</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>CUDA 路径</strong>
+                  <span>为 EasyOCR 指定 CUDA Toolkit 或 PyTorch CUDA Runtime 目录，留空时使用系统环境；不影响 WSG-NCC 的 WebGPU 检测。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-cuda-path-row">
+                    <div class="config-cuda-input-wrap">
+                      <input type="text" id="cfg-cuda-path" class="input" placeholder="Toolkit 根目录，或 ...\torch\lib">
+                      <span id="cfg-cuda-status" class="adb-status adb-status-unknown">系统环境</span>
+                    </div>
+                    <button class="btn btn-small" id="btn-browse-cuda">选择</button>
+                    <button class="btn btn-small" id="btn-validate-cuda">检测</button>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>舰名文字识别（FastOCR，CPU-only）</strong>
+                  <span>独立的 CPU-only 舰名文字 OCR 路径，不受识别加速设置影响，也不参与 WSG-NCC 舰船卡身份识别。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-enhanced-ship-ocr">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用 CPU FastOCR</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>舰名匹配置信度</strong>
+                  <span>OCR 结果与舰名数据库的最低相似程度，0.65 为后端默认值。</span>
+                </div>
+                <div class="config-setting-control config-confidence-preview">
+                  <input type="range" id="cfg-ocr-confidence-range" min="0" max="1" step="0.01" value="0.65">
+                  <input type="number" id="cfg-ocr-confidence" class="input" min="0" max="1" step="0.01" value="0.65">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>系统舰名匹配规则</strong>
+                  <span>后端内置的特殊字符、等级和舰名标准化规则，普通用户不直接修改。</span>
+                </div>
+                <div class="config-setting-control">
+                  <span class="config-status-badge config-status-readonly">系统内置</span>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自定义舰名映射</strong>
+                </div>
+                <div class="config-setting-control">
+                  <textarea id="cfg-ship-name-aliases" class="input config-map-editor" rows="3"
+                    placeholder="用于适配玩家的自定义舰名，请使用英文半角冒号进行分割，每行一条规则，冒号两侧空格可省略。&#10;格式：{自定义舰名}:{默认舰名}&#10;举例：0v0:昆西"></textarea>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>识别纠错规则</strong>
+                </div>
+                <div class="config-setting-control">
+                  <textarea id="cfg-ship-name-corrections" class="input config-map-editor" rows="3"
+                    placeholder="用于在OCR异常时提供规避方案，请使用英文半角冒号进行分割，每行一条规则，冒号两侧空格可省略。&#10;格式：{OCR识别结果}:{正确结果}&#10;举例：A111:AIII"></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </div>
-
-        <hr class="card-divider">
-
-        <div class="form-group">
-          <label>颜色主题</label>
-          <div class="config-ui-theme-row">
-            <select id="cfg-theme-mode" class="input">
-              <option value="dark">暗色</option>
-              <option value="light">浅色</option>
-              <option value="system">跟随系统</option>
-            </select>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>主色调</label>
-          <div class="input-row config-accent-row">
-            <input type="color" id="cfg-accent-color" value="#0f7dff" class="color-picker">
-            <span id="cfg-accent-label" class="accent-label">#0f7dff</span>
-            <button class="btn btn-small" id="btn-reset-accent">重置</button>
-          </div>
-        </div>
-      </div>
-
-      </div><!-- /config-col-right -->
-
       </div>
     </section>
 
@@ -812,7 +1904,7 @@
               <small>选择战役类型</small>
             </div>
           </label>
-          <label class="template-type-card">
+          <label class="template-type-card" style="display:none">
             <input type="radio" name="tpl-type" value="decisive">
             <div class="template-type-inner">
               <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536a3 3 0 1 1-1.133 5.89c-.79 1.865-1.878 2.777-2.833 3.011v2.173l1.425.356c.194.048.377.135.537.255L13.3 15.1a.5.5 0 0 1-.3.9H3a.5.5 0 0 1-.3-.9l1.838-1.379c.16-.12.343-.207.537-.255L6.5 13.11v-2.173c-.955-.234-2.043-1.146-2.833-3.012a3 3 0 1 1-1.132-5.89A33.076 33.076 0 0 1 2.5.5zm.099 2.54a2 2 0 0 0 .72 3.935c-.333-1.398-.588-2.797-.72-3.935zm10.083 3.935a2 2 0 0 0 .72-3.935c-.133 1.138-.388 2.537-.72 3.935zM3.504 1c.007.517.026 1.006.056 1.469.13 2.028.457 3.546.87 4.667C5.294 9.48 6.484 10 7 10a.5.5 0 0 1 .5.5v2.61a1 1 0 0 1-.757.97l-1.426.356a.5.5 0 0 0-.179.085L4.5 15h7l-.638-.479a.501.501 0 0 0-.18-.085l-1.425-.356a1 1 0 0 1-.757-.97V10.5A.5.5 0 0 1 9 10c.516 0 1.706-.52 2.57-2.864.413-1.12.74-2.64.87-4.667.03-.463.049-.952.056-1.469H3.504z"/></svg>
@@ -845,7 +1937,7 @@
               <option value="3">第 3 舰队</option>
               <option value="4">第 4 舰队</option>
             </select>
-            <p class="config-hint" style="margin:4px 0 0;font-size:11px">若后续使用编队预设触发自动改编，第1分队将自动切换为第2分队（并写入任务组配置）。</p>
+            <p class="config-hint" style="margin:4px 0 0;font-size:11px">第1分队可自动改编，但槽位0必须配置舰船。</p>
           </div>
           <div class="form-group">
             <label><input type="checkbox" id="tpl-fleet-enable-nf"> 设置编队舰船</label>
@@ -973,12 +2065,10 @@
       </div>
     </div>
   </div>
-
   <!-- 右键上下文菜单 -->
   <div id="context-menu" class="context-menu" style="display:none">
     <div class="context-menu-item" id="ctx-edit">编辑</div>
   </div>
-
   <!-- 首次运行引导向导 -->
   <div id="setup-wizard" class="modal-overlay" style="display:none">
     <div class="modal card" style="max-width:460px">
@@ -1014,7 +2104,331 @@
       </div>
     </div>
   </div>
-
+  <!-- 出征规划：加载作战计划 -->
+  <div id="battle-plan-loader" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-team-loader-dialog battle-plan-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3 id="battle-plan-loader-title">加载出征配置</h3>
+          <p id="battle-plan-loader-description">读取系统与用户作战计划目录中的合法 YAML 配置。</p>
+        </div>
+        <div class="fleet-team-loader-header-actions">
+          <span id="battle-plan-loader-count">共读取 0 个作战计划</span>
+          <button class="btn btn-small" id="btn-refresh-battle-plan-loader" type="button">刷新</button>
+        </div>
+      </div>
+      <input
+        class="input"
+        id="battle-plan-loader-search"
+        type="search"
+        placeholder="搜索配置名称或关卡"
+        autocomplete="off"
+      >
+      <div class="fleet-team-loader-content battle-plan-loader-content">
+        <div class="fleet-team-loader-list" id="battle-plan-loader-list"></div>
+        <div class="fleet-team-loader-preview-column">
+          <div class="fleet-team-loader-tools">
+            <div class="fleet-team-loader-system-filter">
+              <span>过滤系统预设</span>
+              <label class="config-switch">
+                <input type="checkbox" id="battle-plan-loader-filter-system">
+                <span class="config-switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="fleet-team-loader-sort">
+              <span>排序方式</span>
+              <div class="fleet-team-loader-sort-controls">
+                <div class="fleet-team-loader-sort-fields">
+                  <button
+                    class="fleet-team-loader-sort-option"
+                    data-battle-plan-sort-field="name"
+                    type="button"
+                  >名称</button>
+                  <button
+                    class="fleet-team-loader-sort-option active"
+                    data-battle-plan-sort-field="modifiedAt"
+                    type="button"
+                  >修改时间</button>
+                </div>
+                <label class="fleet-sort-direction">
+                  <span>倒序</span>
+                  <input type="checkbox" id="battle-plan-loader-sort-asc">
+                  <span class="fleet-sort-track" aria-hidden="true"></span>
+                  <span>正序</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="fleet-team-loader-preview battle-plan-loader-preview">
+            <div class="battle-plan-preview-heading">
+              <h3 id="battle-plan-loader-preview-title">配置预览：未选择</h3>
+              <span id="battle-plan-loader-preview-source" class="fleet-team-source-badge user" hidden></span>
+            </div>
+            <div id="battle-plan-loader-preview-body" class="battle-plan-preview-body">
+              <div class="fleet-team-loader-preview-empty">从左侧选择一个出征配置查看摘要</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="fleet-dialog-status" id="battle-plan-loader-status" hidden></p>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-battle-plan-loader" type="button">取消</button>
+        <button class="btn" id="btn-import-local-battle-plan" type="button">添加本地 YAML</button>
+        <button class="btn btn-primary" id="btn-confirm-battle-plan-loader" type="button" disabled>加载</button>
+      </div>
+    </div>
+  </div>
+  <!-- 主页：加载独立日常任务 -->
+  <div id="daily-task-loader" class="modal-overlay" style="display:none">
+    <div class="modal card daily-task-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>日常任务</h3>
+          <p>演习、战役和决战使用独立配置，不进入普通出征计划管理。</p>
+        </div>
+      </div>
+      <div class="daily-task-tabs" role="tablist" aria-label="日常任务分类">
+        <button
+          class="daily-task-tab active"
+          data-daily-task-tab="exercise"
+          type="button"
+          role="tab"
+        >演习</button>
+        <button
+          class="daily-task-tab"
+          data-daily-task-tab="campaign"
+          type="button"
+          role="tab"
+        >战役</button>
+        <button
+          class="daily-task-tab"
+          data-daily-task-tab="decisive"
+          type="button"
+          role="tab"
+        >决战</button>
+      </div>
+      <div id="daily-task-loader-list" class="daily-task-loader-list"></div>
+      <p
+        id="daily-task-loader-status"
+        class="fleet-dialog-status"
+        hidden
+      ></p>
+      <div class="modal-actions">
+        <button
+          class="btn"
+          id="btn-close-daily-task-loader"
+          type="button"
+        >取消</button>
+        <button
+          class="btn"
+          id="btn-daily-task-add-list"
+          type="button"
+          disabled
+        >加入任务列表</button>
+        <button
+          class="btn btn-primary"
+          id="btn-daily-task-add-queue"
+          type="button"
+          disabled
+        >加入执行队列</button>
+      </div>
+    </div>
+  </div>
+  <!-- 主页：队列管理 -->
+  <div id="task-list-loader" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-team-loader-dialog task-list-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>队列管理</h3>
+          <p>选择或删除计划组，右侧可预览并拖拽调整出征计划顺序。</p>
+        </div>
+        <div class="fleet-team-loader-header-actions">
+          <span id="task-list-loader-count">共 0 个计划组</span>
+        </div>
+      </div>
+      <div class="fleet-team-loader-content task-list-loader-content">
+        <section class="task-list-loader-groups">
+          <h4>计划组</h4>
+          <div id="task-list-loader-groups" class="fleet-team-loader-list"></div>
+        </section>
+        <section class="task-list-loader-preview">
+          <div class="task-list-loader-preview-heading">
+            <h4 id="task-list-loader-preview-title">计划列表预览：未选择</h4>
+            <span>拖拽卡片可以调整执行顺序</span>
+          </div>
+          <div id="task-list-loader-preview" class="task-list-loader-preview-list">
+            <div class="fleet-team-loader-preview-empty">从左侧选择一个计划组</div>
+          </div>
+        </section>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-task-list-loader" type="button">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-task-list-loader" type="button" disabled>加载</button>
+      </div>
+    </div>
+  </div>
+  <!-- 舰队规划：加载编队预设 -->
+  <div id="fleet-team-loader" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-team-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>加载舰队预设</h3>
+          <p>读取系统与用户编队目录中的合法 team-*.yaml 配置。</p>
+        </div>
+        <div class="fleet-team-loader-header-actions">
+          <span id="fleet-team-loader-count">共读取 0 个舰队预设</span>
+          <button class="btn btn-small" id="btn-refresh-team-loader" type="button">刷新</button>
+        </div>
+      </div>
+      <input
+        class="input"
+        id="fleet-team-loader-search"
+        type="search"
+        placeholder="搜索预设名称"
+        autocomplete="off"
+      >
+      <div class="fleet-team-loader-content">
+        <div class="fleet-team-loader-list" id="fleet-team-loader-list"></div>
+        <div class="fleet-team-loader-preview-column">
+          <div class="fleet-team-loader-tools">
+            <div class="fleet-team-loader-system-filter">
+              <span>过滤系统预设</span>
+              <label class="config-switch">
+                <input type="checkbox" id="fleet-team-loader-filter-system" checked>
+                <span class="config-switch-track" aria-hidden="true"></span>
+              </label>
+            </div>
+            <div class="fleet-team-loader-sort">
+              <span>排序方式</span>
+              <div class="fleet-team-loader-sort-controls">
+                <div class="fleet-team-loader-sort-fields">
+                  <button
+                    class="fleet-team-loader-sort-option"
+                    data-team-loader-sort-field="name"
+                    type="button"
+                  >名称</button>
+                  <button
+                    class="fleet-team-loader-sort-option active"
+                    data-team-loader-sort-field="modifiedAt"
+                    type="button"
+                  >修改时间</button>
+                </div>
+                <label class="fleet-sort-direction">
+                  <span>倒序</span>
+                  <input type="checkbox" id="fleet-team-loader-sort-asc">
+                  <span class="fleet-sort-track" aria-hidden="true"></span>
+                  <span>正序</span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="fleet-team-loader-preview fleet-team-preview">
+            <div class="fleet-team-preview-heading">
+              <h3 id="fleet-team-loader-preview-title">编队预览：未选择</h3>
+              <p class="fleet-team-preview-hint">点击主编队位置，查看该位置对应的备选队列。</p>
+            </div>
+            <div id="fleet-team-loader-preview-slots" class="fleet-team-main-preview"></div>
+            <h4 id="fleet-team-loader-backup-title">【位置1】的备选队列</h4>
+            <div id="fleet-team-loader-backup-slots" class="fleet-team-backup-preview"></div>
+          </div>
+        </div>
+      </div>
+      <p class="fleet-dialog-status" id="fleet-team-loader-status"></p>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-team-loader" type="button">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-team-loader" type="button" disabled>加载</button>
+      </div>
+    </div>
+  </div>
+  <!-- 舰队规划：复制当前位置的备选队列 -->
+  <div id="fleet-backup-copy-dialog" class="modal-overlay" style="display:none">
+    <div class="modal card fleet-backup-copy-dialog">
+      <h3>复制备选队列</h3>
+      <p id="fleet-backup-copy-description">选择需要接收备选队列的主选位置。</p>
+      <div id="fleet-backup-copy-targets" class="fleet-backup-copy-targets"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-backup-copy" type="button">取消</button>
+      </div>
+    </div>
+  </div>
+  <!-- 旧配置迁移完成后的 YAML 冲突确认 -->
+  <div
+    id="migration-conflict-dialog"
+    class="modal-overlay"
+    style="display:none"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="migration-conflict-title"
+  >
+    <div class="modal card migration-conflict-dialog">
+      <div class="migration-conflict-heading">
+        <div>
+          <h3 id="migration-conflict-title">处理迁移配置冲突</h3>
+          <p>勾选卡片后使用中间按钮移动；最终位于删除侧的 YAML 会直接删除。</p>
+        </div>
+        <span id="migration-conflict-count">0 项冲突</span>
+      </div>
+      <div class="migration-conflict-warning">
+        <strong>数据丢失风险</strong>
+        <span>删除操作无法撤销。请确认文件内容和冲突原因后再提交。</span>
+      </div>
+      <div class="migration-conflict-columns">
+        <section class="migration-conflict-column delete">
+          <div class="migration-conflict-column-heading">
+            <h4 id="migration-conflict-delete-title">删除（0）</h4>
+            <button
+              class="btn btn-small"
+              id="btn-select-all-migration-delete"
+              type="button"
+            >全选</button>
+          </div>
+          <div
+            id="migration-conflict-delete-list"
+            class="migration-conflict-list"
+          ></div>
+        </section>
+        <div class="migration-conflict-transfer">
+          <button
+            class="btn btn-small"
+            id="btn-migration-move-keep"
+            type="button"
+          >保留 →</button>
+          <button
+            class="btn btn-small migration-delete-button"
+            id="btn-migration-move-delete"
+            type="button"
+          >← 删除</button>
+        </div>
+        <section class="migration-conflict-column keep">
+          <div class="migration-conflict-column-heading">
+            <h4 id="migration-conflict-keep-title">保留（0）</h4>
+            <button
+              class="btn btn-small"
+              id="btn-select-all-migration-keep"
+              type="button"
+            >全选</button>
+          </div>
+          <div
+            id="migration-conflict-keep-list"
+            class="migration-conflict-list"
+          ></div>
+        </section>
+      </div>
+      <p id="migration-conflict-status" class="fleet-dialog-status" hidden></p>
+      <div class="modal-actions">
+        <button
+          class="btn"
+          id="btn-migration-keep-all"
+          type="button"
+        >全部保留</button>
+        <button
+          class="btn btn-primary"
+          id="btn-confirm-migration-conflicts"
+          type="button"
+        >确认处理</button>
+      </div>
+    </div>
+  </div>
   <!-- 通用输入对话框 -->
   <div id="generic-prompt" class="modal-overlay" style="display:none">
     <div class="modal card">
@@ -1027,7 +2441,6 @@
       </div>
     </div>
   </div>
-
   <script src="../../dist/renderer.bundle.js"></script>
 </body>
 </html>

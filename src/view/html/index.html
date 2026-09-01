@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- CSP 由 Electron 主进程动态注入，端口跟随 BACKEND_PORT 配置 -->
+  <title>WSGR GUI</title>
+  <link rel="stylesheet" href="styles/styles.css">
+</head>
+<body>
+<!-- @include layout/navigation.html -->
+
+  <!-- ═══ 页面容器 ═══ -->
+  <main class="page-container">
+
+<!-- @include pages/main.html -->
+
+<!-- @include pages/plan/index.html -->
+
+<!-- @include pages/config/index.html -->
+
+  </main>
+
+<!-- @include dialogs/index.html -->
+  <script src="../../dist/renderer.bundle.js"></script>
+</body>
+</html>

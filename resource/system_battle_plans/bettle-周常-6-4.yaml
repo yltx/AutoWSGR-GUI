@@ -1,0 +1,36 @@
+chapter: 6
+map: 4
+selected_nodes: ['0', A, C, F, H, J, K]
+endpoint_nodes: [K]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  A:
+    enemy_rules:
+      - [SS >= 1, 5]
+  C:
+    enemy_rules:
+      - [SS >= 1, 5]
+  F:
+    enemy_rules:
+      - [SS >= 1, 5]
+  H:
+    enemy_rules:
+      - [SS >= 1, 5]
+  J:
+    enemy_rules:
+      - [SS >= 1, 5]
+  K:
+    formation: 2
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+fleet_id: 3
+result: S
+fleet_presets:
+  - name: 3驱克劳85工程队

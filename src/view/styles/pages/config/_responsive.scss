@@ -1,0 +1,121 @@
+@media (max-width: 1180px) {
+  .config-grid {
+    grid-template-columns: 1fr;
+    align-items: start;
+    padding-right: 4px;
+  }
+
+  .config-col-right > .card {
+    flex: none;
+  }
+
+  .config-card-wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .config-section-heading {
+    align-items: flex-start;
+    gap: 5px;
+  }
+
+  .config-tab-description {
+    display: none;
+  }
+
+  .config-draft-list {
+    grid-template-columns: 1fr;
+  }
+
+  .config-setting-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .config-setting-control,
+  .config-setting-control-stack {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .config-setting-control > input.input:not(.config-inline-number),
+  .config-setting-control > select.input,
+  .config-setting-control > .input-row {
+    width: 100%;
+    max-width: none;
+  }
+
+  .config-inline-options {
+    align-items: stretch;
+    flex-direction: column;
+
+    &:not(.config-auto-task-options) select.input {
+      width: 100%;
+      max-width: none;
+      flex-basis: auto;
+    }
+  }
+
+  .config-auto-task-control {
+    align-items: center;
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  .config-auto-task-options {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .config-theme-accent-row {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+
+    #cfg-theme-mode {
+      flex-basis: 100%;
+    }
+  }
+
+  .ship-library-update-control {
+    align-items: flex-start;
+    flex-direction: column;
+
+    .adb-status {
+      text-align: left;
+    }
+  }
+
+  .config-update-controls {
+    flex-wrap: wrap;
+
+    .config-update-progress {
+      flex: 1 1 160px;
+      width: auto;
+    }
+  }
+
+  .config-confidence-preview {
+    display: grid;
+    grid-template-columns: 1fr 84px;
+
+    .config-status-badge {
+      grid-column: 1 / -1;
+      justify-self: start;
+    }
+  }
+
+  .config-normal-fight-editor,
+  .config-map-editor {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .config-task-list {
+    max-width: min(230px, 40vw);
+  }
+
+  .config-chip-list {
+    justify-content: flex-start;
+  }
+}

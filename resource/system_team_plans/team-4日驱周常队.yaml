@@ -1,0 +1,46 @@
+name: 4日驱周常队
+ships:
+  - name: 岛风(岛风型驱逐舰)·改
+    search_name: 岛风
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 吹雪·改, search_name: 吹雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 早春·改, search_name: 早春, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 初夏·改
+    search_name: 初夏
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 吹雪·改, search_name: 吹雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 早春·改, search_name: 早春, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 高波·改
+    search_name: 高波
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 吹雪·改, search_name: 吹雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 早春·改, search_name: 早春, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 阳炎·改
+    search_name: 阳炎
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 绫波·改, search_name: 绫波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 吹雪·改, search_name: 吹雪, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 早春·改, search_name: 早春, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 敷波·改, search_name: 敷波, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: 黑潮·改, search_name: 黑潮, ship_type: [dd], min_level: 100, relaxed: false}

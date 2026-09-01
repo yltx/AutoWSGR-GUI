@@ -1,633 +1,731 @@
 /**
- * Electron 主进程。
- * 负责创建窗口、注册 IPC handler。
+ * 组装主进程服务、注册 IPC，并管理 Electron 生命周期。
  */
-import { app, BrowserWindow, ipcMain, dialog, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, screen, shell, Menu } from 'electron';
 import * as path from 'path';
-import * as fs from 'fs';
-import { exec } from 'child_process';
-import { promisify } from 'util';
-import { autoUpdater, UpdateInfo, ProgressInfo } from 'electron-updater';
 import {
   initPythonEnv, clearPythonCache,
   isAllowedPythonVersion, findPython, checkEnvironment,
-  checkForUpdates, installDependencies, installPortablePython,
-  pullUpdates,
+  installDependencies, installPortablePython,
+  backendShipNamesPath,
 } from './pythonEnv';
 import { detectEmulator } from './emulatorDetect';
-import { initBackend, getBackendProcess, startBackend, stopBackend, runSetupScript } from './backend';
+import {
+  initBackend,
+  getBackendProcess,
+  startBackend,
+  stopBackend,
+  runSetupScript,
+} from './services/BackendService';
+import { AppPaths } from './services/AppPaths';
+import { AtomicFileStore } from './services/AtomicFileStore';
+import { GuiSettingsStore } from './services/GuiSettingsStore';
+import { SafePathService } from './services/SafePathService';
+import { SecureFileService } from './services/SecureFileService';
+import { WindowService } from './services/WindowService';
+import { SingleInstanceService } from './services/SingleInstanceService';
+import {
+  GuiUpdateStateStore,
+} from './services/GuiUpdateStateStore';
+import {
+  resolveGuiUpdateSelectionPolicy,
+  validateGuiUpdateCandidate,
+} from './services/GuiUpdatePolicy';
+import { GuiUpdateInstaller } from './services/GuiUpdateInstaller';
+import { GuiUpdaterLogger } from './services/GuiUpdaterLogger';
+import {
+  DEFAULT_LEGACY_MIGRATION_SELECTION,
+  UserDataMigrationService,
+  type LegacyMigrationSelection,
+} from './services/UserDataMigrationService';
+import {
+  LegacyMigrationPrompt,
+} from './services/LegacyMigrationPrompt';
+import { MigrationStateStore } from './services/MigrationStateStore';
+import {
+  LEGACY_PLAN_MIGRATION_STAGE,
+  LegacyPlanMigration,
+} from './services/LegacyPlanMigration';
+import {
+  MigrationConflictService,
+} from './services/MigrationConflictService';
+import {
+  emptyLegacyMigrationSummary,
+  mergeLegacyMigrationSummaries,
+} from './services/LegacyMigrationSummary';
+import {
+  buildLegacyMigrationNotice,
+} from './services/LegacyMigrationNotice';
+import {
+  TeamPlanCodec,
+  type UserTeamPlan,
+} from './services/TeamPlanCodec';
+import { TeamPlanRepository } from './services/TeamPlanRepository';
+import { TeamPlanService } from './services/TeamPlanService';
+import { CombatPlanCodec } from './services/CombatPlanCodec';
+import { CombatPlanRepository } from './services/CombatPlanRepository';
+import { RuntimePlanService } from './services/RuntimePlanService';
+import { PlanManagementService } from './services/PlanManagementService';
+import { PlanExportService } from './services/PlanExportService';
+import { TaskPresetCodec } from '../src/shared/taskPreset';
+import { DailyPlanService } from './services/DailyPlanService';
+import { ShipLibraryService } from './services/ShipLibraryService';
+import { ShipLibraryUpdater } from './services/ShipLibraryUpdater';
+import { ShipNameSynchronizer } from './services/ShipNameSynchronizer';
+import { AdbService } from './services/AdbService';
+import { CudaEnvironmentService } from './services/CudaEnvironmentService';
+import { GuiConfigurationService } from './services/GuiConfigurationService';
+import {
+  GuiSettingsCommitService,
+} from './services/GuiSettingsCommitService';
+import { PythonEnvironmentService } from './services/PythonEnvironmentService';
+import { registerBackendIpc } from './ipc/BackendIpc';
+import { registerCombatPlanIpc } from './ipc/CombatPlanIpc';
+import { registerConfigurationIpc } from './ipc/ConfigurationIpc';
+import { registerDailyPlanIpc } from './ipc/DailyPlanIpc';
+import { registerDeviceIpc } from './ipc/DeviceIpc';
+import { registerEnvironmentIpc } from './ipc/EnvironmentIpc';
+import { registerFileIpc } from './ipc/FileIpc';
+import {
+  registerMigrationConflictIpc,
+} from './ipc/MigrationConflictIpc';
+import { registerShipLibraryIpc } from './ipc/ShipLibraryIpc';
+import { registerTeamPlanIpc } from './ipc/TeamPlanIpc';
+import { registerUpdaterIpc } from './ipc/UpdaterIpc';
 
-const execAsync = promisify(exec);
-
-/** GUI 设置文件路径（延迟到 app ready 后才有效，先用函数） */
-function guiSettingsPath(): string {
-  return path.join(appRoot(), 'gui_settings.json');
+/** 启动终端关闭输出管道时，不让 EPIPE 终止 GUI 主进程。 */
+function ignoreBrokenPipe(stream: NodeJS.WriteStream): void {
+  stream.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code !== 'EPIPE') throw error;
+  });
 }
 
-/** 读取 GUI 设置 */
-function readGuiSettings(): Record<string, unknown> {
+ignoreBrokenPipe(process.stdout);
+ignoreBrokenPipe(process.stderr);
+
+const singleInstanceService = new SingleInstanceService(app);
+const isPrimaryInstance = singleInstanceService.acquire();
+
+const appPaths = new AppPaths({
+  moduleDirectory: __dirname,
+  isPackaged: () => app.isPackaged,
+  getPath: name => app.getPath(name),
+  getResourcesPath: () => process.resourcesPath,
+});
+const atomicFileStore = new AtomicFileStore();
+const guiUpdateStateStore = new GuiUpdateStateStore(
+  () => path.join(appPaths.userDataRoot(), '.gui-update-state.json'),
+  atomicFileStore,
+);
+const guiUpdaterLogger = new GuiUpdaterLogger(
+  path.join(
+    appPaths.isPackaged()
+      ? appPaths.appRoot()
+      : appPaths.userDataRoot(),
+    'logs',
+    'updater.log',
+  ),
+  path.join(appPaths.userDataRoot(), 'logs', 'updater.log'),
+);
+const guiUpdateInstaller = new GuiUpdateInstaller(
+  guiUpdateStateStore,
+  guiUpdaterLogger,
+  process.resourcesPath,
+);
+const migrationStateStore = new MigrationStateStore(
+  () => path.join(appPaths.userDataRoot(), '.migration-state.json'),
+  atomicFileStore,
+);
+const userDataMigrationService = new UserDataMigrationService(
+  appPaths,
+  atomicFileStore,
+  migrationStateStore,
+);
+const migrationConflictService = new MigrationConflictService(
+  appPaths,
+  atomicFileStore,
+);
+let legacyUserDataMigration = emptyLegacyMigrationSummary();
+const legacyMigrationPrompt = new LegacyMigrationPrompt({
+  createWindow: options => new BrowserWindow(options),
+});
+const guiSettingsStore = new GuiSettingsStore(
+  () => path.join(appPaths.userDataRoot(), 'gui_settings.json'),
+  atomicFileStore,
+);
+const safePathService = new SafePathService(appPaths);
+const secureFileService = new SecureFileService(
+  safePathService,
+  atomicFileStore,
+);
+const teamPlanCodec = new TeamPlanCodec();
+const teamPlanRepository = new TeamPlanRepository(
+  appPaths,
+  atomicFileStore,
+  teamPlanCodec,
+);
+const combatPlanRepository = new CombatPlanRepository(
+  appPaths,
+  atomicFileStore,
+);
+const combatPlanCodec = new CombatPlanCodec(
+  teamPlanCodec,
+  teamPlanRepository,
+);
+const teamPlanService = new TeamPlanService(
+  teamPlanCodec,
+  teamPlanRepository,
+  combatPlanCodec,
+  combatPlanRepository,
+);
+const taskPresetCodec = new TaskPresetCodec();
+const dailyPlanService = new DailyPlanService(
+  appPaths,
+  atomicFileStore,
+  combatPlanCodec,
+  taskPresetCodec,
+);
+const runtimePlanService = new RuntimePlanService(
+  combatPlanCodec,
+  combatPlanRepository,
+  atomicFileStore,
+  {
+    getTempDirectory: () => app.getPath('temp'),
+    processId: process.pid,
+  },
+);
+const planManagementService = new PlanManagementService(
+  combatPlanCodec,
+  combatPlanRepository,
+  runtimePlanService,
+  teamPlanRepository,
+  guiSettingsStore,
+  taskPresetCodec,
+);
+const planExportService = new PlanExportService(
+  combatPlanRepository,
+  teamPlanRepository,
+  atomicFileStore,
+  combatPlanCodec,
+);
+const shipLibraryService = new ShipLibraryService(appPaths, {
+  processId: process.pid,
+});
+const shipNameSynchronizer = new ShipNameSynchronizer(atomicFileStore);
+const adbService = new AdbService(appPaths);
+
+/** 关闭 GUI 管理的后端与内置 ADB server，释放安装目录中的可执行文件。 */
+async function stopRuntimeResources(): Promise<void> {
+  await stopBackend();
   try {
-    const p = guiSettingsPath();
-    if (fs.existsSync(p)) {
-      return JSON.parse(fs.readFileSync(p, 'utf-8'));
-    }
-  } catch { /* ignore */ }
-  return {};
-}
-
-/** 写入 GUI 设置（合并） */
-function writeGuiSettings(patch: Record<string, unknown>): void {
-  const cur = readGuiSettings();
-  Object.assign(cur, patch);
-  fs.writeFileSync(guiSettingsPath(), JSON.stringify(cur, null, 2), 'utf-8');
-}
-
-/** 后端端口：环境变量 > gui_settings.json > 默认 8438 */
-function getBackendPort(): number {
-  if (process.env.AUTOWSGR_PORT) {
-    return parseInt(process.env.AUTOWSGR_PORT, 10);
+    const stopped = await adbService.stopServer();
+    console.log(
+      stopped
+        ? '[ADB] GUI 内置 server 已停止'
+        : '[ADB] 未发现 GUI 内置 server，跳过停止',
+    );
+  } catch (error) {
+    const message = error instanceof Error
+      ? error.message
+      : String(error);
+    console.warn(`[ADB] GUI 内置 server 停止失败，将继续退出: ${message}`);
   }
-  const settings = readGuiSettings();
-  if (typeof settings.backend_port === 'number' && settings.backend_port > 0 && settings.backend_port < 65536) {
-    return settings.backend_port;
-  }
-  return 8438;
 }
 
-const BACKEND_PORT = getBackendPort();
+const cudaEnvironmentService = new CudaEnvironmentService(
+  CudaEnvironmentService.createDependencies(findPython),
+);
+const guiConfigurationService = new GuiConfigurationService(
+  guiSettingsStore,
+  {
+    clearPythonCache,
+    normalizeCudaPath: candidate => (
+      cudaEnvironmentService.normalizePath(candidate)
+    ),
+    environmentPort: () => process.env.AUTOWSGR_PORT,
+    defaultAllowTestUpdates: () => (
+      resolveGuiUpdateSelectionPolicy(app.getVersion(), true).stage
+        === 'prerelease'
+    ),
+  },
+);
+const pythonEnvironmentService = new PythonEnvironmentService(
+  PythonEnvironmentService.createDependencies({
+    isAllowedVersion: isAllowedPythonVersion,
+    findPython,
+    checkEnvironment,
+    installDependencies,
+    installPortablePython,
+  }),
+);
+const BACKEND_PORT = guiConfigurationService.backendPort();
+const windowService = new WindowService(guiSettingsStore, {
+  backendPort: BACKEND_PORT,
+  moduleDirectory: __dirname,
+  createBrowserWindow: options => new BrowserWindow(options),
+  getDisplays: () => screen.getAllDisplays(),
+  getAppPath: () => app.getAppPath(),
+  isPackaged: () => appPaths.isPackaged(),
+  resourceRoot: () => appPaths.resourceRoot(),
+  showMessageBox: options => {
+    void dialog.showMessageBox(options);
+  },
+});
+const guiSettingsCommitService = new GuiSettingsCommitService(
+  guiConfigurationService,
+  secureFileService,
+  windowService,
+);
+singleInstanceService.setMainWindowProvider(
+  () => windowService.getMainWindow(),
+);
+let updateInProgressDialogOpen = false;
 
-/** 用户配置的 Python 路径：gui_settings.json > null (自动检测) */
-function getConfiguredPythonPath(): string | null {
-  const settings = readGuiSettings();
-  if (typeof settings.python_path === 'string' && settings.python_path.length > 0) {
-    return settings.python_path;
-  }
-  return null;
-}
-
-function getUpdateMode(): 'auto' | 'manual' {
-  const settings = readGuiSettings();
-  return settings.update_mode === 'manual' ? 'manual' : 'auto';
-}
-
-type BackendStartupMode = 'managed' | 'external';
-type OcrGpuMode = 'auto' | 'cpu' | 'cuda';
-
-function getBackendStartupMode(): BackendStartupMode {
-  const settings = readGuiSettings();
-  return settings.backend_startup_mode === 'external' ? 'external' : 'managed';
-}
-
-function getBackendRepoPath(): string {
-  const settings = readGuiSettings();
-  if (typeof settings.backend_repo_path !== 'string') return '';
-  return settings.backend_repo_path.trim();
-}
-
-function getOcrGpuMode(): OcrGpuMode {
-  const settings = readGuiSettings();
-  const value = typeof settings.ocr_gpu_mode === 'string' ? settings.ocr_gpu_mode : '';
-  if (value === 'cpu' || value === 'cuda') return value;
-  return 'auto';
-}
-
-function getCudaPath(): string {
-  const settings = readGuiSettings();
-  if (typeof settings.cuda_path !== 'string') return '';
-  return settings.cuda_path.trim();
-}
-
-function normalizeCudaPath(candidate: string): string {
-  const resolved = path.resolve(candidate.trim());
-  if (findCudaRuntimeDll(resolved)) return resolved;
-  return path.basename(resolved).toLowerCase() === 'bin' ? path.dirname(resolved) : resolved;
-}
-
-function findCudaRuntimeDll(directory: string): boolean {
+/** 安装期间的重复启动只显示系统提示，不创建旧版主窗口。 */
+async function showUpdateInProgressDialog(): Promise<void> {
+  if (updateInProgressDialogOpen) return;
+  updateInProgressDialogOpen = true;
   try {
-    const names = fs.readdirSync(directory);
-    return names.some(name => /^cudart64.*\.dll$/i.test(name))
-      && names.some(name => /^cublas64.*\.dll$/i.test(name));
-  } catch {
+    await app.whenReady();
+    await dialog.showMessageBox({
+      type: 'info',
+      title: 'AutoWSGR-GUI 正在更新',
+      message: '后台正在更新，请稍后',
+      buttons: ['确认'],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+  } finally {
+    updateInProgressDialogOpen = false;
+  }
+}
+
+singleInstanceService.setDuplicateLaunchHandler(() => {
+  const state = guiUpdateStateStore.read();
+  if (
+    !state
+    || state.sourceVersion !== app.getVersion()
+    || !guiUpdateStateStore.isInstallationActive(state)
+  ) {
     return false;
   }
-}
-
-function validateCudaPath(candidate: string): { valid: boolean; path: string; version: string | null; kind?: 'toolkit' | 'runtime'; error?: string } {
-  if (!candidate.trim()) return { valid: false, path: '', version: null, error: '路径为空' };
-  const cudaRoot = normalizeCudaPath(candidate);
-  if (!fs.existsSync(cudaRoot)) return { valid: false, path: cudaRoot, version: null, error: '目录不存在' };
-  const binDir = path.join(cudaRoot, 'bin');
-  const isToolkit = fs.existsSync(path.join(binDir, 'nvcc.exe'));
-  const runtimeDir = findCudaRuntimeDll(cudaRoot)
-    ? cudaRoot
-    : findCudaRuntimeDll(binDir)
-      ? binDir
-      : null;
-  if (!isToolkit && !runtimeDir) {
-    return { valid: false, path: cudaRoot, version: null, error: '未找到 CUDA Toolkit（bin\\nvcc.exe）或 PyTorch CUDA Runtime DLL' };
-  }
-
-  let version: string | null = null;
-  try {
-    const versionJson = path.join(cudaRoot, 'version.json');
-    if (fs.existsSync(versionJson)) {
-      const raw = JSON.parse(fs.readFileSync(versionJson, 'utf-8').replace(/^\uFEFF/, '')) as Record<string, any>;
-      version = raw.cuda?.version ?? raw.cuda_cudart?.version ?? null;
-    }
-  } catch { /* use directory name fallback */ }
-  version ??= path.basename(cudaRoot).match(/v\d+(?:\.\d+)?/i)?.[0] ?? null;
-  if (isToolkit) return { valid: true, path: cudaRoot, version, kind: 'toolkit' };
-
-  let runtimeVersion: string | null = null;
-  try {
-    const cudart = fs.readdirSync(runtimeDir!).find(name => /^cudart64.*\.dll$/i.test(name));
-    runtimeVersion = cudart?.match(/^cudart64[_-]?(\d+)/i)?.[1] ?? null;
-    if (runtimeVersion?.length === 2) runtimeVersion = `${runtimeVersion[0]}.${runtimeVersion[1]}`;
-    else if (runtimeVersion?.length === 3) runtimeVersion = `${runtimeVersion.slice(0, 2)}.${runtimeVersion[2]}`;
-  } catch { /* version remains unknown */ }
-  return { valid: true, path: runtimeDir!, version: runtimeVersion, kind: 'runtime' };
-}
-
-function getSaveBackendScreenshots(): boolean {
-  const settings = readGuiSettings();
-  return settings.save_backend_screenshots === true;
-}
-
-let mainWindow: BrowserWindow | null = null;
-
-/** 是否处于打包后的生产模式 */
-function isPackaged(): boolean {
-  return app.isPackaged;
-}
-
-/**
- * 应用工作目录（外部可写文件：autowsgr/、usersettings.yaml 等）：
- * - 开发模式: 项目根目录
- * - 打包模式: exe 所在目录
- */
-function appRoot(): string {
-  if (isPackaged()) {
-    return path.dirname(app.getPath('exe'));
-  }
-  return path.join(__dirname, '..', '..');
-}
-
-/** extraResources 目录 (resource/, plans/, setup.bat) */
-function resourceRoot(): string {
-  if (isPackaged()) {
-    return process.resourcesPath;
-  }
-  return path.join(__dirname, '..', '..');
-}
-
-/** 将相对路径解析为绝对路径 */
-function resolveAppPath(filePath: string): string {
-  if (path.isAbsolute(filePath)) return filePath;
-  // resource/ 在打包后位于 extraResources（只读）
-  if (filePath.startsWith('resource')) {
-    return path.join(resourceRoot(), filePath);
-  }
-  // plans/ 及其他文件在 appRoot（可写，用户数据不会被覆盖安装覆盖）
-  return path.join(appRoot(), filePath);
-}
-
-/**
- * 初始化用户方案目录：将 extraResources 中的默认方案
- * 复制到 appRoot/plans（不覆盖已有文件，保留用户自定义方案）。
- */
-function initUserPlansDir(): void {
-  const bundledDir = path.join(resourceRoot(), 'plans');
-  const userDir = path.join(appRoot(), 'plans');
-  if (!fs.existsSync(bundledDir)) return;
-  copyDirNoOverwrite(bundledDir, userDir);
-}
-
-/** 递归复制目录，跳过已存在的文件 */
-function copyDirNoOverwrite(src: string, dest: string): void {
-  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
-  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
-    const srcPath = path.join(src, entry.name);
-    const destPath = path.join(dest, entry.name);
-    if (entry.isDirectory()) {
-      copyDirNoOverwrite(srcPath, destPath);
-    } else if (!fs.existsSync(destPath)) {
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-}
-
-function createWindow(): BrowserWindow {
-  const win = new BrowserWindow({
-    width: 1280,
-    height: 720,
-    minWidth: 960,
-    minHeight: 540,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
+  void showUpdateInProgressDialog();
+  return true;
+});
+const shipLibraryUpdater = new ShipLibraryUpdater(
+  shipLibraryService,
+  {
+    findPython,
+    appRoot,
+    sendProgress: message => {
+      windowService.sendToRenderer(
+        'ship-library-update-progress',
+        { message },
+      );
     },
-    titleBarStyle: 'hiddenInset',
-    backgroundColor: '#1a1a2e',
-    icon: path.join(isPackaged() ? process.resourcesPath : path.join(__dirname, '..', '..'), 'resource', 'images', 'logo.png'),
-  });
+    compareShipNames: pythonCmd => {
+      return shipNameSynchronizer.compare(
+        backendShipNamesPath(pythonCmd),
+        shipLibraryService.getManifest().ships,
+      );
+    },
+    syncShipNames: pythonCmd => {
+      return shipNameSynchronizer.sync(
+        backendShipNamesPath(pythonCmd),
+        shipLibraryService.getManifest().ships,
+      );
+    },
+  },
+);
 
-  const appDir = app.getAppPath();
-  const htmlPath = path.join(appDir, 'src', 'view', 'index.html');
+/** 返回开发项目根目录或打包后的 exe 目录。 */
+function appRoot(): string {
+  return appPaths.appRoot();
+}
 
-  // 根据 BACKEND_PORT 动态注入 CSP
-  win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          `default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:${BACKEND_PORT} ws://localhost:${BACKEND_PORT}`
-        ],
+/** 返回包含 resource 和 setup.bat 的 extraResources 目录。 */
+function resourceRoot(): string {
+  return appPaths.resourceRoot();
+}
+
+/** 返回 Electron userData 根目录。 */
+function userDataRoot(): string {
+  return appPaths.userDataRoot();
+}
+
+// IPC 注册
+
+registerFileIpc(ipcMain, {
+  dialog,
+  shell,
+  secureFiles: secureFileService,
+  safePaths: safePathService,
+  combatPlans: combatPlanRepository,
+  appRoot,
+  userDataRoot,
+});
+registerDeviceIpc(ipcMain, {
+  adb: adbService,
+  detectEmulator,
+});
+registerConfigurationIpc(ipcMain, {
+  getAppVersion: () => app.getVersion(),
+  backendPort: BACKEND_PORT,
+  configuration: guiConfigurationService,
+  settingsCommit: guiSettingsCommitService,
+  cudaEnvironment: cudaEnvironmentService,
+  pythonEnvironment: pythonEnvironmentService,
+  windows: windowService,
+});
+registerDailyPlanIpc(ipcMain, {
+  dailyPlans: dailyPlanService,
+  configuration: guiConfigurationService,
+});
+registerMigrationConflictIpc(ipcMain, migrationConflictService);
+registerEnvironmentIpc(ipcMain, pythonEnvironmentService);
+registerTeamPlanIpc(ipcMain, {
+  dialog,
+  repository: teamPlanRepository,
+  service: teamPlanService,
+});
+registerCombatPlanIpc(ipcMain, {
+  dialog,
+  safePaths: safePathService,
+  plans: planManagementService,
+  planExports: planExportService,
+});
+registerShipLibraryIpc(ipcMain, {
+  library: shipLibraryService,
+  updater: shipLibraryUpdater,
+  getStatus: async () => {
+    const status = shipLibraryService.getStatus();
+    if (
+      !status.exists
+      || status.error
+      || status.shipCount <= 0
+      || status.missingAssets > 0
+    ) {
+      return status;
+    }
+    try {
+      const backend = await shipLibraryUpdater.getBackendSyncStatus();
+      return {
+        ...status,
+        backendSynchronized: backend.synchronized,
+        backendMissingRecords: backend.missingRecords,
+        backendMissingAliases: backend.missingAliases,
+      };
+    } catch (error) {
+      return {
+        ...status,
+        backendSynchronized: false,
+        backendError: error instanceof Error
+          ? error.message
+          : String(error),
+      };
+    }
+  },
+});
+registerBackendIpc(ipcMain, {
+  getBackendProcess,
+  startBackend,
+  runSetupScript,
+});
+
+const legacyPlanMigration = new LegacyPlanMigration<UserTeamPlan>(
+  appPaths,
+  atomicFileStore,
+  userDataMigrationService,
+  migrationStateStore,
+  {
+    yamlFiles: directory => combatPlanRepository.yamlFiles(directory),
+    safePlanBaseName: value => combatPlanCodec.safeBaseName(value),
+    normalizeUserTeamPlan: raw => teamPlanCodec.normalizeLegacy(raw),
+    teamPlanMatches: (filePath, team) => (
+      teamPlanRepository.matches(filePath, team)
+    ),
+    teamName: team => team.name,
+    renameTeam: (team, name) => ({
+      ...structuredClone(team),
+      name,
+    }),
+    normalizeCombatPlanFleetPresets: (
+      root,
+      source,
+      requireEmbeddedShips,
+    ) => combatPlanCodec.normalizeLegacyFleetPresets(
+      root,
+      source,
+      requireEmbeddedShips,
+    ),
+    buildTeamPlanWrites: (teams, directory) => (
+      teamPlanRepository.buildWrites(teams, directory)
+    ),
+    serializeCombatPlan: (root, originalContent) => (
+      combatPlanCodec.serialize(root, originalContent)
+    ),
+    isStandaloneTaskPreset: root => (
+      taskPresetCodec.isStandalone(root)
+    ),
+    normalizeTaskPreset: root => taskPresetCodec.normalize(root),
+  },
+);
+
+/** 向渲染进程发送环境检查进度。 */
+function sendProgress(msg: string): void {
+  windowService.sendToRenderer('backend-log', msg);
+}
+
+// 应用生命周期
+
+if (isPrimaryInstance) initializeApplicationLifecycle();
+
+function initializeApplicationLifecycle(): void {
+  let runtimeShutdownInProgress = false;
+  let runtimeShutdownComplete = false;
+
+  /** 在任何迁移、后端初始化和主窗口创建前处理待安装更新。 */
+  const handleStartupUpdate = async (): Promise<boolean> => {
+    const pendingUpdate = guiUpdateStateStore.read();
+    if (pendingUpdate) {
+      const updatePolicy = resolveGuiUpdateSelectionPolicy(
+        app.getVersion(),
+        guiConfigurationService.allowTestUpdates(),
+      );
+      const mismatch = validateGuiUpdateCandidate(
+        updatePolicy,
+        pendingUpdate.targetVersion,
+      );
+      if (mismatch) {
+        guiUpdaterLogger.warn(
+          `Discarded pending GUI update after channel change: ${mismatch}`,
+        );
+        guiUpdateStateStore.clear();
+      }
+    }
+    const resolution = guiUpdateStateStore.resolveStartup(
+      app.getVersion(),
+    );
+    if (resolution.action === 'continue') return false;
+    if (resolution.action === 'cleanup') {
+      const cleanupTimer = setTimeout(() => {
+        guiUpdateInstaller.cleanupAppliedUpdate(resolution.state);
+      }, 10_000);
+      cleanupTimer.unref();
+      return false;
+    }
+    if (resolution.action === 'wait') {
+      guiUpdaterLogger.info(
+        `Blocked old GUI startup while v`
+        + `${resolution.state.targetVersion} is installing`,
+      );
+      await showUpdateInProgressDialog();
+      runtimeShutdownComplete = true;
+      app.quit();
+      return true;
+    }
+
+    try {
+      await guiUpdateInstaller.launchPendingUpdate();
+      runtimeShutdownComplete = true;
+      app.quit();
+      return true;
+    } catch (error) {
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      guiUpdaterLogger.error(
+        `Cannot install pending GUI update: ${message}`,
+      );
+      await dialog.showMessageBox({
+        type: 'error',
+        title: 'GUI 更新失败',
+        message: '后台更新无法启动',
+        detail: `${message}\n本次将继续打开当前版本。`,
+        buttons: ['确认'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      });
+      return false;
+    }
+  };
+
+  app.whenReady().then(async () => {
+    if (await handleStartupUpdate()) return;
+
+    let migrationSelection: LegacyMigrationSelection = {
+      ...DEFAULT_LEGACY_MIGRATION_SELECTION,
+    };
+    if (userDataMigrationService.shouldMigrateLegacyInstallation()) {
+      const selected = await legacyMigrationPrompt.show();
+      if (!selected) {
+        app.quit();
+        return;
+      }
+      migrationSelection = selected;
+      legacyUserDataMigration = (
+        userDataMigrationService.migrateLegacyUserDataFiles(
+          migrationSelection,
+        )
+      );
+    }
+
+    initPythonEnv({
+      appRoot,
+      sendProgress,
+      getConfiguredPythonPath: () => (
+        guiConfigurationService.configuredPythonPath()
+      ),
+      getUpdateMode: () => guiConfigurationService.updateMode(),
+      getBackendStartupMode: () => (
+        guiConfigurationService.backendStartupMode()
+      ),
+      getBackendRepoPath: () => (
+        guiConfigurationService.backendRepoPath()
+      ),
+      getTempDir: () => app.getPath('temp'),
+    });
+    initBackend({
+      appRoot,
+      userDataRoot,
+      resourceRoot,
+      BACKEND_PORT,
+      sendToRenderer: (channel, ...args) => (
+        windowService.sendToRenderer(channel, ...args)
+      ),
+    });
+    combatPlanRepository.initializeUserDirectory();
+    shipLibraryService.initialize();
+    teamPlanRepository.initializeUserDirectory();
+    const presetInventoryResult = (
+      userDataMigrationService.migratePresetInventory()
+    );
+    const legacyPlanResult = legacyPlanMigration.migrate(
+      migrationSelection,
+    );
+    const legacyMigrationResult = mergeLegacyMigrationSummaries(
+      legacyUserDataMigration,
+      legacyPlanResult,
+      presetInventoryResult,
+    );
+    userDataMigrationService.writeMigrationReport(
+      legacyMigrationResult,
+    );
+    if (
+      legacyMigrationResult.failed === 0
+      && migrationStateStore.isStageComplete(
+        LEGACY_PLAN_MIGRATION_STAGE,
+      )
+    ) {
+      userDataMigrationService.completeLegacySourceMigration();
+    }
+    migrationConflictService.prepareAfterMigration(
+      legacyMigrationResult.total > 0,
+    );
+    registerUpdaterIpc(ipcMain, {
+      sendToRenderer: (channel, ...args) => (
+        windowService.sendToRenderer(channel, ...args)
+      ),
+      getAppVersion: () => app.getVersion(),
+      allowTestUpdates: () => guiConfigurationService.allowTestUpdates(),
+      logger: guiUpdaterLogger,
+      updateStates: guiUpdateStateStore,
+      chooseDownload: async (version) => {
+        const options = {
+          type: 'question' as const,
+          title: '发现 GUI 更新',
+          message: `发现 GUI v${version}，是否现在更新？`,
+          detail: [
+            '“现在更新”只会在后台静默下载和校验，不会关闭 GUI 或中断当前任务。',
+            '“稍后”本次不下载，下次打开 GUI 时仍会提示。',
+          ].join('\n'),
+          buttons: ['现在更新', '稍后'],
+          defaultId: 1,
+          cancelId: 1,
+          noLink: true,
+        };
+        const mainWindow = windowService.getMainWindow();
+        const result = mainWindow
+          ? await dialog.showMessageBox(mainWindow, options)
+          : await dialog.showMessageBox(options);
+        return result.response === 0 ? 'now' : 'later';
+      },
+      chooseRestartTiming: async (version) => {
+        const options = {
+          type: 'question' as const,
+          title: 'GUI 更新准备完成',
+          message: `GUI v${version} 已下载并校验完成`,
+          detail: [
+            '“立即重启”会安全停止后端和 ADB，静默安装完成后启动新版本。',
+            '“下次启动”会继续当前任务，下次打开 GUI 时先完成更新再显示主窗口。',
+          ].join('\n'),
+          buttons: ['立即重启', '下次启动'],
+          defaultId: 1,
+          cancelId: 1,
+          noLink: true,
+        };
+        const mainWindow = windowService.getMainWindow();
+        const result = mainWindow
+          ? await dialog.showMessageBox(mainWindow, options)
+          : await dialog.showMessageBox(options);
+        return result.response === 0
+          ? 'restart'
+          : 'next-launch';
+      },
+      installDownloadedUpdate: async () => {
+        await stopRuntimeResources();
+        await guiUpdateInstaller.launchPendingUpdate();
+        runtimeShutdownComplete = true;
+        app.quit();
       },
     });
-  });
-
-  win.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL) => {
-    const msg = `Page load failed!\nCode: ${errorCode}\nDesc: ${errorDescription}\nURL: ${validatedURL}\nPath: ${htmlPath}`;
-    console.error('[Main]', msg);
-    if (isPackaged()) {
-      dialog.showMessageBox({ type: 'error', title: 'Load Error', message: msg });
+    Menu.setApplicationMenu(null);
+    windowService.createWindow();
+    const migrationNotice = buildLegacyMigrationNotice(
+      legacyMigrationResult,
+    );
+    const mainWindow = windowService.getMainWindow();
+    if (migrationNotice && mainWindow) {
+      void dialog.showMessageBox(mainWindow, migrationNotice);
     }
+
+    app.on('activate', () => {
+      if (BrowserWindow.getAllWindows().length === 0) {
+        windowService.createWindow();
+      }
+    });
   });
 
-  win.loadFile(htmlPath).catch(err => {
-    console.error('[Main] loadFile failed:', err);
-    if (isPackaged()) {
-      dialog.showMessageBox({ type: 'error', title: 'loadFile Error', message: `${err.message}\nPath: ${htmlPath}` });
+  app.on('before-quit', (event) => {
+    windowService.captureWindowBounds();
+    windowService.persistWindowBounds();
+    if (runtimeShutdownComplete) return;
+    event.preventDefault();
+    if (runtimeShutdownInProgress) return;
+
+    runtimeShutdownInProgress = true;
+    void stopRuntimeResources().then(() => {
+      runtimeShutdownComplete = true;
+      runtimeShutdownInProgress = false;
+      app.quit();
+    }).catch(error => {
+      runtimeShutdownInProgress = false;
+      const message = error instanceof Error
+        ? error.message
+        : String(error);
+      console.error('[Backend] 无法安全退出:', message);
+      dialog.showErrorBox(
+        '无法安全退出',
+        `后端进程仍在运行，应用没有退出：${message}`,
+      );
+    });
+  });
+
+  app.on('window-all-closed', () => {
+    if (process.platform !== 'darwin') {
+      app.quit();
     }
-  });
-
-  mainWindow = win;
-  win.on('closed', () => { mainWindow = null; });
-  return win;
-}
-
-// ════════════════════════════════════════
-// IPC Handlers
-// ════════════════════════════════════════
-
-ipcMain.handle('open-directory-dialog', async (_event, title?: string) => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openDirectory'],
-    title: title || '选择文件夹',
-  });
-  if (result.canceled || result.filePaths.length === 0) return null;
-  return result.filePaths[0];
-});
-
-ipcMain.handle('open-file-dialog', async (_event, filters: Electron.FileFilter[], defaultDir?: string) => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    defaultPath: defaultDir || undefined,
-    filters,
-  });
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return null;
-  }
-
-  const filePath = result.filePaths[0];
-  const content = fs.readFileSync(filePath, 'utf-8');
-  return { path: filePath, content };
-});
-
-ipcMain.handle('save-file', async (_event, filePath: string, content: string) => {
-  const resolved = resolveAppPath(filePath);
-  const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(resolved, content, 'utf-8');
-});
-
-ipcMain.handle('save-file-dialog', async (_event, defaultName: string, content: string, filters: Electron.FileFilter[]) => {
-  const result = await dialog.showSaveDialog({
-    defaultPath: defaultName,  // caller can pass full path (dir + filename)
-    filters,
-  });
-  if (result.canceled || !result.filePath) return null;
-  fs.writeFileSync(result.filePath, content, 'utf-8');
-  return result.filePath;
-});
-
-ipcMain.handle('read-file', async (_event, filePath: string) => {
-  const resolved = resolveAppPath(filePath);
-  if (!fs.existsSync(resolved)) return '';
-  return fs.readFileSync(resolved, 'utf-8');
-});
-
-ipcMain.handle('append-file', async (_event, filePath: string, content: string) => {
-  const resolved = resolveAppPath(filePath);
-  const dir = path.dirname(resolved);
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  fs.appendFileSync(resolved, content, 'utf-8');
-});
-
-
-ipcMain.handle('detect-emulator', async () => {
-  return detectEmulator();
-});
-
-ipcMain.handle('check-adb-devices', async () => {
-  const adbDir = path.join(appRoot(), 'adb');
-  const adbExe = path.join(adbDir, 'adb.exe');
-  const adbCmd = fs.existsSync(adbExe) ? adbExe : 'adb';
-  try {
-    const { stdout } = await execAsync(`"${adbCmd}" devices`, { windowsHide: true, timeout: 5000 });
-    const lines = stdout.split('\n').slice(1); // skip header
-    return lines
-      .map(l => l.trim())
-      .filter(l => l.length > 0)
-      .map(l => {
-        const [serial, status] = l.split(/\s+/);
-        return { serial, status: status || 'unknown' };
-      });
-  } catch {
-    return [];
-  }
-});
-
-ipcMain.on('get-app-version-sync', (event) => {
-  event.returnValue = app.getVersion();
-});
-
-ipcMain.on('get-backend-port-sync', (event) => {
-  event.returnValue = BACKEND_PORT;
-});
-
-ipcMain.on('get-backend-startup-mode-sync', (event) => {
-  event.returnValue = getBackendStartupMode();
-});
-
-ipcMain.on('get-backend-repo-path-sync', (event) => {
-  event.returnValue = getBackendRepoPath();
-});
-
-ipcMain.on('get-ocr-gpu-mode-sync', (event) => {
-  event.returnValue = getOcrGpuMode();
-});
-
-ipcMain.on('get-cuda-path-sync', (event) => {
-  event.returnValue = getCudaPath();
-});
-
-ipcMain.on('get-save-backend-screenshots-sync', (event) => {
-  event.returnValue = getSaveBackendScreenshots();
-});
-
-ipcMain.handle('set-backend-port', (_event, port: number) => {
-  // 防御性校验：仅在端口为有限数值且位于合法范围时才写入设置
-  if (typeof port !== 'number' || !Number.isFinite(port)) {
-    return;
-  }
-  const normalizedPort = Math.trunc(port);
-  if (normalizedPort < 1 || normalizedPort > 65535) {
-    return;
-  }
-  writeGuiSettings({ backend_port: normalizedPort });
-});
-
-ipcMain.handle('set-backend-startup-mode', (_event, mode: BackendStartupMode) => {
-  const normalized = mode === 'external' ? 'external' : 'managed';
-  writeGuiSettings({ backend_startup_mode: normalized });
-});
-
-ipcMain.handle('set-backend-repo-path', (_event, repoPath: string | null) => {
-  const normalized = typeof repoPath === 'string' ? repoPath.trim() : '';
-  writeGuiSettings({ backend_repo_path: normalized });
-});
-
-ipcMain.handle('set-ocr-gpu-mode', (_event, mode: OcrGpuMode) => {
-  const normalized: OcrGpuMode = mode === 'cpu' || mode === 'cuda' ? mode : 'auto';
-  writeGuiSettings({ ocr_gpu_mode: normalized });
-});
-
-ipcMain.handle('set-cuda-path', (_event, cudaPath: string | null) => {
-  const raw = typeof cudaPath === 'string' ? cudaPath.trim() : '';
-  const normalized = raw ? normalizeCudaPath(raw) : '';
-  writeGuiSettings({ cuda_path: normalized });
-});
-
-ipcMain.handle('validate-cuda-path', (_event, cudaPath: string) => {
-  return validateCudaPath(cudaPath);
-});
-
-ipcMain.handle('set-save-backend-screenshots', (_event, enabled: boolean) => {
-  writeGuiSettings({ save_backend_screenshots: enabled === true });
-});
-
-ipcMain.on('get-python-path-sync', (event) => {
-  event.returnValue = getConfiguredPythonPath();
-});
-
-ipcMain.on('get-update-mode-sync', (event) => {
-  event.returnValue = getUpdateMode();
-});
-
-ipcMain.handle('set-update-mode', (_event, mode: 'auto' | 'manual') => {
-  const normalized = mode === 'manual' ? 'manual' : 'auto';
-  writeGuiSettings({ update_mode: normalized });
-});
-
-ipcMain.handle('set-python-path', (_event, pythonPath: string | null) => {
-  writeGuiSettings({ python_path: pythonPath ?? '' });
-  clearPythonCache(); // 清除缓存，下次查找时使用新路径
-});
-
-ipcMain.handle('validate-python', async (_event, pythonPath: string) => {
-  if (!pythonPath) return { valid: false, version: null, error: '路径为空' };
-  if (!fs.existsSync(pythonPath)) return { valid: false, version: null, error: '文件不存在' };
-  try {
-    const { stdout } = await execAsync(`"${pythonPath}" --version`, { windowsHide: true, timeout: 10000 });
-    const version = stdout.trim();
-    if (!isAllowedPythonVersion(version)) {
-      return { valid: false, version, error: `版本不兼容: ${version}（需要 3.12 或 3.13）` };
-    }
-    return { valid: true, version };
-  } catch (e) {
-    return { valid: false, version: null, error: `执行失败: ${e instanceof Error ? e.message : String(e)}` };
-  }
-});
-
-ipcMain.handle('get-app-root', () => {
-  return appRoot();
-});
-
-ipcMain.handle('resolve-app-path', (_event, filePath: string) => {
-  return resolveAppPath(filePath);
-});
-
-ipcMain.handle('get-plans-dir', () => {
-  return resolveAppPath('plans');
-});
-
-ipcMain.handle('list-plan-files', () => {
-  const dir = resolveAppPath('plans');
-  if (!fs.existsSync(dir)) return [];
-  return fs.readdirSync(dir)
-    .filter(f => /\.ya?ml$/i.test(f))
-    .map(f => ({ name: f.replace(/\.ya?ml$/i, ''), file: f }));
-});
-
-ipcMain.handle('get-config-dir', () => {
-  return appRoot();
-});
-
-ipcMain.handle('open-folder', async (_event, folderPath: string) => {
-  if (fs.existsSync(folderPath)) {
-    await shell.openPath(folderPath);
-  }
-});
-
-ipcMain.handle('check-environment', async () => {
-  return await checkEnvironment();
-});
-
-/*
- * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-ipcMain.handle('check-updates', async () => {
-  return await checkForUpdates();
-});
-*/
-
-ipcMain.handle('install-deps', async () => {
-  const pythonCmd = await findPython();
-  if (!pythonCmd) return { success: false, output: '找不到 Python' };
-  return installDependencies(pythonCmd);
-});
-
-ipcMain.handle('run-setup', async () => {
-  return runSetupScript();
-});
-
-ipcMain.handle('install-portable-python', async () => {
-  return installPortablePython();
-});
-
-/*
- * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-ipcMain.handle('pull-updates', async () => {
-  return pullUpdates();
-});
-*/
-
-ipcMain.handle('start-backend', async () => {
-  if (getBackendProcess()) return { success: true, message: '后端已在运行' };
-  await startBackend();
-  return { success: true, message: '后端启动中' };
-});
-
-// ════════════════════════════════════════
-// GUI 自动更新 (electron-updater)
-// ════════════════════════════════════════
-
-/** 初始化自动更新 */
-function initAutoUpdater(): void {
-  autoUpdater.autoDownload = false;
-  autoUpdater.autoInstallOnAppQuit = true;
-
-  autoUpdater.on('update-available', (info: UpdateInfo) => {
-    mainWindow?.webContents.send('update-status', {
-      status: 'available',
-      version: info.version,
-      releaseNotes: typeof info.releaseNotes === 'string' ? info.releaseNotes : '',
-    });
-  });
-
-  autoUpdater.on('update-not-available', () => {
-    mainWindow?.webContents.send('update-status', { status: 'up-to-date' });
-  });
-
-  autoUpdater.on('download-progress', (progress: ProgressInfo) => {
-    mainWindow?.webContents.send('update-status', {
-      status: 'downloading',
-      percent: Math.round(progress.percent),
-      transferred: progress.transferred,
-      total: progress.total,
-    });
-  });
-
-  autoUpdater.on('update-downloaded', (info: UpdateInfo) => {
-    mainWindow?.webContents.send('update-status', {
-      status: 'downloaded',
-      version: info.version,
-    });
-  });
-
-  autoUpdater.on('error', (err: Error) => {
-    mainWindow?.webContents.send('update-status', {
-      status: 'error',
-      message: err.message,
-    });
   });
 }
-
-ipcMain.handle('check-gui-updates', async () => {
-  try {
-    const result = await autoUpdater.checkForUpdates();
-    return result?.updateInfo ? { version: result.updateInfo.version } : null;
-  } catch {
-    return null;
-  }
-});
-
-ipcMain.handle('download-gui-update', async () => {
-  try {
-    await autoUpdater.downloadUpdate();
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, message: err.message };
-  }
-});
-
-ipcMain.handle('install-gui-update', () => {
-  autoUpdater.quitAndInstall(false, true);
-});
-
-/** 向渲染进程发送环境检查进度 */
-function sendProgress(msg: string): void {
-  mainWindow?.webContents.send('backend-log', msg);
-}
-
-// ════════════════════════════════════════
-// App Lifecycle
-// ════════════════════════════════════════
-
-app.whenReady().then(() => {
-  initPythonEnv({
-    appRoot,
-    sendProgress,
-    getConfiguredPythonPath,
-    getUpdateMode,
-    getTempDir: () => app.getPath('temp'),
-  });
-  initBackend({
-    appRoot,
-    resourceRoot,
-    BACKEND_PORT,
-    getMainWindow: () => mainWindow,
-  });
-  initUserPlansDir();
-  initAutoUpdater();
-  createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
-});
-
-app.on('before-quit', () => {
-  stopBackend();
-});
-
-app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
-});

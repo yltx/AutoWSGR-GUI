@@ -1,0 +1,74 @@
+name: 6潜艇队
+ships:
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}
+  - candidates:
+      - {name: U-47·改, search_name: U-47, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-81·改, search_name: U-81, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-96·改, search_name: U-96, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-505·改, search_name: U-505, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-2540·改, search_name: U-2540, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1405·改, search_name: U-1405, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: U-1206·改, search_name: U-1206, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 射水鱼·改, search_name: 射水鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 大青花鱼·改, search_name: 大青花鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鲃鱼·改, search_name: 鲃鱼, ship_type: [ss], min_level: 100, relaxed: false}
+      - {name: 鹦鹉螺·改, search_name: 鹦鹉螺, ship_type: [ss], min_level: 100, relaxed: false}

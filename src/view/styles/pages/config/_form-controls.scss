@@ -1,0 +1,217 @@
+.config-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+
+  input[type='checkbox'] {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+  }
+
+  input[type='checkbox']:focus-visible + .config-switch-track {
+    box-shadow: 0 0 0 3px var(--accent-subtle);
+  }
+
+  input[type='checkbox']:checked + .config-switch-track {
+    background: var(--accent);
+    border-color: var(--accent);
+
+    &::after {
+      transform: translateX(16px);
+    }
+  }
+
+  input[type='checkbox']:disabled + .config-switch-track,
+  input[type='checkbox']:disabled ~ span {
+    opacity: 0.45;
+  }
+}
+
+.config-switch-track {
+  position: relative;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 20px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: background 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+    transition: transform 0.16s ease;
+  }
+}
+
+.config-compat-controls {
+  display: none !important;
+}
+
+.ship-library-update-control {
+  justify-content: flex-end;
+
+  .adb-status {
+    margin-left: 0;
+    max-width: 360px;
+    white-space: normal;
+    text-align: right;
+  }
+}
+
+.window-size-control {
+  justify-content: flex-end;
+
+  label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
+  input[type='number'] {
+    width: var(--config-short-field-width);
+  }
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 6px;
+  align-items: stretch;
+}
+
+.config-grid-tabs {
+  .config-col-left,
+  .config-col-right {
+    display: contents;
+  }
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+.config-card-wide {
+  grid-column: 1 / -1;
+}
+
+.config-col-left {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-col-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-col-right > .card {
+  flex: 1;
+}
+
+.config-col-left > .card,
+.config-col-right > .card {
+  margin-bottom: 0;
+  padding: 8px 12px;
+}
+
+.config-grid .card h3 {
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.config-grid .form-group {
+  margin-bottom: 4px;
+}
+
+.config-grid .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.config-grid .form-group > label {
+  font-size: 10.5px;
+  margin-bottom: 3px;
+}
+
+.config-grid .input {
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.config-grid .btn-small {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.config-grid .card-divider {
+  margin: 8px 0;
+}
+
+.config-runtime-row {
+  align-items: center;
+}
+
+.config-inline-number {
+  width: var(--config-short-field-width) !important;
+  flex: 0 0 var(--config-short-field-width);
+}
+
+.config-inline-note {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.config-accent-row {
+  align-items: center;
+}
+
+.config-theme-accent-row {
+  justify-content: flex-end;
+
+  .accent-label {
+    flex: 0 0 auto;
+  }
+}
+
+.config-ui-theme-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-ui-theme-row .input {
+  min-width: 0;
+  flex: 1;
+}
+
+.config-ui-debug-toggle {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

@@ -1,0 +1,15 @@
+# 旧版 8-5 刷取战利品计划。
+# 稳定计划标识必须继续指向 8-5，不能借用当前周常 8-2。
+chapter: 8
+map: 5
+selected_nodes: [A, I]
+fleet_id: 1
+repair_mode: 1
+node_args:
+  A:
+    formation: 4
+    night: false
+    proceed: true
+  I:
+    formation: 4
+    night: true

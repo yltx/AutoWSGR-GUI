@@ -1,0 +1,72 @@
+name: 重巡周常队
+ships:
+  - name: 巴尔的摩·改
+    search_name: 巴尔的摩
+    ship_type: [ca]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 旧金山·改, search_name: 旧金山, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 彭萨科拉·改, search_name: 彭萨科拉, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 昆西·改, search_name: 昆西, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 威奇塔·改, search_name: 威奇塔, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 萨勒姆, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 德梅因, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 什罗普郡·改, search_name: 什罗普郡, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 埃克赛特·改, search_name: 埃克赛特, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 约克·改, search_name: 约克, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 欧根亲王·改, search_name: 欧根亲王, ship_type: [ca], min_level: 100, relaxed: false}
+  - name: 欧根亲王·改
+    search_name: 欧根亲王
+    ship_type: [ca]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 旧金山·改, search_name: 旧金山, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 彭萨科拉·改, search_name: 彭萨科拉, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 昆西·改, search_name: 昆西, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 威奇塔·改, search_name: 威奇塔, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 萨勒姆, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 德梅因, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 什罗普郡·改, search_name: 什罗普郡, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 埃克赛特·改, search_name: 埃克赛特, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 约克·改, search_name: 约克, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 欧根亲王·改, search_name: 欧根亲王, ship_type: [ca], min_level: 100, relaxed: false}
+  - name: 昆西·改
+    search_name: 昆西
+    ship_type: [ca]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 旧金山·改, search_name: 旧金山, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 彭萨科拉·改, search_name: 彭萨科拉, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 昆西·改, search_name: 昆西, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 威奇塔·改, search_name: 威奇塔, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 萨勒姆, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 德梅因, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 什罗普郡·改, search_name: 什罗普郡, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 埃克赛特·改, search_name: 埃克赛特, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 约克·改, search_name: 约克, ship_type: [ca], min_level: 100, relaxed: false}
+      - {name: 欧根亲王·改, search_name: 欧根亲王, ship_type: [ca], min_level: 100, relaxed: false}
+  - name: 亚特兰大·改
+    search_name: 亚特兰大
+    ship_type: [cl]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 海伦娜·改, search_name: 海伦娜, ship_type: [cl], min_level: 100, relaxed: false}
+      - {name: 圣胡安·改, search_name: 圣胡安, ship_type: [cl], min_level: 100, relaxed: false}
+      - {name: 朱诺(CL-52)·改, search_name: 朱诺, ship_type: [cl], min_level: 100, relaxed: false}
+  - name: 圣胡安·改
+    search_name: 圣胡安
+    ship_type: [cl]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: 塔林, ship_type: [cl], min_level: 100, relaxed: false}
+      - {name: 亚特兰大·改, search_name: 亚特兰大, ship_type: [cl], min_level: 100, relaxed: false}
+      - {name: 朱诺(CL-52)·改, search_name: 朱诺, ship_type: [cl], min_level: 100, relaxed: false}
+  - name: 85工程
+    ship_type: [cv]
+    min_level: 100
+    relaxed: false

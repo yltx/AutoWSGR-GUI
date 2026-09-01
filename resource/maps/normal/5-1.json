@@ -1,0 +1,111 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.891,
+      0.779
+    ],
+    "next": [
+      "A",
+      "B"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.711,
+      0.722
+    ],
+    "next": [
+      "C",
+      "D"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.802,
+      0.375
+    ],
+    "next": [
+      "D"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.516,
+      0.861
+    ],
+    "next": [
+      "E",
+      "F"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.54,
+      0.46
+    ],
+    "next": [
+      "F",
+      "G"
+    ]
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.121,
+      0.679
+    ],
+    "next": [
+      "H"
+    ]
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.265,
+      0.542
+    ],
+    "next": [
+      "G",
+      "H"
+    ]
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.358,
+      0.209
+    ],
+    "next": []
+  },
+  "H": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.141,
+      0.178
+    ],
+    "next": []
+  }
+}

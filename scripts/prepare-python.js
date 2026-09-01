@@ -21,12 +21,34 @@ function run(cmd, opts = {}) {
   execSync(cmd, { stdio: 'inherit', windowsHide: true, timeout: 600000, ...opts });
 }
 
+function ensureVCRedist() {
+  console.log('[5/5] 检查 VC++ Redistributable…');
+  const redistDir = path.join(ROOT, 'redist');
+  const redistExe = path.join(redistDir, 'vc_redist.x64.exe');
+  if (fs.existsSync(redistExe)) {
+    console.log('✓ vc_redist.x64.exe 已就绪');
+    return;
+  }
+
+  console.log('  下载 vc_redist.x64.exe…');
+  if (!fs.existsSync(redistDir)) fs.mkdirSync(redistDir, { recursive: true });
+  try {
+    run(`curl.exe -L -o "${redistExe}" "https://aka.ms/vs/17/release/vc_redist.x64.exe"`);
+    console.log('✓ vc_redist.x64.exe 下载完成');
+  } catch {
+    console.error('✗ vc_redist.x64.exe 下载失败，请手动下载到 redist/ 目录');
+    console.error('  URL: https://aka.ms/vs/17/release/vc_redist.x64.exe');
+    process.exit(1);
+  }
+}
+
 async function main() {
-  // 如果已有完整的 python.exe + pip，跳过
+  // 如果已有完整的 python.exe + pip，只跳过 Python 下载。
   if (fs.existsSync(PYTHON_EXE)) {
     try {
       execSync(`"${PYTHON_EXE}" -m pip --version`, { windowsHide: true });
       console.log(`✓ Python ${PYTHON_VERSION} 已就绪，跳过下载`);
+      ensureVCRedist();
       return;
     } catch { /* pip missing, re-setup */ }
   }
@@ -89,24 +111,7 @@ async function main() {
     process.exit(1);
   }
 
-  // VC++ Redistributable
-  console.log('[5/5] 检查 VC++ Redistributable…');
-  const REDIST_DIR = path.join(ROOT, 'redist');
-  const redistExe = path.join(REDIST_DIR, 'vc_redist.x64.exe');
-  if (fs.existsSync(redistExe)) {
-    console.log('✓ vc_redist.x64.exe 已就绪');
-  } else {
-    console.log('  下载 vc_redist.x64.exe…');
-    if (!fs.existsSync(REDIST_DIR)) fs.mkdirSync(REDIST_DIR, { recursive: true });
-    try {
-      run(`curl.exe -L -o "${redistExe}" "https://aka.ms/vs/17/release/vc_redist.x64.exe"`);
-      console.log('✓ vc_redist.x64.exe 下载完成');
-    } catch {
-      console.error('✗ vc_redist.x64.exe 下载失败，请手动下载到 redist/ 目录');
-      console.error('  URL: https://aka.ms/vs/17/release/vc_redist.x64.exe');
-      process.exit(1);
-    }
-  }
+  ensureVCRedist();
 }
 
 main().catch(err => {

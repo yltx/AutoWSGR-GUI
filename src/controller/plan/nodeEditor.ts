@@ -1,9 +1,10 @@
+/** 编排节点编辑表单与 PlanModel 节点规则更新。 */
 /**
  * nodeEditor —— 节点编辑面板值保存逻辑。
  */
 import type { PlanPreviewView } from '../../view/plan/PlanPreviewView';
 import type { PlanModel } from '../../model/PlanModel';
-import type { EnemyRule, RuleAction } from '../../types/model';
+import type { EnemyRule, RuleAction } from '../../types/model.js';
 import { Logger } from '../../utils/Logger';
 
 function normalizeRuleAction(actionRaw: string): RuleAction | null {
@@ -23,7 +24,9 @@ function normalizeRuleAction(actionRaw: string): RuleAction | null {
     const value = Number(normalized);
     return value >= 1 && value <= 5 ? (value as RuleAction) : null;
   }
-  return normalized === 'retreat' || normalized === 'detour' ? normalized : null;
+  return normalized === 'retreat' || normalized === 'detour'
+    ? normalized
+    : null;
 }
 
 function parseRuleLine(rawLine: string): EnemyRule | null {
@@ -50,7 +53,7 @@ function parseRuleLine(rawLine: string): EnemyRule | null {
 }
 
 /**
- * 从节点编辑面板收集值并写回 PlanModel，然后即时保存到文件。
+ * 从节点编辑面板收集值并写回 PlanModel。
  * 返回 true 表示成功执行。
  */
 export function saveNodeEditorValues(
@@ -75,10 +78,18 @@ export function saveNodeEditorValues(
         currentPlan.data.node_args = undefined;
       }
     }
-
-    if (currentPlan.fileName) {
-      const bridge = window.electronBridge;
-      bridge?.saveFile(currentPlan.fileName, currentPlan.toYaml());
+    const endpointNodes =
+      currentPlan.data.endpoint_nodes;
+    if (endpointNodes) {
+      const endpointIndex =
+        endpointNodes.indexOf(editingNodeId);
+      if (endpointIndex >= 0) {
+        endpointNodes.splice(endpointIndex, 1);
+      }
+      if (endpointNodes.length === 0) {
+        currentPlan.data.endpoint_nodes = undefined;
+        currentPlan.data.result = undefined;
+      }
     }
 
     planView.hideNodeEditor();
@@ -101,6 +112,9 @@ export function saveNodeEditorValues(
   }
   if (currentPlan.data.endpoint_nodes.length === 0) {
     currentPlan.data.endpoint_nodes = undefined;
+    currentPlan.data.result = undefined;
+  } else if (vals.isEndpoint) {
+    currentPlan.data.result = vals.result;
   }
 
   // 解析索敌规则文本
@@ -130,17 +144,11 @@ export function saveNodeEditorValues(
     formation: vals.formation,
     night: vals.night,
     long_missile_support: vals.longMissileSupport,
-    proceed: vals.proceed,
+    proceed: vals.isEndpoint ? false : vals.proceed,
     detour: vals.detour,
-    SL_when_detour_fails: vals.slWhenDetourFails || undefined,
+    SL_when_detour_fails: vals.slWhenDetourFails,
     enemy_rules: rules.length > 0 ? rules : undefined,
   };
-
-  // 即时保存到文件
-  if (currentPlan.fileName) {
-    const bridge = window.electronBridge;
-    bridge?.saveFile(currentPlan.fileName, currentPlan.toYaml());
-  }
 
   planView.hideNodeEditor();
   return true;

@@ -1,9 +1,10 @@
+/** 把模板参数实例化为可加入任务组的任务条目。 */
 /**
  * useTemplate —— 模板应用到任务列表的逻辑。
  */
 import type { TemplateModel } from '../../model/TemplateModel';
 import type { TaskGroupModel } from '../../model/TaskGroupModel';
-import type { TaskTemplate } from '../../types/model';
+import type { TaskTemplate } from '../../types/model.js';
 import { Logger } from '../../utils/Logger';
 
 export interface UseTemplateCallbacks {
@@ -72,7 +73,6 @@ export function addPlanToTaskList(
   fleetPresetIndex?: number,
   presetName?: string,
   fleetId?: number,
-  autoFleetFallback?: boolean,
 ): void {
   const planName = planPath.split(/[\\/]/).pop()?.replace(/\.ya?ml$/i, '') ?? tpl.name;
   const label = presetName
@@ -85,7 +85,6 @@ export function addPlanToTaskList(
     label,
     fleetPresetIndex,
     fleet_id: fleetId,
-    autoFleetFallback,
     forceRetry: tpl.forceRetry,
     allowPolling: tpl.allowPolling,
   });

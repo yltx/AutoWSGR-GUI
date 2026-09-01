@@ -1,12 +1,24 @@
+/** 唯一持有就绪与延迟队列，并实现优先级和轮询排序。 */
 /**
  * TaskQueue —— 优先级任务队列 + 延迟任务管理。
  * 从 Scheduler.ts 拆出，封装队列数据结构及相关操作。
  */
-import type { TaskRequest } from '../../types/api';
-import type { StopCondition, BathRepairConfig, FleetPreset } from '../../types/model';
+import type { TaskRequest } from '../../types/api.js';
+import type {
+  StopCondition,
+  BathRepairConfig,
+  FleetPreset,
+  BattleResultGrade,
+} from '../../types/model.js';
 import type { BathingShip } from './RepairManager';
 import { TaskPriority, type SchedulerTaskType, type SchedulerTask } from '../../types/scheduler';
-import { resolveFleetPreset, resolveFleetPresetRules, toBackendName } from '../../data/shipData';
+import { toBackendName } from '../../shared/shipNameNormalizer.js';
+import {
+  resolveFleetPreset,
+  resolveFleetPresetRules,
+} from '../fleet/index.js';
+import { calculateRepairWaitMs } from './SchedulerRepairPolicy.js';
+import { createSchedulerTask, findPriorityInsertionIndex } from './SchedulerTaskPolicy.js';
 
 // ════════════════════════════════════════
 // ID 生成 & 辅助函数
@@ -25,14 +37,23 @@ export function parseUiCount(msg: string, label: string): number | null {
   return m ? parseInt(m[1], 10) : null;
 }
 
-/** Split repeatable backend requests into scheduler-owned single-round tasks. */
+/**
+ * 将支持重复执行的后端请求拆成调度器管理的单轮任务。
+ * 兼容旧数据中写在 request.times 的总次数，并保留 GUI 的无限任务语义。
+ */
 export function normalizeRoundTask(
   type: SchedulerTaskType,
   request: TaskRequest,
   times: number,
 ): { request: TaskRequest; times: number } {
-  const schedulerTimes = Number.isFinite(times) ? Math.max(1, Math.trunc(times)) : 1;
-  const isRoundBased = type === 'normal_fight' || type === 'event_fight' || type === 'campaign';
+  const schedulerTimes = times === Number.POSITIVE_INFINITY
+    ? times
+    : Number.isFinite(times)
+      ? Math.max(1, Math.trunc(times))
+      : 1;
+  const isRoundBased = type === 'normal_fight'
+    || type === 'event_fight'
+    || type === 'campaign';
   const hasRoundRequest = request.type === 'normal_fight'
     || request.type === 'event_fight'
     || request.type === 'campaign';
@@ -45,7 +66,9 @@ export function normalizeRoundTask(
     : 1;
   return {
     request: { ...request, times: 1 },
-    times: Math.max(schedulerTimes, requestTimes),
+    times: schedulerTimes === Number.POSITIVE_INFINITY
+      ? schedulerTimes
+      : Math.max(schedulerTimes, requestTimes),
   };
 }
 
@@ -59,6 +82,11 @@ export class TaskQueue {
   private deferredTasks: SchedulerTask[] = [];
   /** 延迟任务重试定时器 */
   private deferredRetryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  constructor(
+    private readonly getShipNameAliases:
+      () => Readonly<Record<string, string>> = () => ({}),
+  ) {}
 
   // ── 队列读取 ──
 
@@ -96,17 +124,7 @@ export class TaskQueue {
    * beforeSamePriority=true 时，会插入到同优先级任务之前（用于重试/跟随）。
    */
   insertByPriority(task: SchedulerTask, beforeSamePriority = false): void {
-    const idx = this.queue.findIndex((t) => {
-      if (t.priority < task.priority) return false;
-      if (t.priority > task.priority) return true;
-      // 同优先级: 按 sortKey 排序
-      const tKey = t.sortKey ?? Infinity;
-      const taskKey = task.sortKey ?? Infinity;
-      if (beforeSamePriority) {
-        return tKey >= taskKey;
-      }
-      return tKey > taskKey;
-    });
+    const idx = findPriorityInsertionIndex(this.queue, task, beforeSamePriority);
     if (idx === -1) {
       this.queue.push(task);
     } else {
@@ -129,40 +147,52 @@ export class TaskQueue {
     forceRetry?: boolean,
     allowPolling?: boolean,
     endpointNodes?: string[],
+    endpointResult?: BattleResultGrade,
     sortKey?: number,
   ): string {
     const id = generateTaskId();
     const normalized = normalizeRoundTask(type, request, times);
-    const task: SchedulerTask = {
+    const task = createSchedulerTask({
       id,
       name,
       type,
-      priority,
       request: normalized.request,
-      remainingTimes: normalized.times,
-      totalTimes: normalized.times,
+      priority,
+      times: normalized.times,
       stopCondition,
-      maxRetries: 2,
-      retryCount: 0,
-      forceRetry,
-      allowPolling: !!allowPolling,
       bathRepairConfig,
       fleetId,
       fleetPresets,
-      currentPresetIndex: currentPresetIndex ?? -1,
+      currentPresetIndex,
+      forceRetry,
+      allowPolling,
       endpointNodes,
+      endpointResult,
       sortKey,
-    };
+    });
     this.insertByPriority(task);
     return id;
   }
 
-  /** 移除排队中的任务 */
-  removeTask(taskId: string): boolean {
+  /** 查找就绪或修理延迟中的任务。 */
+  findTask(taskId: string): SchedulerTask | null {
+    return this.queue.find(task => task.id === taskId)
+      ?? this.deferredTasks.find(task => task.id === taskId)
+      ?? null;
+  }
+
+  /** 移除就绪或修理延迟中的任务，并返回被移除的任务。 */
+  removeTask(taskId: string): SchedulerTask | null {
     const idx = this.queue.findIndex((t) => t.id === taskId);
-    if (idx === -1) return false;
-    this.queue.splice(idx, 1);
-    return true;
+    if (idx !== -1) {
+      return this.queue.splice(idx, 1)[0];
+    }
+
+    const deferredIdx = this.deferredTasks.findIndex(
+      task => task.id === taskId,
+    );
+    if (deferredIdx === -1) return null;
+    return this.deferredTasks.splice(deferredIdx, 1)[0];
   }
 
   /** 移动队列中的任务顺序 */
@@ -182,11 +212,6 @@ export class TaskQueue {
       clearTimeout(this.deferredRetryTimer);
       this.deferredRetryTimer = null;
     }
-  }
-
-  /** 清空队列（不清延迟任务） */
-  clearQueue(): void {
-    this.queue = [];
   }
 
   // ── 延迟任务管理 ──
@@ -209,7 +234,7 @@ export class TaskQueue {
   ): void {
     if (this.deferredRetryTimer) return;
 
-    const waitMs = this.calculateDynamicWait(bathingShips);
+    const waitMs = calculateRepairWaitMs(bathingShips);
 
     if (waitMs <= 0) {
       emitLog('info', '维修时间未知，30 秒后重试...');
@@ -247,36 +272,6 @@ export class TaskQueue {
     }
   }
 
-  /**
-   * 根据泡澡中舰船的 repairEndTime 计算动态等待时间。
-   * @returns 等待毫秒数，或 -1（全部不可信，应使用默认 30 秒）
-   */
-  private calculateDynamicWait(bathingShips?: ReadonlyMap<string, BathingShip>): number {
-    if (!bathingShips || bathingShips.size === 0) {
-      return -1;
-    }
-
-    let minEndTime = Infinity;
-    let hasValidTime = false;
-
-    for (const ship of bathingShips.values()) {
-      if (ship.repairEndTime && ship.repairEndTime > 0) {
-        minEndTime = Math.min(minEndTime, ship.repairEndTime);
-        hasValidTime = true;
-      }
-    }
-
-    if (!hasValidTime) return -1;
-
-    const now = Date.now();
-    if (minEndTime <= now) {
-      return 5_000;
-    }
-
-    const rawWait = minEndTime - now + 5_000;
-    return Math.min(rawWait, 30_000);
-  }
-
   // ── 编队预设切换 ──
 
   /** 切换任务使用的编队预设（修改 request 中的 fleet 舰船列表） */
@@ -289,13 +284,16 @@ export class TaskQueue {
     if (req.type === 'normal_fight' || req.type === 'event_fight') {
       const resolved = resolveFleetPreset(preset.ships);
       const fleet = resolved.map(toBackendName);
-      const fleetRules = resolveFleetPresetRules(preset.ships);
+      const fleetRules = resolveFleetPresetRules(
+        preset.ships,
+        this.getShipNameAliases(),
+      );
       if (req.plan) {
         if (fleet.length > 0) req.plan.fleet = fleet;
         if (fleetRules.length > 0) req.plan.fleet_rules = fleetRules;
         req.plan.fleet_id = task.fleetId;
       } else {
-        (req as any).plan = {
+        req.plan = {
           ...(fleet.length > 0 ? { fleet } : {}),
           ...(fleetRules.length > 0 ? { fleet_rules: fleetRules } : {}),
           fleet_id: task.fleetId,

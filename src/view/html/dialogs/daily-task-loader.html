@@ -1,0 +1,56 @@
+  <!-- 主页：加载独立日常任务 -->
+  <div id="daily-task-loader" class="modal-overlay" style="display:none">
+    <div class="modal card daily-task-loader-dialog">
+      <div class="fleet-dialog-header">
+        <div class="fleet-dialog-heading">
+          <h3>日常任务</h3>
+          <p>演习、战役和决战使用独立配置，不进入普通出征计划管理。</p>
+        </div>
+      </div>
+      <div class="daily-task-tabs" role="tablist" aria-label="日常任务分类">
+        <button
+          class="daily-task-tab active"
+          data-daily-task-tab="exercise"
+          type="button"
+          role="tab"
+        >演习</button>
+        <button
+          class="daily-task-tab"
+          data-daily-task-tab="campaign"
+          type="button"
+          role="tab"
+        >战役</button>
+        <button
+          class="daily-task-tab"
+          data-daily-task-tab="decisive"
+          type="button"
+          role="tab"
+        >决战</button>
+      </div>
+      <div id="daily-task-loader-list" class="daily-task-loader-list"></div>
+      <p
+        id="daily-task-loader-status"
+        class="fleet-dialog-status"
+        hidden
+      ></p>
+      <div class="modal-actions">
+        <button
+          class="btn"
+          id="btn-close-daily-task-loader"
+          type="button"
+        >取消</button>
+        <button
+          class="btn"
+          id="btn-daily-task-add-list"
+          type="button"
+          disabled
+        >加入任务列表</button>
+        <button
+          class="btn btn-primary"
+          id="btn-daily-task-add-queue"
+          type="button"
+          disabled
+        >加入执行队列</button>
+      </div>
+    </div>
+  </div>

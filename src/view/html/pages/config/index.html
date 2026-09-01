@@ -1,0 +1,20 @@
+    <!-- 配置页面 -->
+    <section id="page-config" class="page">
+      <div class="config-navigation-row">
+        <div class="config-tabs" role="tablist" aria-label="设置分类">
+          <button class="config-tab active" type="button" data-config-tab="system">系统设置</button>
+          <button class="config-tab" type="button" data-config-tab="behavior">脚本行为</button>
+        </div>
+        <p class="config-tab-description" id="config-tab-description">管理运行环境、自动任务、日志和界面设置。</p>
+        <div class="config-header-actions">
+          <button class="btn btn-link" id="btn-open-config-dir">打开 AutoWSGR-GUI 根目录</button>
+          <button class="btn btn-primary" id="btn-save-config">保存设置</button>
+        </div>
+      </div>
+
+      <div class="config-list-panels">
+<!-- @include system.html -->
+
+<!-- @include behavior.html -->
+      </div>
+    </section>

@@ -1,0 +1,189 @@
+    <!-- 主页面 -->
+    <section id="page-main" class="page active">
+      <div class="main-layout">
+        <!-- 左侧：状态 & 任务 -->
+        <div class="main-left">
+          <div class="battle-overview-grid">
+            <!-- 统一任务区域：空闲 / 队列 / 运行 合并 -->
+            <div class="card" id="task-area-card">
+              <div id="task-area-idle">
+                <p class="idle-text">当前无运行任务</p>
+                <div class="idle-actions">
+                  <button class="btn btn-primary" id="btn-import-plan">导入战斗方案 (.yaml)</button>
+                </div>
+              </div>
+              <div id="task-area-queue" style="display:none">
+                <div class="task-area-header">
+                  <h3>执行队列</h3>
+                  <div class="queue-actions">
+                    <button class="btn btn-primary btn-small" id="btn-start-queue">开始执行</button>
+                    <button class="btn btn-small" id="btn-clear-queue">清空队列</button>
+                    <button class="btn btn-danger btn-small" id="btn-stop-task" style="display:none">停止</button>
+                  </div>
+                </div>
+                <div class="task-queue-list" id="task-queue-list"></div>
+              </div>
+            </div>
+            <div
+              class="card fleet-preview-card"
+              id="current-fleet-preview-card"
+              aria-label="任务编队预览"
+            >
+              <h3>任务编队预览</h3>
+              <div class="current-fleet-stage">
+                <div
+                  class="current-fleet-empty"
+                  id="current-fleet-empty"
+                >当前无任务执行</div>
+                <div
+                  class="current-fleet-preview"
+                  id="current-fleet-preview"
+                  role="list"
+                  aria-label="当前运行任务的舰队"
+                  hidden
+                ></div>
+              </div>
+              <section
+                class="daily-sortie-stats"
+                id="daily-sortie-stats"
+                aria-label="今日出征统计"
+              >
+                <div class="daily-sortie-heading">
+                  <h4>今日出征统计</h4>
+                  <span>每日 00:00 清空</span>
+                </div>
+                <div class="daily-sortie-summary">
+                  <div class="daily-sortie-metric">
+                    <span>战斗</span>
+                    <strong id="daily-battle-count">-</strong>
+                  </div>
+                  <div class="daily-sortie-metric daily-repair-metric">
+                    <strong>
+                      快修 <b id="daily-quick-repair-count">-</b>
+                      · 泡澡 <b id="daily-bath-repair-count">-</b>
+                    </strong>
+                  </div>
+                  <div class="daily-sortie-metric">
+                    <span>战利品</span>
+                    <strong id="daily-loot-count">-</strong>
+                  </div>
+                  <button
+                    class="daily-sortie-metric daily-ship-toggle"
+                    id="daily-ship-toggle"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="daily-ship-details"
+                  >
+                    <span>捞船</span>
+                    <strong id="daily-ship-count">-</strong>
+                  </button>
+                  <div class="daily-sortie-metric">
+                    <span>远征</span>
+                    <strong id="daily-expedition-count">-</strong>
+                  </div>
+                </div>
+                <div class="daily-grade-row" aria-label="战果等级统计">
+                  <span>SS <b id="daily-grade-ss">-</b></span>
+                  <span>S <b id="daily-grade-s">-</b></span>
+                  <span>A <b id="daily-grade-a">-</b></span>
+                  <span>B <b id="daily-grade-b">-</b></span>
+                  <span>C <b id="daily-grade-c">-</b></span>
+                  <span>D <b id="daily-grade-d">-</b></span>
+                </div>
+                <div
+                  class="daily-drop-notice"
+                  id="daily-drop-notice"
+                  role="status"
+                  aria-live="polite"
+                  hidden
+                ></div>
+                <div
+                  class="daily-ship-details"
+                  id="daily-ship-details"
+                  hidden
+                >
+                  <div class="daily-ship-details-title">今日舰船掉落</div>
+                  <div
+                    class="daily-ship-drop-list"
+                    id="daily-ship-drop-list"
+                  ></div>
+                </div>
+              </section>
+            </div>
+          </div>
+
+          <!-- 任务组 -->
+          <div class="card task-group-card" id="task-group-card">
+            <div class="task-group-header">
+              <div class="task-group-heading">
+                <h3>任务列表</h3>
+                <span class="task-group-count" id="task-group-count">0 项</span>
+                <button class="btn btn-small ops-btn" id="btn-ops-expedition" title="收取所有已完成的远征">收取远征</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-reward" title="收取每日奖励">收取奖励</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-build-collect" title="收取已完成的建造">收取建造</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-cook" title="食堂烹饪">食堂烹饪</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-repair" title="浴室快速修理">浴室修理</button>
+                <button class="btn btn-small ops-btn" id="btn-ops-intensify" title="自动强化">自动强化</button>
+                <span class="ops-status" id="ops-status"></span>
+              </div>
+            </div>
+            <div class="task-group-toolbar">
+              <div class="task-group-actions">
+                <button class="btn btn-primary btn-small" id="btn-tg-add-managed-plan">加载计划</button>
+                <button class="btn btn-small" id="btn-tg-add-daily-plan">加载日常任务</button>
+                <button class="btn btn-small" id="btn-tg-load-all">全部加入队列</button>
+              </div>
+              <div class="task-list-management">
+                <span>列表管理：</span>
+                <input
+                  class="input input-sm"
+                  id="task-group-name"
+                  type="text"
+                  maxlength="60"
+                  placeholder="输入任务列表名称"
+                >
+                <button class="btn btn-small" id="btn-tg-new" type="button">新建</button>
+                <button class="btn btn-primary btn-small" id="btn-tg-save" type="button">保存</button>
+                <button class="btn btn-small" id="btn-tg-open-loader" type="button">队列管理</button>
+              </div>
+            </div>
+            <div class="task-group-items" id="task-group-items">
+              <p class="tg-empty">暂无任务，可通过「加载计划」或「加载日常任务」添加。</p>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 右侧：日志 -->
+        <div class="main-right">
+          <div class="card log-card">
+            <div class="log-header">
+              <h3>日志预览</h3>
+              <div class="log-filters" id="log-filters">
+                <button class="log-filter-btn active" data-level="debug" title="调试">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M4.5 1a.5.5 0 0 0-.5.5v1.02a4.5 4.5 0 0 0-1.87 1.16L.94 2.94a.5.5 0 1 0-.38.92l1.2.5A4.5 4.5 0 0 0 1.5 5.5H.5a.5.5 0 0 0 0 1h1.05a4.5 4.5 0 0 0 .55 1.53l-1.16.48a.5.5 0 1 0 .38.92l1.19-.49a4.5 4.5 0 0 0 1.99 1.56v.5a.5.5 0 0 0 1 0v-.16A4.5 4.5 0 0 0 8 11.5a4.5 4.5 0 0 0 2-.44v.44a.5.5 0 0 0 1 0v-.78a4.5 4.5 0 0 0 1.69-1.28l1.19.49a.5.5 0 1 0 .38-.92l-1.16-.48A4.5 4.5 0 0 0 13.5 7h.5a.5.5 0 0 0 0-1h-1a4.5 4.5 0 0 0-.26-1.14l1.2-.5a.5.5 0 1 0-.38-.92l-1.19.74A4.5 4.5 0 0 0 11 2.52V1.5a.5.5 0 0 0-1 0v.68A4.5 4.5 0 0 0 8 1.5a4.5 4.5 0 0 0-2 .68V1.5a.5.5 0 0 0-.5-.5zM8 3a3.5 3.5 0 0 1 3.5 3.5v1A3.5 3.5 0 0 1 8 11a3.5 3.5 0 0 1-3.5-3.5v-1A3.5 3.5 0 0 1 8 3z"/></svg>
+                  <span class="log-filter-label">调试</span>
+                  <span class="log-filter-count" id="log-count-debug">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="info" title="信息">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm0 3a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5zM7 7.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v3.5h.5a.5.5 0 0 1 0 1h-2a.5.5 0 0 1 0-1H8V8h-.5a.5.5 0 0 1-.5-.5z"/></svg>
+                  <span class="log-filter-label">信息</span>
+                  <span class="log-filter-count" id="log-count-info">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="warning" title="警告">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M7.134 1.503a1 1 0 0 1 1.732 0l6 10.392A1 1 0 0 1 14 13.5H2a1 1 0 0 1-.866-1.5l6-10.497zM8 4.5a.5.5 0 0 0-.5.5v3.5a.5.5 0 0 0 1 0V5a.5.5 0 0 0-.5-.5zm0 6a.625.625 0 1 0 0 1.25.625.625 0 0 0 0-1.25z"/></svg>
+                  <span class="log-filter-label">警告</span>
+                  <span class="log-filter-count" id="log-count-warning">0</span>
+                </button>
+                <button class="log-filter-btn active" data-level="error" title="错误">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1a6 6 0 1 1 0 12A6 6 0 0 1 8 2zm2.354 3.146a.5.5 0 0 1 0 .708L8.707 8l1.647 1.646a.5.5 0 0 1-.708.708L8 8.707l-1.646 1.647a.5.5 0 0 1-.708-.708L7.293 8 5.646 6.354a.5.5 0 0 1 .708-.708L8 7.293l1.646-1.647a.5.5 0 0 1 .708 0z"/></svg>
+                  <span class="log-filter-label">错误</span>
+                  <span class="log-filter-count" id="log-count-error">0</span>
+                </button>
+              </div>
+            </div>
+            <div class="log-container" id="log-container"></div>
+          </div>
+        </div>
+      </div>
+    </section>

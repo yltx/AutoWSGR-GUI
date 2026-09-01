@@ -1,0 +1,138 @@
+/* ═══ 动画下拉框 ═══ */
+select.animated-select-source {
+  appearance: none;
+  padding-right: 30px;
+  cursor: pointer;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--text-muted) 50%),
+    linear-gradient(135deg, var(--text-muted) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+}
+
+#page-config select.input.animated-select-source {
+  padding-right: 28px;
+}
+
+select.animated-select-source.is-select-open {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+select.animated-select-source:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.animated-select-popover {
+  --animated-select-enter-y: -4px;
+
+  position: fixed;
+  z-index: 10000;
+  min-width: 0;
+  padding: 4px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  color: var(--text);
+  background:
+    color-mix(in srgb, var(--bg-card-solid) 94%, transparent);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: var(--shadow-elevated);
+  opacity: 0;
+  pointer-events: none;
+  transform:
+    translate3d(0, var(--animated-select-enter-y), 0)
+    scale(0.985);
+  transform-origin: top center;
+  transition:
+    opacity 140ms ease-out,
+    transform 140ms cubic-bezier(0.2, 0.72, 0.2, 1);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.animated-select-popover.is-above {
+  --animated-select-enter-y: 4px;
+  transform-origin: bottom center;
+}
+
+.animated-select-popover.is-open {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.animated-select-popover[hidden] {
+  display: none;
+}
+
+.animated-select-option,
+.animated-select-group {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.animated-select-option {
+  position: relative;
+  min-height: 28px;
+  padding: 6px 28px 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 16px;
+  transition:
+    color 100ms ease,
+    background-color 100ms ease;
+}
+
+.animated-select-option.is-selected {
+  color: var(--accent-hover);
+  font-weight: 600;
+  background: var(--accent-subtle);
+}
+
+.animated-select-option.is-selected::after {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  width: 7px;
+  height: 4px;
+  content: "";
+  border-bottom: 2px solid currentColor;
+  border-left: 2px solid currentColor;
+  transform: translateY(-65%) rotate(-45deg);
+}
+
+.animated-select-option.is-active {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.animated-select-option.is-disabled {
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.animated-select-group {
+  padding: 7px 10px 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animated-select-popover {
+    transition-duration: 1ms;
+  }
+
+  .animated-select-option {
+    transition: none;
+  }
+}

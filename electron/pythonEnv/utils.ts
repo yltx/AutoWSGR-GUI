@@ -18,9 +18,7 @@ const CERT_ENV_KEYS: Array<keyof NodeJS.ProcessEnv> = [
 
 const certFileCache = new Map<string, string | null>();
 
-// ════════════════════════════════════════
 // 共享接口
-// ════════════════════════════════════════
 
 export interface EnvCheckResult {
   pythonCmd: string | null;
@@ -29,25 +27,14 @@ export interface EnvCheckResult {
   allReady: boolean;
 }
 
-// ════════════════════════════════════════
 // 路径工具
-// ════════════════════════════════════════
 
-/** 项目本地包目录 */
+/** 返回项目本地包目录。 */
 export function localSitePackages(): string {
   return path.join(getCtx().appRoot(), 'python', 'site-packages');
 }
 
-/** 生成在 Python 命令前插入 site-packages 路径的前缀代码 */
-export function sysPathInsert(): string {
-  // 使用 sys.path.insert 而非 PYTHONPATH 环境变量，因为：
-  // 1. 嵌入式 Python 的 ._pth 会完全忽略 PYTHONPATH
-  // 2. 避免 Windows 环境变量传递的各种边界问题
-  const sp = localSitePackages().replace(/\\/g, '\\\\');
-  return `import sys; sys.path.insert(0, r'${sp}'); `;
-}
-
-/** pip 命令的公共环境变量：确保项目目录的包优先于全局 */
+/** 构造优先使用项目包目录的 pip 环境。 */
 export function pipEnv(): NodeJS.ProcessEnv {
   const localSite = localSitePackages();
   const existing = process.env.PYTHONPATH || '';
@@ -130,19 +117,16 @@ async function probePythonCertFile(pythonCmd: string): Promise<string | null> {
       return certFile;
     }
   } catch {
-    // ignore probe failures; caller will continue without TLS env override
+    // 探测失败时由调用方继续使用原环境。
   } finally {
-    try { fs.unlinkSync(scriptPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(scriptPath); } catch { /* 忽略清理失败。 */ }
   }
 
   certFileCache.set(pythonCmd, null);
   return null;
 }
 
-/**
- * 为给定 Python 解释器补齐 TLS 证书环境变量。
- * 优先沿用用户已配置的证书路径，否则自动探测 Python 默认/Certifi 证书。
- */
+/** 沿用或探测证书，并补齐 Python TLS 环境变量。 */
 export async function ensureSslCertForPython(pythonCmd: string): Promise<string | null> {
   const existing = pickExistingCertFromEnv();
   const certFile = existing || await probePythonCertFile(pythonCmd);
@@ -156,16 +140,20 @@ export async function ensureSslCertForPython(pythonCmd: string): Promise<string 
   return certFile;
 }
 
-/** 判断是否使用本地便携版 Python */
+/** 判断是否使用本地便携版 Python。 */
 export function isLocalPython(pythonCmd: string): boolean {
-  return path.isAbsolute(pythonCmd) && pythonCmd.startsWith(getCtx().appRoot());
+  if (!path.isAbsolute(pythonCmd)) return false;
+  const pythonRoot = path.resolve(getCtx().appRoot(), 'python');
+  const relative = path.relative(pythonRoot, path.resolve(pythonCmd));
+  return relative !== ''
+    && relative !== '..'
+    && !relative.startsWith(`..${path.sep}`)
+    && !path.isAbsolute(relative);
 }
 
-// ════════════════════════════════════════
 // ._pth 配置
-// ════════════════════════════════════════
 
-/** 确保嵌入式 Python 的 ._pth 包含 site-packages（每次检查前都执行） */
+/** 确保嵌入式 Python 的 ._pth 包含 site-packages。 */
 export function ensurePthFile(): void {
   const pythonDir = path.join(getCtx().appRoot(), 'python');
   for (const pthName of ['python312._pth', 'python313._pth']) {
@@ -173,7 +161,7 @@ export function ensurePthFile(): void {
     if (!fs.existsSync(pthFile)) continue;
     let content = fs.readFileSync(pthFile, 'utf-8');
     let changed = false;
-    // 去除可能的 BOM
+    // 去除可能存在的 BOM。
     if (content.charCodeAt(0) === 0xFEFF) {
       content = content.slice(1);
       changed = true;
@@ -190,17 +178,15 @@ export function ensurePthFile(): void {
   }
 }
 
-// ════════════════════════════════════════
 // pip 管理
-// ════════════════════════════════════════
 
-/** 确保 pip 可用，缺失时自动安装 */
+/** 确保 pip 可用，缺失时自动安装。 */
 export async function ensurePip(pythonCmd: string): Promise<boolean> {
   const ctx = getCtx();
   try {
     await execAsync(`"${pythonCmd}" -m pip --version`, { windowsHide: true, timeout: 15000 });
     return true;
-  } catch { /* pip not available */ }
+  } catch { /* pip 不可用时继续安装。 */ }
 
   if (isLocalPython(pythonCmd)) ensurePthFile();
 
@@ -209,12 +195,12 @@ export async function ensurePip(pythonCmd: string): Promise<boolean> {
   try {
     await execAsync(`curl -sSL -o "${getPipPath}" "https://bootstrap.pypa.io/get-pip.py"`, { windowsHide: true, timeout: 60000 });
     await execAsync(`"${pythonCmd}" "${getPipPath}"`, { windowsHide: true, timeout: 120000 });
-    try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(getPipPath); } catch { /* 忽略清理失败。 */ }
     ctx.sendProgress('pip 安装完成 ✓');
     return true;
   } catch {
     ctx.sendProgress('ERROR pip 安装失败');
-    try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(getPipPath); } catch { /* 忽略清理失败。 */ }
     return false;
   }
 }

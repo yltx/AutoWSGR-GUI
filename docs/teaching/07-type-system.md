@@ -1,192 +1,264 @@
-# 07 — 类型系统分层
+# 07：类型系统分层
 
-> **前置阅读**：[03-viewobject-flow](03-viewobject-flow.md)、[06-model-layer](06-model-layer.md)  
-> **核心原则**：类型定义按层分文件 — `model.ts` 给 Model/Controller 用，`view.ts` 给 View/Controller 用，两者不互相引用。
+> 前置阅读：[03 ViewObject 单向数据流](03-viewobject-flow.md)、[06 Model 与领域状态](06-model-layer.md)
 
----
+TypeScript 类型不仅用于消除编译错误，还用于限制数据穿过哪些边界。API DTO、
+IPC DTO、领域状态、编辑意图和 ViewObject 即使描述同一功能，也不应合并成一个
+万能接口。
 
-## 目录结构
+## 当前类型目录
 
-```
+```text
 src/types/
-├── model.ts           业务领域实体 (Plan, Config, FleetPreset...)
-├── view.ts            ViewObject 接口 (MainViewObject, TaskQueueItemVO...)
-├── api.ts             后端 API 请求/响应类型
-├── scheduler.ts       调度器公共类型 (SchedulerTask, TaskPriority...)
-└── electronBridge.ts  IPC 桥方法签名
+├─ api.ts
+├─ fleetEditor.ts
+├─ ipc.ts
+├─ model.ts
+├─ scheduler.ts
+├─ statistics.ts
+└─ view.ts
 ```
 
----
+`ElectronBridge` 和全部 IPC DTO 定义在 `src/types/ipc.ts`。
 
-## 类型流向图
+## 类型流向
 
-```
-  后端 (Python)
-      │
-      ▼
-  types/api.ts          ← 后端通信契约 (TaskRequest, TaskResult, WsLogMessage)
-      │
-      ▼
-  Model 层              ← types/model.ts (PlanData, UserSettings, FleetPreset...)
-      │                 ← types/scheduler.ts (SchedulerTask, TaskPriority...)
-      │
-      ▼
-  Controller 层         ← 同时引用 model.ts + view.ts
-  (拼装 VO)             ← 把 Model 类型转换为 View 类型
-      │
-      ▼
-  View 层               ← types/view.ts (MainViewObject, TaskQueueItemVO...)
-                        ← 不允许引用 model.ts 或 api.ts
+```mermaid
+flowchart LR
+  Backend["AutoWSGR"] --> Api["types/api.ts"]
+  Main["Electron Main"] --> Ipc["types/ipc.ts"]
+  Api --> Model["Model"]
+  Ipc --> Adapter["IpcAdapter"]
+  Adapter --> Controller
+  Model --> Controller
+  Scheduler["types/scheduler.ts"] --> Controller
+  Intent["types/fleetEditor.ts"] --> Controller
+  Controller --> ViewType["types/view.ts"]
+  ViewType --> View
 ```
 
----
+Controller 是主要转换边界，因此可以同时认识领域类型和 ViewObject。View 只
+应看到展示和明确交互所需的类型。
 
-## 各文件职责
+## api.ts：AutoWSGR 契约
 
-### types/model.ts — 业务实体
+包含：
 
-对应后端 AutoWSGR 的数据结构，Controller 和 Model 层使用：
+- `ApiResponse`
+- 游戏上下文和资源响应。
+- `TaskRequest` 联合类型。
+- `TaskResult` 和战斗轮次。
+- WebSocket 消息。
+- `ApiClientCallbacks`
+
+`TaskRequest` 是联合：
 
 ```typescript
-export interface PlanData {
-  chapter: number;
-  map: number;
-  selected_nodes: string[];
-  node_args?: Record<string, NodeArgs>;
-  fleet_presets?: FleetPreset[];
-  times?: number;
-  stop_condition?: StopCondition;
-  // ...
-}
-
-export interface UserSettings {
-  emulator: EmulatorConfig;
-  account: AccountConfig;
-  daily_automation: DailyAutomation;
-}
+export type TaskRequest =
+  | NormalFightReq
+  | EventFightReq
+  | CampaignReq
+  | ExerciseReq
+  | DecisiveReq;
 ```
 
-### types/view.ts — ViewObject
+新增任务字段时必须先确认后端公开契约，再更新 GUI DTO、`ApiClient` 和 API
+契约测试。不能用 `Record<string, unknown>` 绕过联合类型。
 
-Controller 拼装后传给 View 的纯数据，View 层唯一认识的类型：
+## ipc.ts：跨进程契约
 
-```typescript
-export interface MainViewObject {
-  status: AppStatus;
-  statusText: string;        // 已转换为中文
-  taskQueue: TaskQueueItemVO[];
-  wsConnected: boolean;
-  // ...
-}
+包含：
 
-export interface NodeViewObject {
-  id: string;
-  formation: string;         // 已转换为中文阵型名
-  nodeType: MapNodeType;
-  // ...
-}
+- `ElectronBridge`
+- GUI 配置提交 DTO。
+- 方案、编队、日常方案 DTO。
+- 舰船资料库 DTO。
+- 更新、CUDA、ADB 和窗口 DTO。
+
+IPC 类型必须可结构化克隆，不能携带 DOM、函数实现、Node Stream 或具体
+Service 实例。
+
+调用链：
+
+```text
+src/types/ipc.ts
+  -> electron/preload.ts
+  -> electron/ipc/**
+  -> src/adapter/IpcAdapter.ts
+  -> Controller
 ```
 
-**设计要点**：VO 字段是**展示友好**的格式，不暴露内部枚举值。
+新增 Bridge 方法时，这条链路必须同步更新。
 
-### types/api.ts — 后端 API 契约
+## model.ts：领域数据
 
-定义请求/响应类型，只在 Model 层和 Controller 层使用：
+包含：
 
-```typescript
-export interface TaskRequest {
-  type: string;
-  fleet_id?: number;
-  // ...
-}
+- `UserSettings`
+- `GuiAutomationSettings`
+- `PlanData`
+- `NodeArgs`
+- `FleetPreset`
+- `StopCondition`
+- `TaskPreset`
+- 修理和模板领域类型
 
-export interface ApiResponse<T = unknown> {
-  success: boolean;
-  data: T;
-  error?: string;
-}
+这些类型表达领域和持久化含义，不是页面展示结构。
+
+例如 `PlanData.node_args` 可以包含节点覆盖，但 View 不应直接读取它来决定显示
+文案。Controller 先生成 `NodeViewObject`。
+
+## scheduler.ts：任务状态机契约
+
+包含：
+
+- `TaskPriority`
+- `SchedulerTaskType`
+- `SchedulerTask`
+- `SchedulerStatus`
+- `SchedulerWaitingTask`
+- 逻辑任务完成/取消原因。
+- `SchedulerCallbacks`
+
+`SchedulerTask` 同时包含物理 `id` 和逻辑 `logicalId`，这是调度领域不变量，不
+应塞入后端 `TaskRequest`。
+
+## fleetEditor.ts：编辑意图
+
+包含：
+
+- `FleetEditorSelection`
+- `FleetEditorDragSource`
+- `FleetRuleUpdate`
+- `FleetDraftEditIntent`
+- `FleetDraftEditResult`
+
+Intent 表达用户要做的动作，Model 类型表达当前状态。两者分开后，View 不需要
+拿到可写草稿对象。
+
+例如：
+
+```text
+FleetDraftViewObject   页面看到什么
+FleetDraftEditIntent   用户想改什么
+FleetDraftEditResult   领域是否接受这次修改
 ```
 
-### types/scheduler.ts — 调度器公共类型
+## statistics.ts：统计快照
 
-从 `Scheduler.ts` 中提取，供 Controller 和 View 层引用：
+定义战果等级、掉落和 `DailySortieStatsSnapshot`。统计快照可进入 VO，但统计
+累加逻辑仍由 `DailySortieStats` 持有。
 
-```typescript
-export enum TaskPriority {
-  EXPEDITION = 0,
-  USER_TASK = 10,
-  DAILY = 20,
-}
+## view.ts：展示契约
 
-export interface SchedulerTask {
-  id: string;
-  name: string;
-  type: SchedulerTaskType;
-  priority: TaskPriority;
-  remainingTimes: number;
-  totalTimes: number;
-  // ...
-}
+包含：
 
-export type SchedulerStatus = 'idle' | 'running' | 'stopping' | 'not_connected';
-```
+- `ConfigViewObject`
+- `MainViewObject`
+- `TaskQueueItemVO`
+- Fleet 和 Team Plan ViewObject。
+- `PlanPreviewViewObject`
+- 任务组、模板和向导 ViewObject。
 
-### types/electronBridge.ts — IPC 方法签名
+VO 字段应是 View 能直接渲染的格式：
 
-定义 `window.electronBridge` 的完整接口，Renderer 进程通过此接口与主进程通信：
+- 已转换的文案。
+- 已合并的列表。
+- 明确的 loading/error 状态。
+- 只读展示 identity。
 
-```typescript
-export interface ElectronBridge {
-  openDirectoryDialog: (title?: string) => Promise<string | null>;
-  startBackend: () => Promise<{ success: boolean; message: string }>;
-  detectEmulator: () => Promise<EmulatorDetectResult | null>;
-  getAppVersion: () => string;
-  getBackendPort: () => number;
-  // ... 40+ 个方法
-}
-```
+VO 不应把完整 Model、Repository 或 API 响应包进去。
 
----
+## 同一概念为何需要多个类型
+
+以作战任务为例：
+
+| 边界 | 类型关注点 |
+|---|---|
+| API | 后端执行需要的请求字段 |
+| Scheduler | 优先级、轮次、重试、logicalId |
+| Model | 方案、停止条件和舰队规则 |
+| ViewObject | 名称、剩余次数、进度和等待文案 |
+
+如果全部合成一个 `Task`：
+
+- 后端会看到 GUI 私有字段。
+- View 会依赖请求内部结构。
+- 持久化兼容字段会污染运行状态。
+- 大量成员只能被标为可选，类型失去约束力。
 
 ## 引用规则
 
-| 层 | 可引用 | 禁止引用 |
-|----|--------|----------|
-| View | `types/view.ts` | `types/model.ts`, `types/api.ts` |
-| Controller | `types/view.ts`, `types/model.ts`, `types/api.ts`, `types/scheduler.ts` | — |
-| Model | `types/model.ts`, `types/api.ts`, `types/scheduler.ts` | `types/view.ts` |
-| Electron 主进程 | `types/electronBridge.ts` | `types/view.ts` |
+| 消费方 | 主要可引用 | 不应引用 |
+|---|---|---|
+| View | `view.ts`、明确 Intent、纯共享 DTO | 有状态 Model、ApiClient、Bridge |
+| Controller | Model、Scheduler、API、IPC、View 类型 | DOM 实现类型 |
+| Model | Model、Scheduler、API 类型 | ViewObject |
+| Adapter | API/IPC 契约 | 页面实现 |
+| Electron Main | IPC DTO、Shared 契约 | ViewObject 和 DOM |
 
----
+架构测试会拒绝 Controller 中的 `HTMLElement`、`ResizeObserver` 等 DOM 实现
+类型，也会拒绝 View 导入有状态 Model、ApiClient 或 Adapter。
 
-## 为什么要分开
+## 新增字段的正确路径
 
-一个反例：如果 `PlanPreviewView` 直接 import `types/model.ts` 中的 `PlanData`——
+先确定字段属于哪条契约：
 
-```typescript
-// ❌ 反例
-import type { PlanData } from '../../types/model';
+### 只影响展示
 
-class PlanPreviewView {
-  render(plan: PlanData): void {
-    // View 要自己处理 plan.node_args 的格式转换
-    // View 要知道 formation 数字对应什么阵型名
-    // 后端改了 PlanData 结构，View 也要改
-  }
-}
+```text
+types/view.ts
+  -> Controller rendering
+  -> View
 ```
 
-正确做法：Controller 完成所有转换，View 只接收 `PlanPreviewViewObject`：
+### 后端 API 字段
 
-```typescript
-// ✅ 正确
-import type { PlanPreviewViewObject } from '../../types/view';
-
-class PlanPreviewView {
-  render(vo: PlanPreviewViewObject | null): void {
-    // vo.mapName 已经是 "7-4" 格式
-    // vo.selectedNodes[0].formation 已经是 "单纵"
-    // View 不需要任何转换逻辑
-  }
-}
+```text
+types/api.ts
+  -> ApiClient
+  -> 请求构建方
+  -> API contract test
 ```
+
+### Electron IPC 字段
+
+```text
+types/ipc.ts
+  -> preload
+  -> Main IPC / Service
+  -> IpcAdapter / Controller
+```
+
+### 领域持久化字段
+
+```text
+types/model.ts
+  -> Model parse/default/serialize
+  -> Controller
+  -> 必要时再生成 VO
+```
+
+不要因为一个字段最终会显示在页面上，就直接把它同时加入所有类型。
+
+## 常见反例
+
+- 用 `any` 或双重断言连接不兼容层。
+- 给万能接口堆几十个可选字段。
+- View 直接消费 `ApiResponse<T>`。
+- Main IPC 返回具体 Service 对象。
+- SchedulerTask 直接作为后端 TaskRequest。
+- 为避免转换，令 VO 继承完整 Model 类型。
+- 在 Renderer 和 Main 各复制一份不同的 IPC 接口。
+
+## 验证
+
+```powershell
+npm run build
+npm run test:architecture-boundaries
+npm run test:main-ipc
+npm run test:api-contract
+git diff --check
+```
+
+编译通过只能证明结构类型兼容；API、IPC、持久化和页面语义仍需对应专项测试。

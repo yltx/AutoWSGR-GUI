@@ -1,23 +1,28 @@
+/** 编排运行环境准备、依赖安装和 GUI 更新检查。 */
 /**
  * envAndUpdates —— 环境检查、依赖安装、更新检查逻辑。
  */
-import type { ElectronBridge } from '../../types/electronBridge';
-import type { StartupHost } from './StartupController';
+import type { StartupGateway } from '../../adapter/IpcAdapter.js';
+import { browserStorageStore } from '../../adapter/StorageAdapter.js';
 import { Logger } from '../../utils/Logger';
 
-function getUpdateMode(bridge?: ElectronBridge): 'auto' | 'manual' {
+function getUpdateMode(bridge?: StartupGateway): 'auto' | 'manual' {
   const fromBridge = bridge?.getUpdateMode?.();
   if (fromBridge === 'manual') return 'manual';
   if (fromBridge === 'auto') return 'auto';
   try {
-    return localStorage.getItem('updateMode') === 'manual' ? 'manual' : 'auto';
+    return browserStorageStore.get('updateMode') === 'manual'
+      ? 'manual'
+      : 'auto';
   } catch {
     return 'auto';
   }
 }
 
 /** 检查 Python 环境, 缺失时自动安装本地便携版 */
-export async function checkAndPrepareEnv(bridge: ElectronBridge): Promise<boolean> {
+export async function checkAndPrepareEnv(
+  bridge: StartupGateway,
+): Promise<boolean> {
   Logger.info('正在检查运行环境…');
 
   let env = await bridge.checkEnvironment();
@@ -46,8 +51,9 @@ export async function checkAndPrepareEnv(bridge: ElectronBridge): Promise<boolea
   const installResult = await bridge.installDeps();
 
   if (!installResult.success) {
-    Logger.error('依赖安装失败');
-    Logger.error(installResult.output.slice(-200));
+    Logger.error('依赖安装失败，请检查日志');
+    // 原始 pip 输出仅写入日志文件，不推送到 UI 面板（可能含乱码，不适合展示）
+    Logger.logToFile(installResult.output.slice(-200));
     return false;
   }
 
@@ -61,7 +67,9 @@ export async function checkAndPrepareEnv(bridge: ElectronBridge): Promise<boolea
 }
 
 /** 运行 setup.bat 安装环境 */
-export async function runSetupScript(bridge: ElectronBridge): Promise<boolean> {
+export async function runSetupScript(
+  bridge: StartupGateway,
+): Promise<boolean> {
   if (!bridge.runSetup) return false;
 
   if (bridge.onSetupLog) {
@@ -85,51 +93,40 @@ export async function runSetupScript(bridge: ElectronBridge): Promise<boolean> {
 }
 
 /** 检查更新 (非阻塞, 仅日志提示) */
-export async function checkForUpdates(bridge: ElectronBridge, host: StartupHost): Promise<void> {
+export async function checkForUpdates(
+  bridge: StartupGateway,
+): Promise<void> {
   const updateMode = getUpdateMode(bridge);
 
-  initGuiAutoUpdate(bridge, host);
+  initGuiAutoUpdate(bridge);
   if (updateMode === 'manual') {
     Logger.info('当前为手动更新模式，已跳过启动自动更新检查');
     return;
   }
-
-  /*
-   * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-  try {
-    const updates = await bridge.checkUpdates();
-    if (updates.hasUpdates) {
-      Logger.warn(`发现 ${updates.behindCount} 个新提交可更新，可通过「配置 → 检查更新」拉取`);
-    }
-  } catch {
-    // 忽略
-  }
-  */
 }
 
 /** 初始化 GUI 自动更新监听 + 首次检查 */
-function initGuiAutoUpdate(bridge: ElectronBridge, host: StartupHost): void {
+function initGuiAutoUpdate(bridge: StartupGateway): void {
   if (!bridge.onUpdateStatus) return;
 
   bridge.onUpdateStatus((status) => {
-    const updateMode = getUpdateMode(bridge);
     switch (status.status) {
       case 'available':
-        if (updateMode === 'manual') {
-          Logger.warn(`发现 GUI 新版本 v${status.version}，当前为手动更新模式，请点击「立即检查更新」后手动下载`);
-          break;
-        }
-        Logger.info(`发现 GUI 新版本 v${status.version}，正在自动下载增量更新…`);
-        bridge.downloadGuiUpdate?.();
+        Logger.info(
+          `发现 GUI 新版本 v${status.version}，等待用户选择更新时间`,
+        );
         break;
       case 'downloading':
-        if (status.percent != null && status.percent % 25 === 0) {
-          Logger.info(`GUI 更新下载中… ${status.percent}%`);
-        }
+        Logger.info('GUI 更新正在后台静默下载并校验');
         break;
       case 'downloaded':
-        Logger.info(`GUI v${status.version} 下载完成，将在退出时自动安装`);
-        host.pendingGuiVersion = status.version;
+        Logger.info(`GUI v${status.version} 已准备完成，等待选择重启时间`);
+        break;
+      case 'deferred':
+        Logger.info(`GUI v${status.version} 将在下次打开前更新，当前任务继续运行`);
+        break;
+      case 'installing':
+        Logger.info(status.message);
         break;
       case 'error':
         Logger.warn(`GUI 更新检查失败: ${status.message || '未知错误'}`);

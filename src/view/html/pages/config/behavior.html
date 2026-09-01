@@ -1,0 +1,414 @@
+        <div class="config-list-panel" data-config-panel="behavior" hidden>
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>全局延迟</h3>
+              <p>可以调节脚本操作的全局间隔，如果出现页面卡顿可以尝试拉高。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>操作等待区间</strong>
+                  <span>每次操作后，在最小值和最大值之间随机等待，范围为 0 到 10 秒。</span>
+                </div>
+                <div class="config-setting-control config-range-preview">
+                  <label>最小值 <input type="range" id="cfg-delay-min-range" min="0" max="10" step="0.1" value="0"><input type="number" id="cfg-delay-min" class="input" min="0" max="10" step="0.1" value="0"></label>
+                  <label>最大值 <input type="range" id="cfg-delay-max-range" min="0" max="10" step="0.1" value="0"><input type="number" id="cfg-delay-max" class="input" min="0" max="10" step="0.1" value="0"></label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>手动安全强化</h3>
+              <p>不加入 Scheduler。当前只扫描库存、选择 occurrence 并展示收益投影，不提供强化执行入口。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>强化目标舰</strong><span>目标舰必须明确；输入框支持舰名补全。</span></div>
+                <div class="config-setting-control">
+                  <input type="text" id="cfg-intensify-target" class="input" placeholder="输入舰名，例如 胡德">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>素材策略</strong><span>限制每批素材数量，或明确设为不限制；自动强化与本页只读预览都会使用这里保存的策略。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <select id="cfg-intensify-material-types" class="input intensify-material-types" multiple size="5">
+                    <option value="AP">补给 AP</option><option value="AV">装母 AV</option>
+                    <option value="CV">航母 CV</option><option value="BB">战列 BB</option>
+                    <option value="BBG">导战 BBG</option><option value="BBV">航战 BBV</option>
+                    <option value="BC">战巡 BC</option><option value="BG">大巡 BG</option>
+                    <option value="BM">重炮 BM</option><option value="CA">重巡 CA</option>
+                    <option value="CAV">航巡 CAV</option><option value="CG">防巡 CG</option>
+                    <option value="CL">轻巡 CL</option><option value="CLT">雷巡 CLT</option>
+                    <option value="CVL">轻母 CVL</option><option value="DD">驱逐 DD</option>
+                    <option value="ASDG">导驱 ASDG</option><option value="AADG">防驱 AADG</option>
+                    <option value="KP">导巡 KP</option><option value="SC">炮潜 SC</option>
+                    <option value="SS">潜艇 SS</option><option value="SSG">导潜 SSG</option>
+                  </select>
+                  <label>单批素材上限 <input type="number" id="cfg-intensify-max-materials" class="input config-inline-number" min="1" step="1" value="4"></label>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-intensify-unlimited-materials">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>不限制每批素材数量（保存为 null）</span>
+                  </label>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-intensify-reuse-target-baseline">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>复用目标舰扫描基线（会话内跳过全量目标重扫）</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>显式保护舰</strong><span>每行一个舰名，也可用逗号分隔；当前只读预览不会消耗舰船，该名单保留给未来经确认的执行契约。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <textarea id="cfg-intensify-protected-ships" class="input intensify-protected-ships" rows="3" placeholder="每行一个舰名"></textarea>
+                  <div class="intensify-actions">
+                    <button class="btn btn-small" id="btn-intensify-scan" type="button">扫描只读库存</button>
+                    <button class="btn btn-small" id="btn-intensify-preview" type="button" disabled>生成候选预览</button>
+                  </div>
+                  <div id="cfg-intensify-status" class="intensify-status intensify-status-unknown">尚未扫描库存，不会选择、操作或消耗舰船。</div>
+                  <div id="cfg-intensify-occurrences" class="intensify-occurrences" aria-live="polite" hidden>
+                    <p id="cfg-intensify-occurrence-summary" class="config-hint"></p>
+                    <div class="intensify-occurrence-group">
+                      <strong>目标 occurrence</strong>
+                      <div id="cfg-intensify-target-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                    <div class="intensify-occurrence-group">
+                      <strong>素材 occurrences</strong>
+                      <div id="cfg-intensify-material-occurrences" class="intensify-occurrence-list" role="list"></div>
+                    </div>
+                  </div>
+                  <div id="cfg-intensify-candidate-preview" class="intensify-candidate-preview" aria-live="polite" hidden></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>自动化设置</h3>
+              <p>自动任务最终以后端日常调度配置为准。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动远征</strong>
+                  <span>定期检查并收取已完成远征，然后重新派遣。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-expedition" checked>
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动战役</strong>
+                  <span>每日完成8次战役，C、D结算同样计入。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-battle-body">
+                    <span>战役类型</span>
+                    <select id="cfg-battle-type" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="困难潜艇">困难潜艇</option>
+                      <option value="困难航母">困难航母</option>
+                      <option value="困难驱逐">困难驱逐</option>
+                      <option value="困难巡洋">困难巡洋</option>
+                      <option value="困难战列">困难战列</option>
+                      <option value="简单航母">简单航母</option>
+                      <option value="简单潜艇">简单潜艇</option>
+                      <option value="简单驱逐">简单驱逐</option>
+                      <option value="简单巡洋">简单巡洋</option>
+                      <option value="简单战列">简单战列</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-battle">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动演习</strong>
+                  <span>每日空闲时完成剩余演习次数。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-exercise-body">
+                    <span>出征舰队</span>
+                    <select id="cfg-exercise-fleet" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="1">第 1 舰队</option>
+                      <option value="2">第 2 舰队</option>
+                      <option value="3">第 3 舰队</option>
+                      <option value="4">第 4 舰队</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-exercise">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动出征</strong>
+                  <span>每分钟检查任务队列，空闲时执行配置计划各一次。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-normal-fight-editor" id="cfg-auto-normal-fight-body">
+                    <button class="btn btn-small" id="btn-add-normal-fight-task" type="button">加载</button>
+                    <div class="config-task-list" id="cfg-normal-fight-tasks"></div>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-normal-fight">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动决战</strong>
+                  <span>每日空闲时执行一轮；可使用计划页面方案或系统预设。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-decisive-body">
+                    <span>决战方案</span>
+                    <select id="cfg-decisive-template" class="input"
+                            data-animated-select-width="source"
+                            data-config-select-width="124">
+                      <option value="user_plan">用户计划</option>
+                      <option value="system_preset">系统预设</option>
+                    </select>
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-decisive">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自动胖次</strong>
+                  <span>配置一个胖次任务，每日空闲时执行。</span>
+                </div>
+                <div class="config-setting-control config-auto-task-control config-auto-loot-control">
+                  <div class="config-inline-options config-auto-task-options" id="cfg-auto-loot-body">
+                    <button class="btn btn-small" id="btn-load-loot-plans" type="button">加载</button>
+                    <span>任务预设</span>
+                    <select id="cfg-loot-plan" class="input"></select>
+                    <span>停止数量</span>
+                    <input type="number" id="cfg-loot-stop-count" class="input config-inline-number" min="1" max="50" value="50">
+                  </div>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-auto-loot">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>舰队设置</h3>
+              <p>集中管理与游戏内舰队、修理、船坞和解装操作有关的配置。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>船坞满处理</strong><span>船坞已满时的自动化策略：解装、强化或自动混合（部分强化、部分解装）。</span></div>
+                <div class="config-setting-control">
+                  <select id="cfg-dock-full-mode" class="input"
+                          data-animated-select-width="source">
+                    <option value="0">关闭（不处理）</option>
+                    <option value="1">自动解装</option>
+                    <option value="2">自动强化</option>
+                    <option value="3">自动（先强化后解装）</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>维修方式</strong><span>选择脚本自动维修，或等待用户手动处理。</span></div>
+                <div class="config-setting-control">
+                  <select id="cfg-repair-manually" class="input"
+                          data-animated-select-width="source">
+                    <option value="false">脚本自动维修</option>
+                    <option value="true">手动处理</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>浴室数量</strong><span>账号已开放的浴室位置数量，后端允许最大 12 个。</span></div>
+                <div class="config-setting-control">
+                  <input type="number" id="cfg-bathroom-count" class="input config-inline-number" min="1" max="12" value="2">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>解装规则</strong><span>配置工作模式、舰种范围以及是否先拆下装备。</span></div>
+                <div class="config-setting-control config-setting-control-stack">
+                  <div class="config-inline-options">
+                    <select id="cfg-destroy-ship-mode" class="input"
+                            data-animated-select-width="source">
+                      <option value="0">不启用</option>
+                      <option value="1">黑名单</option>
+                      <option value="2">白名单</option>
+                    </select>
+                    <label class="config-switch">
+                      <input type="checkbox" id="cfg-remove-equipment-mode">
+                      <span class="config-switch-track" aria-hidden="true"></span>
+                      <span>卸下装备</span>
+                    </label>
+                  </div>
+                  <div class="config-chip-list" id="cfg-destroy-ship-types">
+                    <label><input type="checkbox" value="航母">航母</label>
+                    <label><input type="checkbox" value="轻母">轻母</label>
+                    <label><input type="checkbox" value="装母">装母</label>
+                    <label><input type="checkbox" value="战列">战列</label>
+                    <label><input type="checkbox" value="航战">航战</label>
+                    <label><input type="checkbox" value="战巡">战巡</label>
+                    <label><input type="checkbox" value="重巡">重巡</label>
+                    <label><input type="checkbox" value="航巡">航巡</label>
+                    <label><input type="checkbox" value="雷巡">雷巡</label>
+                    <label><input type="checkbox" value="轻巡">轻巡</label>
+                    <label><input type="checkbox" value="重炮">重炮</label>
+                    <label><input type="checkbox" value="驱逐">驱逐</label>
+                    <label><input type="checkbox" value="导潜">导潜</label>
+                    <label><input type="checkbox" value="潜艇">潜艇</label>
+                    <label><input type="checkbox" value="炮潜">炮潜</label>
+                    <label><input type="checkbox" value="补给">补给</label>
+                    <label><input type="checkbox" value="导驱">导驱</label>
+                    <label><input type="checkbox" value="防驱">防驱</label>
+                    <label><input type="checkbox" value="导巡">导巡</label>
+                    <label><input type="checkbox" value="防巡">防巡</label>
+                    <label><input type="checkbox" value="大巡">大巡</label>
+                    <label><input type="checkbox" value="导战">导战</label>
+                    <label><input type="checkbox" value="其他">其他</label>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy"><strong>作战方案目录</strong><span>后端查找普通战和活动战 YAML 的自定义目录。</span></div>
+                <div class="config-setting-control">
+                  <div class="input-row config-compact-path-row">
+                    <input type="text" id="cfg-plan-root" class="input" placeholder="留空使用后端内置目录">
+                    <button class="btn btn-small" id="btn-browse-plan-root" type="button">选择</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="config-list-section">
+            <div class="config-section-heading">
+              <h3>识别设置</h3>
+              <p>管理文字 OCR、WSG-NCC 舰船识别、运行硬件和舰名匹配规则。</p>
+            </div>
+            <div class="config-setting-list">
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>模型下载源</strong>
+                  <span>首次下载 EasyOCR 模型时使用的镜像来源。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-ocr-mirror" class="input">
+                    <option value="modelscope">ModelScope</option>
+                    <option value="origin">EasyOCR 原始地址</option>
+                    <option value="github">GitHub</option>
+                    <option value="tencent">腾讯云</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>识别加速</strong>
+                  <span>统一控制 EasyOCR 与 WSG-NCC：自动模式分别检测 CUDA 与 WebGPU，CPU 模式关闭两者的 GPU 加速。</span>
+                </div>
+                <div class="config-setting-control">
+                  <select id="cfg-ocr-gpu-mode" class="input">
+                    <option value="auto">自动检测可用 GPU（推荐）</option>
+                    <option value="cuda">强制 EasyOCR 使用 CUDA</option>
+                    <option value="cpu">全部强制使用 CPU</option>
+                  </select>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>CUDA 路径</strong>
+                  <span>为 EasyOCR 指定 CUDA Toolkit 或 PyTorch CUDA Runtime 目录，留空时使用系统环境；不影响 WSG-NCC 的 WebGPU 检测。</span>
+                </div>
+                <div class="config-setting-control">
+                  <div class="input-row config-cuda-path-row">
+                    <div class="config-cuda-input-wrap">
+                      <input type="text" id="cfg-cuda-path" class="input" placeholder="Toolkit 根目录，或 ...\torch\lib">
+                      <span id="cfg-cuda-status" class="adb-status adb-status-unknown">系统环境</span>
+                    </div>
+                    <button class="btn btn-small" id="btn-browse-cuda">选择</button>
+                    <button class="btn btn-small" id="btn-validate-cuda">检测</button>
+                  </div>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>舰名文字识别（FastOCR，CPU-only）</strong>
+                  <span>独立的 CPU-only 舰名文字 OCR 路径，不受识别加速设置影响，也不参与 WSG-NCC 舰船卡身份识别。</span>
+                </div>
+                <div class="config-setting-control">
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-enhanced-ship-ocr">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>启用 CPU FastOCR</span>
+                  </label>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>舰名匹配置信度</strong>
+                  <span>OCR 结果与舰名数据库的最低相似程度，0.65 为后端默认值。</span>
+                </div>
+                <div class="config-setting-control config-confidence-preview">
+                  <input type="range" id="cfg-ocr-confidence-range" min="0" max="1" step="0.01" value="0.65">
+                  <input type="number" id="cfg-ocr-confidence" class="input" min="0" max="1" step="0.01" value="0.65">
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>系统舰名匹配规则</strong>
+                  <span>后端内置的特殊字符、等级和舰名标准化规则，普通用户不直接修改。</span>
+                </div>
+                <div class="config-setting-control">
+                  <span class="config-status-badge config-status-readonly">系统内置</span>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>自定义舰名映射</strong>
+                </div>
+                <div class="config-setting-control">
+                  <textarea id="cfg-ship-name-aliases" class="input config-map-editor" rows="3"
+                    placeholder="用于适配玩家的自定义舰名，请使用英文半角冒号进行分割，每行一条规则，冒号两侧空格可省略。&#10;格式：{自定义舰名}:{默认舰名}&#10;举例：0v0:昆西"></textarea>
+                </div>
+              </div>
+              <div class="config-setting-row">
+                <div class="config-setting-copy">
+                  <strong>识别纠错规则</strong>
+                </div>
+                <div class="config-setting-control">
+                  <textarea id="cfg-ship-name-corrections" class="input config-map-editor" rows="3"
+                    placeholder="用于在OCR异常时提供规避方案，请使用英文半角冒号进行分割，每行一条规则，冒号两侧空格可省略。&#10;格式：{OCR识别结果}:{正确结果}&#10;举例：A111:AIII"></textarea>
+                </div>
+              </div>
+            </div>
+          </section>
+
+        </div>

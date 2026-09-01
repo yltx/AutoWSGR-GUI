@@ -1,3 +1,4 @@
+/** 作为 Renderer 组合根，初始化并协调页面、模型和功能控制器。 */
 /**
  * AppController —— 核心控制器（瘦身版）。
  * 协调 Model 和 View，委托子控制器与独立函数处理细分逻辑。
@@ -7,29 +8,55 @@ import { PlanPreviewView } from '../../view/plan/PlanPreviewView';
 import { ConfigView } from '../../view/config/ConfigView';
 import { TaskGroupView } from '../../view/taskGroup/TaskGroupView';
 import { SetupWizardView } from '../../view/setup/SetupWizardView';
-import type { MainViewObject, TaskQueueItemVO } from '../../types/view';
+import {
+  disposeAnimatedSelects,
+  initAnimatedSelects,
+} from '../../view/shared/AnimatedSelect';
+import {
+  applyTheme,
+  watchSystemTheme,
+} from '../../view/theme';
 import { ConfigModel } from '../../model/ConfigModel';
 import { ApiClient } from '../../model/ApiClient';
-import type { ApiResponse } from '../../types/api';
-import { Scheduler, CronScheduler } from '../../model/scheduler';
+import {
+  CampaignDailyQuota,
+  CronScheduler,
+  NormalFightDailyQuota,
+  Scheduler,
+} from '../../model/scheduler';
 import { TaskGroupModel } from '../../model/TaskGroupModel';
 import { TemplateModel } from '../../model/TemplateModel';
 import { Logger } from '../../utils/Logger';
-import { showPrompt, showConfirm, showAlert } from '../shared/DialogHelper';
+import { showAlert } from '../../view/shared/DialogHelper';
+import {
+  getAppRuntimeGateway,
+  type AppRuntimeGateway,
+} from '../../adapter/IpcAdapter';
+import { browserStorageStore } from '../../adapter/StorageAdapter';
 import { TemplateController } from '../template/TemplateController';
 import { TaskGroupController } from '../taskGroup/TaskGroupController';
+import { loadManagedPlanToQueue } from '../taskGroup/queueLoader';
 import { PlanController } from '../plan/PlanController';
+import { DecisivePlanController } from '../plan/DecisivePlanController';
+import { FleetPlannerController } from '../plan/FleetPlannerController';
 import { StartupController } from '../startup/StartupController';
+import {
+  MigrationConflictController,
+} from '../migration/MigrationConflictController';
 
 import { SchedulerBinder } from './SchedulerBinder';
 import { ConfigController } from './ConfigController';
-import { applyTheme, getThemeMode } from './theme';
+import { CurrentFleetController } from './CurrentFleetController';
+import { NavigationController } from './NavigationController';
+import { OperationsController } from './OperationsController';
+import { SettingsController } from './SettingsController';
 import { buildMainViewObject, type RenderingState } from './rendering';
-import { PRIORITY_LABELS, STATUS_TEXT } from './constants';
 
 export class AppController {
   private mainView: MainView;
   private planView: PlanPreviewView;
+  private fleetPlannerCtrl: FleetPlannerController;
+  private currentFleetCtrl: CurrentFleetController;
   private configView: ConfigView;
   private taskGroupView: TaskGroupView;
   private setupView: SetupWizardView;
@@ -41,51 +68,94 @@ export class AppController {
   private api: ApiClient;
   private scheduler: Scheduler;
   private cronScheduler: CronScheduler;
+  private campaignDailyQuota: CampaignDailyQuota;
+  private normalFightDailyQuota: NormalFightDailyQuota;
   private schedulerBinder: SchedulerBinder;
-  private configCtrl: ConfigController;
+  private configCtrl!: ConfigController;
+  private navigationCtrl: NavigationController;
+  private operationsCtrl: OperationsController;
+  private settingsCtrl!: SettingsController;
 
   private appRoot = '';
   private plansDir = '';
   private configDir = '';
-  private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   private templateCtrl!: TemplateController;
   private taskGroupCtrl!: TaskGroupController;
   private planCtrl!: PlanController;
+  private decisivePlanCtrl: DecisivePlanController;
+  private migrationConflictCtrl: MigrationConflictController;
   private startupCtrl!: StartupController;
+  private systemThemeDisposer: (() => void) | null = null;
 
-  /** 待安装的 GUI 版本号 */
-  pendingGuiVersion: string | null = null;
-
-  constructor() {
+  constructor(
+    private readonly runtimeGateway: AppRuntimeGateway | undefined =
+      getAppRuntimeGateway(),
+  ) {
     this.mainView = new MainView();
     this.planView = new PlanPreviewView();
+    this.fleetPlannerCtrl = new FleetPlannerController();
+    this.currentFleetCtrl = new CurrentFleetController();
+    this.decisivePlanCtrl = new DecisivePlanController();
+    this.migrationConflictCtrl = new MigrationConflictController();
     this.configView = new ConfigView();
     this.taskGroupView = new TaskGroupView();
     this.setupView = new SetupWizardView();
     this.configModel = new ConfigModel();
     this.taskGroupModel = new TaskGroupModel();
     this.templateModel = new TemplateModel();
+    this.campaignDailyQuota = new CampaignDailyQuota();
+    this.normalFightDailyQuota = new NormalFightDailyQuota();
+    this.fleetPlannerCtrl.setTaskGroupsProvider(
+      () => this.taskGroupModel.groups,
+    );
 
-    const rawPort = window.electronBridge?.getBackendPort?.();
+    const rawPort = this.runtimeGateway?.getBackendPort();
     let port = Number(rawPort);
     if (!Number.isFinite(port) || port <= 0 || port > 65535) {
       port = 8438;
     }
     this.api = new ApiClient(`http://localhost:${port}`);
-    this.scheduler = new Scheduler(this.api);
+    this.scheduler = new Scheduler(
+      this.api,
+      () => this.configModel.current.ocr.ship_name_aliases,
+    );
+    this.navigationCtrl = new NavigationController({
+      loadFleetPlanner: () => this.fleetPlannerCtrl.load(),
+      ensureDefaultPlan: () => this.planCtrl.ensureDefaultPlan(),
+      loadPlanManagement: () => (
+        this.fleetPlannerCtrl.loadManagement()
+      ),
+      refreshAdbStatus: () => this.settingsCtrl.refreshAdbStatus(),
+      refreshShipLibraryStatus: () => (
+        this.settingsCtrl.refreshShipLibraryStatus()
+      ),
+      hasUnsavedConfigChanges: () => (
+        this.configCtrl?.hasUnsavedChanges() ?? false
+      ),
+    });
+    this.operationsCtrl = new OperationsController(
+      this.api,
+      this.mainView,
+      Logger,
+      () => this.configModel.current.intensify,
+    );
 
     const cfg = this.configModel.current.daily_automation;
+    const gui = this.configModel.currentGuiAutomation;
     this.cronScheduler = new CronScheduler({
       autoExercise: cfg.auto_exercise,
-      exerciseFleetId: cfg.exercise_fleet_id,
+      exerciseFleetId: cfg.exercise_fleet_id ?? 1,
       autoBattle: cfg.auto_battle,
       battleType: cfg.battle_type,
-      battleTimes: cfg.battle_times,
+      battleTimes: gui.battleTimes,
       autoNormalFight: cfg.auto_normal_fight,
-      autoLoot: cfg.auto_loot,
-      lootPlanIndex: cfg.loot_plan_index,
-      lootStopCount: cfg.loot_stop_count,
+      autoDecisive: gui.autoDecisive,
+      decisiveTemplateId: gui.decisiveTemplateId,
+      autoLoot: gui.autoLoot,
+      lootPlanSource: gui.lootPlanSource,
+      lootPlanId: gui.lootPlanId,
+      lootStopCount: gui.lootStopCount,
     });
 
     this.schedulerBinder = new SchedulerBinder({
@@ -93,37 +163,58 @@ export class AppController {
       cronScheduler: this.cronScheduler,
       api: this.api,
       templateModel: this.templateModel,
+      configModel: this.configModel,
+      campaignDailyQuota: this.campaignDailyQuota,
+      normalFightDailyQuota: this.normalFightDailyQuota,
       renderMain: () => this.renderMain(),
-      updateOpsAvailability: (c) => this.updateOpsAvailability(c),
+      refreshNormalFightRemaining: () => (
+        this.configCtrl?.refreshNormalFightRemaining()
+      ),
+      updateOpsAvailability: (c) => this.operationsCtrl.updateOpsAvailability(c),
+      updateExpeditionTimer: (text) => (
+        this.mainView.setExpeditionTimer(text)
+      ),
     });
-
-    // configCtrl 创建延迟到 init()（需要子控制器引用）
-    this.configCtrl = null!;
   }
 
   /** 初始化：绑定事件、渲染初始状态、自动连接后端 */
   init(): void {
     applyTheme();
-    this.bindNavigation();
-    this.bindActions();
+    initAnimatedSelects();
+    this.navigationCtrl.bindNavigation();
+    this.navigationCtrl.bindPlanNavigation();
+    this.bindQueueActions();
     this.schedulerBinder.bindSchedulerCallbacks();
     this.schedulerBinder.bindCronCallbacks();
+
+    this.decisivePlanCtrl.bindActions();
+    void this.decisivePlanCtrl.load();
 
     this.planCtrl = new PlanController(this.planView, {
       scheduler: this.scheduler,
       plansDir: '',
       renderMain: () => this.renderMain(),
-      switchPage: (p) => this.switchPage(p),
+      switchPage: (p) => this.navigationCtrl.switchPage(p, p === 'plan' ? 'scheme' : undefined),
     });
+    this.fleetPlannerCtrl.onOpenBattlePlan = async (file, source) => {
+      await this.planCtrl.openManagedPlan(file, source);
+    };
+    this.fleetPlannerCtrl.onTeamPlanSaved = (
+      previousName,
+      plan,
+    ) => this.planCtrl.synchronizeTeamPlan(previousName, plan);
     this.planCtrl.bindActions();
 
     this.taskGroupCtrl = new TaskGroupController(
       this.taskGroupModel, this.taskGroupView, this.templateModel,
-      this.mainView, {
+      this.mainView, this.planView, {
         scheduler: this.scheduler,
         plansDir: '',
+        getShipNameAliases: () => (
+          this.configModel.current.ocr.ship_name_aliases
+        ),
         renderMain: () => this.renderMain(),
-        switchPage: (p) => this.switchPage(p),
+        switchPage: (p) => this.navigationCtrl.switchPage(p, p === 'plan' ? 'scheme' : undefined),
         importTaskPreset: (preset, fp) => this.planCtrl.importTaskPreset(preset, fp),
         getCurrentPlan: () => this.planCtrl.getCurrentPlan(),
         setCurrentPlan: (plan, mapData) => this.planCtrl.setCurrentPlan(plan, mapData),
@@ -131,6 +222,10 @@ export class AppController {
         closePresetDetail: () => this.planCtrl.closePresetDetail(),
         executePreset: () => this.planCtrl.executePreset(),
         getCurrentPresetInfo: () => this.planCtrl.getCurrentPresetInfo(),
+        pickManagedBattlePlan: () => this.planCtrl.pickManagedBattlePlan(),
+        openManagedPlan: (file, source) => (
+          this.planCtrl.openManagedPlan(file, source)
+        ),
       },
     );
     this.taskGroupCtrl.bindActions();
@@ -141,7 +236,7 @@ export class AppController {
     );
     this.templateCtrl.bindActions();
 
-    // 现在可以创建 configCtrl（依赖 templateCtrl / startupCtrl 后续会赋值）
+    // 现在可以创建 configCtrl（startupCtrl 后续赋值）
     this.configCtrl = new ConfigController({
       configModel: this.configModel,
       configView: this.configView,
@@ -149,32 +244,66 @@ export class AppController {
       mainView: this.mainView,
       scheduler: this.scheduler,
       cronScheduler: this.cronScheduler,
-      templateCtrl: this.templateCtrl,
-      startupCtrl: null!, // 在 startupCtrl 创建后回填
+      normalFightDailyQuota: this.normalFightDailyQuota,
+      startupCtrl: null,
       configDir: this.configDir,
     });
+    this.settingsCtrl = new SettingsController({
+      configView: this.configView,
+      getConfigDir: () => this.configDir,
+      saveConfig: () => this.configCtrl.saveConfig(),
+      pickAutomationPlan: currentTask => (
+        this.planCtrl.pickManagedBattlePlanForAutomation(currentTask)
+      ),
+      pickLootAutomationPlans: currentPlans => (
+        this.planCtrl.pickManagedLootPlans(currentPlans)
+      ),
+      getNormalFightRemaining: task => (
+        this.normalFightDailyQuota.remaining(task)
+      ),
+      reloadShipLibrary: async () => {
+        await Promise.all([
+          this.fleetPlannerCtrl.load(true),
+          this.currentFleetCtrl.load(true),
+        ]);
+        this.renderMain();
+      },
+      ensureSystemConnected: () => {
+        if (this.scheduler.status !== 'not_connected') {
+          return Promise.resolve(true);
+        }
+        return this.startupCtrl?.startSystem() ?? Promise.resolve(false);
+      },
+    }, undefined, this.api);
+    this.settingsCtrl.bindActions();
 
-    this.bindOpsActions();
+    this.operationsCtrl.bindOpsActions();
     this.renderMain();
+    void this.currentFleetCtrl.load().then(() => this.renderMain());
     this.planView.render(null);
 
     // 显示版本号
-    const bridge = window.electronBridge;
-    if (bridge) {
-      const v = bridge.getAppVersion();
-      if (v) this.mainView.setVersion(`v${v}`);
+    const version = this.runtimeGateway?.getAppVersion();
+    if (version) {
+      this.mainView.setVersion(`v${version}`);
     }
 
-    // 监听系统主题变化
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-      if (getThemeMode() === 'system') applyTheme();
-    });
+    this.systemThemeDisposer?.();
+    this.systemThemeDisposer = watchSystemTheme();
 
-    // 窗口关闭时保存任务组状态并刷新日志
-    window.addEventListener('beforeunload', () => {
+    this.mainView.onBeforeUnload = () => {
+      this.schedulerBinder.dispose();
+      this.fleetPlannerCtrl.dispose();
+      this.decisivePlanCtrl.dispose();
+      this.configView.dispose();
       this.taskGroupModel.save();
       Logger.flush();
-    });
+      this.navigationCtrl.dispose();
+      this.planView.dispose();
+      disposeAnimatedSelects();
+      this.systemThemeDisposer?.();
+      this.systemThemeDisposer = null;
+    };
 
     // 加载配置 → 检测模拟器 → 渲染 → 连接
     this.startupCtrl = new StartupController({
@@ -184,7 +313,6 @@ export class AppController {
       appRoot: this.appRoot,
       plansDir: this.plansDir,
       configDir: this.configDir,
-      pendingGuiVersion: this.pendingGuiVersion,
       syncPaths: (appRoot, plansDir, configDir) => {
         this.appRoot = appRoot;
         this.plansDir = plansDir;
@@ -194,7 +322,7 @@ export class AppController {
         this.taskGroupCtrl.host.plansDir = plansDir;
         this.planCtrl.host.plansDir = plansDir;
         // 同步 configCtrl 的 configDir
-        (this.configCtrl as any).host.configDir = configDir;
+        this.configCtrl.setConfigDir(configDir);
       },
       initLogger: (b) => {
         Logger.init({
@@ -204,35 +332,43 @@ export class AppController {
             const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
             this.mainView.appendLog({ time, level, channel, message });
           },
-          logDir: `${this.configDir}/log`,
+          logDir: `${this.configDir}/logs`,
         });
       },
       loadConfigAndSync: async () => {
         await this.configCtrl.loadConfig();
         const da = this.configModel.current.daily_automation;
+        const gui = this.configModel.currentGuiAutomation;
         this.cronScheduler.updateConfig({
           autoExercise: da.auto_exercise,
-          exerciseFleetId: da.exercise_fleet_id,
+          exerciseFleetId: da.exercise_fleet_id ?? 1,
           autoBattle: da.auto_battle,
           battleType: da.battle_type,
-          battleTimes: da.battle_times,
+          battleTimes: gui.battleTimes,
           autoNormalFight: da.auto_normal_fight,
-          autoLoot: da.auto_loot,
-          lootPlanIndex: da.loot_plan_index,
-          lootStopCount: da.loot_stop_count,
+          autoDecisive: gui.autoDecisive,
+          decisiveTemplateId: gui.decisiveTemplateId,
+          autoLoot: gui.autoLoot,
+          lootPlanSource: gui.lootPlanSource,
+          lootPlanId: gui.lootPlanId,
+          lootStopCount: gui.lootStopCount,
         });
       },
       detectAndApplyEmulator: () => this.configCtrl.detectAndApplyEmulator(),
       showSetupWizard: () => this.configCtrl.showSetupWizard(),
       loadModelsAndRender: async (b) => {
         await this.templateModel.init(b);
-        this.configCtrl.renderConfig();
-        this.mainView.setDebugMode(localStorage.getItem('debugMode') === 'true');
         this.templateCtrl.renderLibrary();
+        this.renderConfig();
+        this.mainView.setDebugMode(
+          browserStorageStore.get('debugMode') === 'true',
+        );
         await this.taskGroupModel.load();
         this.taskGroupCtrl.render();
-        this.updatePlanEmptyHint();
       },
+      reviewMigrationConflicts: () => (
+        this.migrationConflictCtrl.reviewPending()
+      ),
       bindBackendLog: (b) => {
         if (b.onBackendLog) {
           b.onBackendLog((line) => {
@@ -250,202 +386,85 @@ export class AppController {
         }
       },
       renderMain: () => this.renderMain(),
-      startHeartbeat: () => this.startHeartbeat(),
+      startHeartbeat: () => this.startupCtrl.startHeartbeat(),
     });
 
     // 回填 startupCtrl 引用
-    (this.configCtrl as any).host.startupCtrl = this.startupCtrl;
+    this.configCtrl.setStartupController(this.startupCtrl);
 
     this.startupCtrl.run().catch((e) => {
       console.error('初始化失败:', e);
-      this.configCtrl.renderConfig();
+      this.renderConfig();
     });
   }
 
-  // ════════════════════════════════════════
-  // 页面导航
-  // ════════════════════════════════════════
-
-  private bindNavigation(): void {
-    document.querySelectorAll<HTMLElement>('.nav-tab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const pageId = tab.dataset['page'];
-        if (pageId) this.switchPage(pageId);
-      });
-    });
-  }
-
-  private switchPage(pageId: string): void {
-    document.querySelectorAll('.nav-tab').forEach((t) => t.classList.remove('active'));
-    document.querySelector(`.nav-tab[data-page="${pageId}"]`)?.classList.add('active');
-    document.querySelectorAll('.page').forEach((p) => p.classList.remove('active'));
-    document.getElementById(`page-${pageId}`)?.classList.add('active');
-    if (pageId === 'config') this.refreshAdbStatus();
+  private renderConfig(): void {
+    this.settingsCtrl.invalidateIntensifySession();
+    this.configCtrl.renderConfig();
   }
 
   // ════════════════════════════════════════
   // 用户操作绑定
   // ════════════════════════════════════════
 
-  private bindActions(): void {
-    document.getElementById('btn-save-config')?.addEventListener('click', () => this.configCtrl.saveConfig());
-    document.getElementById('btn-open-plans-dir')?.addEventListener('click', () => this.openFolder(this.plansDir));
-    document.getElementById('btn-open-config-dir')?.addEventListener('click', () => this.openFolder(this.configDir));
-
-    document.getElementById('btn-browse-emu')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge) return;
-      const dir = await bridge.openDirectoryDialog('选择模拟器安装目录');
-      if (dir) this.configView.setEmulatorPath(dir);
-    });
-
-    document.getElementById('btn-browse-python')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge) return;
-      const result = await bridge.openFileDialog([{ name: 'Python', extensions: ['exe'] }]);
-      if (result) this.configView.setPythonPath(result.path);
-    });
-
-    document.getElementById('btn-browse-backend-repo')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge) return;
-      const dir = await bridge.openDirectoryDialog('选择本地后端仓库目录');
-      if (dir) this.configView.setBackendRepoPath(dir);
-    });
-
-    document.getElementById('btn-browse-cuda')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge) return;
-      const dir = await bridge.openDirectoryDialog('选择 CUDA Toolkit 根目录/bin 或 PyTorch torch\\lib 目录');
-      if (dir) this.configView.setCudaPath(dir);
-    });
-
-    document.getElementById('btn-validate-cuda')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge?.validateCudaPath) return;
-      const cudaPath = this.configView.getCudaPath();
-      if (!cudaPath) { this.configView.setCudaStatus('留空将使用系统环境', 'unknown'); return; }
-      this.configView.setCudaValidateLoading(true);
-      try {
-        const result = await bridge.validateCudaPath(cudaPath);
-        if (result.valid) {
-          this.configView.setCudaPath(result.path);
-          const kind = result.kind === 'runtime' ? 'Runtime' : 'Toolkit';
-          this.configView.setCudaStatus(`✓ CUDA ${result.version ?? ''} ${kind}`.replace(/\s+/g, ' ').trim(), 'ok');
-        } else {
-          this.configView.setCudaStatus(result.error ?? '无效路径', 'error');
-        }
-      } catch {
-        this.configView.setCudaStatus('检测失败', 'error');
-      } finally {
-        this.configView.setCudaValidateLoading(false);
-      }
-    });
-
-    document.getElementById('btn-validate-python')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge?.validatePython) return;
-      const pythonPath = this.configView.getPythonPath();
-      if (!pythonPath) { this.configView.setPythonStatus('"留空"将自动检测', 'unknown'); return; }
-      this.configView.setPythonValidateLoading(true);
-      try {
-        const result = await bridge.validatePython(pythonPath);
-        this.configView.setPythonStatus(result.valid ? '✓ ' + result.version : (result.error ?? '不兼容'), result.valid ? 'ok' : 'error');
-      } catch { this.configView.setPythonStatus('检测失败', 'error'); }
-      finally { this.configView.setPythonValidateLoading(false); }
-    });
-
-    document.getElementById('btn-check-updates')?.addEventListener('click', async () => {
-      await this.checkUpdatesManually();
-    });
-
-    document.getElementById('btn-check-adb')?.addEventListener('click', async () => {
-      const bridge = window.electronBridge;
-      if (!bridge?.checkAdbDevices) return;
-      const btn = document.getElementById('btn-check-adb') as HTMLButtonElement;
-      btn.disabled = true; btn.textContent = '检测中…';
-      try {
-        const devices = await bridge.checkAdbDevices();
-        const online = devices.filter(d => d.status === 'device');
-        if (online.length === 0) {
-          await showAlert('ADB 检测', '未发现在线设备。\n请确认模拟器已启动。');
-        } else if (online.length === 1) {
-          this.configView.setEmulatorSerial(online[0].serial);
-          Logger.info(`ADB 检测到在线设备: ${online[0].serial}，已自动填入`);
-        } else {
-          const list = online.map(d => d.serial).join('\n');
-          const ok = await showConfirm('ADB 检测', `发现 ${online.length} 个在线设备：\n\n${list}\n\n是否将第一个设备填入 serial？`);
-          if (ok) this.configView.setEmulatorSerial(online[0].serial);
-        }
-      } catch (e: any) { await showAlert('ADB 检测失败', e.message || String(e)); }
-      finally { btn.disabled = false; btn.textContent = '检测 ADB'; }
-    });
-
-    document.getElementById('btn-stop-task')?.addEventListener('click', async () => {
-      await this.scheduler.stopRunning();
-      this.schedulerBinder.currentProgress = '';
-      this.schedulerBinder.trackedLoot = '';
-      this.schedulerBinder.trackedShip = '';
-      this.renderMain();
-      Logger.info('已停止当前任务（任务已保留在队列中）');
-    });
-    document.getElementById('btn-clear-queue')?.addEventListener('click', () => {
-      this.scheduler.clearQueue(); this.renderMain();
-    });
-    document.getElementById('btn-start-queue')?.addEventListener('click', () => {
-      this.scheduler.startConsuming(); this.renderMain();
-    });
-
-    this.mainView.onRemoveQueueItem = (taskId) => { this.scheduler.removeTask(taskId); this.renderMain(); };
-    this.mainView.onMoveQueueItem = (from, to) => { this.scheduler.moveTask(from, to); this.renderMain(); };
-
-    document.getElementById('btn-reset-accent')?.addEventListener('click', () => {
-      this.configView.resetAccentColor('#0f7dff');
-      localStorage.setItem('accentColor', '#0f7dff');
-      applyTheme();
-    });
-    document.getElementById('cfg-theme-mode')?.addEventListener('change', (e) => {
-      localStorage.setItem('themeMode', (e.target as HTMLSelectElement).value);
-      applyTheme();
-    });
-    document.getElementById('cfg-accent-color')?.addEventListener('input', (e) => {
-      localStorage.setItem('accentColor', (e.target as HTMLInputElement).value);
-      applyTheme();
-    });
-  }
-
-  // ════════════════════════════════════════
-  // 日常操作按钮
-  // ════════════════════════════════════════
-
-  private bindOpsActions(): void {
-    const wrap = (btnId: string, label: string, action: () => Promise<ApiResponse>) => {
-      document.getElementById(btnId)?.addEventListener('click', async () => {
-        const btn = document.getElementById(btnId) as HTMLButtonElement;
-        btn.disabled = true;
-        this.mainView.setOpsStatus(`${label}中…`);
-        try {
-          const res = await action();
-          if (res.success) { Logger.info(`${label}完成`); this.mainView.setOpsStatus(`${label}完成`); }
-          else { Logger.warn(`${label}失败: ${res.message ?? '未知错误'}`); this.mainView.setOpsStatus(`${label}失败`); }
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          Logger.error(`${label}异常: ${msg}`); this.mainView.setOpsStatus(`${label}异常`);
-        } finally {
-          btn.disabled = false;
-          setTimeout(() => { this.mainView.setOpsStatus(''); }, 3000);
-        }
-      });
+  private bindQueueActions(): void {
+    this.mainView.onStopTask = () => {
+      void this.stopCurrentTask();
     };
-    wrap('btn-ops-expedition', '收取远征', () => this.api.expeditionCheck());
-    wrap('btn-ops-reward', '收取奖励', () => this.api.rewardCollect());
-    wrap('btn-ops-build-collect', '收取建造', () => this.api.buildCollect());
-    wrap('btn-ops-cook', '食堂烹饪', () => this.api.cook());
-    wrap('btn-ops-repair', '浴室修理', () => this.api.repairBath());
+    this.mainView.onClearQueue = () => {
+      this.scheduler.clearQueue();
+      this.renderMain();
+    };
+    this.mainView.onImportPlan = () => {
+      void this.importPlanToQueue();
+    };
+    this.mainView.onStartQueue = () => {
+      this.scheduler.startConsuming();
+      this.renderMain();
+    };
+
+    this.mainView.onRemoveQueueItem = (taskId) => {
+      this.scheduler.removeTask(taskId);
+      this.renderMain();
+    };
+    this.mainView.onMoveQueueItem = (from, to) => {
+      this.scheduler.moveTask(from, to);
+      this.renderMain();
+    };
   }
 
-  private updateOpsAvailability(connected: boolean): void {
-    this.mainView.setOpsAvailability(connected);
+  private async stopCurrentTask(): Promise<void> {
+    if (this.scheduler.status === 'stopping') return;
+    Logger.info('正在停止当前任务，请等待后端确认…');
+    try {
+      await this.scheduler.stopRunning();
+      this.schedulerBinder.resetRuntimeState();
+      this.renderMain();
+      Logger.info('当前任务已停止（任务已保留在队列中）');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      Logger.error(`停止任务失败：${message}`);
+      this.renderMain();
+    }
+  }
+
+  private async importPlanToQueue(): Promise<void> {
+    const selected = await this.planCtrl.pickManagedBattlePlanForQueue();
+    if (!selected) return;
+    try {
+      await loadManagedPlanToQueue(selected, {
+        scheduler: this.scheduler,
+        getShipNameAliases: () => (
+          this.configModel.current.ocr.ship_name_aliases
+        ),
+        renderMain: () => this.renderMain(),
+      });
+    } catch (error) {
+      await showAlert(
+        '无法加载出征计划',
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   // ════════════════════════════════════════
@@ -453,153 +472,24 @@ export class AppController {
   // ════════════════════════════════════════
 
   private renderMain(): void {
+    const running = this.scheduler.currentRunningTask;
+    const runtime = this.schedulerBinder.runtimeState;
     const state: RenderingState = {
       scheduler: this.scheduler,
-      currentProgress: this.schedulerBinder.currentProgress,
-      trackedLoot: this.schedulerBinder.trackedLoot,
-      trackedShip: this.schedulerBinder.trackedShip,
-      wsConnected: this.schedulerBinder.wsConnected,
-      expeditionTimerText: this.schedulerBinder.expeditionTimerText,
+      currentFleet: running
+        ? this.currentFleetCtrl.resolve(running.request)
+        : [],
+      currentProgress: runtime.currentProgress,
+      trackedLoot: runtime.trackedLoot,
+      trackedShip: runtime.trackedShip,
+      dailySortieStats: runtime.dailySortieStats,
+      wsConnected: runtime.wsConnected,
+      expeditionTimerText: runtime.expeditionTimerText,
     };
     const vo = buildMainViewObject(state);
     this.mainView.render(vo);
   }
 
-  // ════════════════════════════════════════
-  // ADB / 心跳 / 辅助
-  // ════════════════════════════════════════
-
-  private async refreshAdbStatus(): Promise<void> {
-    this.configView.setAdbStatus('检测中…', 'unknown');
-    try {
-      const res = await this.api.emulatorDevices();
-      if (res.success && Array.isArray(res.data)) {
-        const online = res.data.filter(d => d.status === 'device');
-        if (online.length > 0) {
-          this.configView.setAdbStatus(`在线 (${online.map(d => d.serial).join(', ')})`, 'online');
-        } else {
-          this.configView.setAdbStatus('未发现在线设备', 'offline');
-        }
-      } else {
-        this.configView.setAdbStatus(res.error || '检测失败', 'offline');
-      }
-    } catch {
-      this.configView.setAdbStatus('检测失败（后端未启动？）', 'offline');
-    }
-  }
-
-  private async checkUpdatesManually(): Promise<void> {
-    const bridge = window.electronBridge;
-    if (!bridge) return;
-    const updateMode = bridge.getUpdateMode?.() ?? 'auto';
-
-    const btn = document.getElementById('btn-check-updates') as HTMLButtonElement | null;
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = '检查中…';
-    }
-
-    try {
-      /*
-       * 测试期接口（后端源码更新）已停用，逻辑保留便于回滚恢复。
-      try {
-        const updates = await bridge.checkUpdates();
-        if (updates.hasUpdates) {
-          const confirmed = await showConfirm(
-            '后端更新',
-            `发现后端可更新，是否立即拉取并更新？`,
-          );
-          if (confirmed) {
-            const pull = await bridge.pullUpdates();
-            if (pull.success) {
-              Logger.info('后端更新完成');
-            } else {
-              Logger.warn(`后端更新失败: ${pull.output || '未知错误'}`);
-            }
-          } else {
-            Logger.info('已取消后端更新');
-          }
-        } else {
-          Logger.info('后端已是最新版本');
-        }
-      } catch {
-        Logger.warn('后端更新检查失败');
-      }
-      */
-      Logger.info('已跳过后端源码更新检查（测试接口已停用）');
-
-      try {
-        const guiUpdate = await bridge.checkGuiUpdates?.();
-        if (updateMode === 'auto') {
-          if (guiUpdate?.version) {
-            Logger.info(`检测到 GUI 新版本 v${guiUpdate.version}，自动模式下将自动下载`);
-          } else {
-            Logger.info('GUI 已是最新版本');
-          }
-          return;
-        }
-        if (guiUpdate?.version) {
-          const confirmed = await showConfirm(
-            'GUI 更新',
-            `发现 GUI 新版本 v${guiUpdate.version}，是否立即下载？`,
-          );
-          if (confirmed) {
-            const result = await bridge.downloadGuiUpdate?.();
-            if (result?.success) {
-              Logger.info(`GUI 更新下载开始: v${guiUpdate.version}`);
-            } else {
-              Logger.warn(`GUI 更新下载失败: ${result?.message || '未知错误'}`);
-            }
-          } else {
-            Logger.info('已取消 GUI 更新下载');
-          }
-        } else {
-          Logger.info('GUI 已是最新版本');
-        }
-      } catch {
-        Logger.warn('GUI 更新检查失败');
-      }
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = '立即检查更新';
-      }
-    }
-  }
-
-  private startHeartbeat(): void {
-    this.stopHeartbeat();
-    let consecutiveFails = 0;
-    this.heartbeatTimer = setInterval(async () => {
-      try {
-        const alive = await this.scheduler.ping();
-        if (alive) { consecutiveFails = 0; } else { consecutiveFails++; }
-      } catch { consecutiveFails++; }
-      if (consecutiveFails >= 3) {
-        Logger.error('后端连续 3 次心跳失败，尝试自动重启…');
-        this.stopHeartbeat();
-        const bridge = window.electronBridge;
-        if (bridge?.startBackend) {
-          await bridge.startBackend();
-          this.startupCtrl.waitForBackendAndConnect();
-        }
-      }
-    }, 30_000);
-  }
-
-  private stopHeartbeat(): void {
-    if (this.heartbeatTimer) { clearInterval(this.heartbeatTimer); this.heartbeatTimer = null; }
-  }
-
-  private updatePlanEmptyHint(): void {
-    if (this.plansDir) this.planView.setPlansDir(this.plansDir);
-  }
-
-  private openFolder(folderPath: string): void {
-    if (!folderPath) return;
-    const bridge = window.electronBridge;
-    if (bridge?.openFolder) bridge.openFolder(folderPath);
-  }
 }
 
 // ── 入口：实例化并初始化 ──

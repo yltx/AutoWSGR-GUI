@@ -1,24 +1,77 @@
+/** 渲染模板创建向导、计划列表和分步表单。 */
 /**
  * TemplateWizardView —— 模板向导 + 选择器弹窗的纯渲染组件。
  * 负责向导 overlay 的显示/隐藏、步骤导航 UI、表单读写、舰船自动补全、
  * 以及通用选择器弹窗（方案/战役/舰队/决战章节）。不含任何业务逻辑。
  */
-import type { WizardFormData, WizardPrefillData, SelectorOption } from '../../types/view';
+import type { WizardFormData, WizardPrefillData, SelectorOption } from '../../types/view.js';
 import { showSelector as showSelectorFn, showMultiSelector as showMultiSelectorFn } from './SelectorDialog';
 import { ShipAutocomplete } from '../shared/ShipAutocomplete';
 
 export class TemplateWizardView {
   private wizardOverlay: HTMLElement;
   private wizardTitle: HTMLElement;
-  private shipAC: ShipAutocomplete;
   private currentStep = 1;
 
-  onWizardFinish?: () => void;
+  onPrevious?: () => void;
+  onNext?: () => void;
+  onCancel?: () => void;
+  onTypeChange?: (type: string) => void;
+  onBrowsePlan?: () => void;
+  onScanPlans?: () => void;
+  onRemovePlan?: (index: number) => void;
 
   constructor() {
     this.wizardOverlay = document.getElementById('template-wizard')!;
     this.wizardTitle = document.getElementById('wizard-title')!;
-    this.shipAC = new ShipAutocomplete(document, '.fleet-ship');
+    new ShipAutocomplete(document, '.fleet-ship');
+
+    document.getElementById('btn-wizard-prev')?.addEventListener(
+      'click',
+      () => this.onPrevious?.(),
+    );
+    document.getElementById('btn-wizard-next')?.addEventListener(
+      'click',
+      () => this.onNext?.(),
+    );
+    document.getElementById('btn-wizard-cancel')?.addEventListener(
+      'click',
+      () => this.onCancel?.(),
+    );
+    document.querySelectorAll<HTMLInputElement>(
+      'input[name="tpl-type"]',
+    ).forEach((radio) => {
+      radio.addEventListener('change', () => {
+        this.onTypeChange?.(this.getSelectedType());
+      });
+    });
+    document.getElementById('btn-tpl-browse-plan')?.addEventListener(
+      'click',
+      () => this.onBrowsePlan?.(),
+    );
+    document.getElementById('btn-tpl-scan-plans')?.addEventListener(
+      'click',
+      () => this.onScanPlans?.(),
+    );
+    document.getElementById('tpl-plan-list')?.addEventListener(
+      'click',
+      (event) => {
+        const button = (event.target as HTMLElement)
+          .closest<HTMLElement>('.btn-remove-plan');
+        if (!button) return;
+        const index = parseInt(button.dataset.idx ?? '-1', 10);
+        if (index >= 0) this.onRemovePlan?.(index);
+      },
+    );
+    for (const suffix of ['nf', 'ex', 'cp']) {
+      const checkbox = document.getElementById(
+        `tpl-fleet-enable-${suffix}`,
+      ) as HTMLInputElement | null;
+      checkbox?.addEventListener('change', () => {
+        const grid = document.getElementById(`tpl-fleet-grid-${suffix}`);
+        if (grid) grid.style.display = checkbox.checked ? '' : 'none';
+      });
+    }
   }
 
   // ════════════════════════════════════════

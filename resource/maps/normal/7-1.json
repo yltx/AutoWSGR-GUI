@@ -1,0 +1,180 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.867,
+      0.65
+    ],
+    "next": [
+      "A",
+      "B"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.743,
+      0.778
+    ],
+    "next": [
+      "C"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.695,
+      0.361
+    ],
+    "next": [
+      "D",
+      "E"
+    ]
+  },
+  "C": {
+    "type": "Normal",
+    "detour": true,
+    "night": false,
+    "position": [
+      0.606,
+      0.682
+    ],
+    "next": [
+      "F",
+      "G"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": true,
+    "night": false,
+    "position": [
+      0.567,
+      0.431
+    ],
+    "next": [
+      "H"
+    ]
+  },
+  "E": {
+    "type": "Penalty",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.624,
+      0.194
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.454,
+      0.821
+    ],
+    "next": [
+      "L"
+    ]
+  },
+  "G": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.454,
+      0.611
+    ],
+    "next": [
+      "I"
+    ]
+  },
+  "H": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.433,
+      0.36
+    ],
+    "next": [
+      "J",
+      "K"
+    ]
+  },
+  "I": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.308,
+      0.575
+    ],
+    "next": [
+      "K",
+      "M",
+      "N"
+    ]
+  },
+  "J": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.244,
+      0.223
+    ],
+    "next": []
+  },
+  "K": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.281,
+      0.388
+    ],
+    "next": [
+      "N"
+    ]
+  },
+  "L": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.284,
+      0.852
+    ],
+    "next": [
+      "M"
+    ]
+  },
+  "M": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.226,
+      0.686
+    ],
+    "next": []
+  },
+  "N": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.094,
+      0.501
+    ],
+    "next": []
+  }
+}

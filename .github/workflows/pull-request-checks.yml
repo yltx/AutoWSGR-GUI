@@ -1,0 +1,95 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-migrations:
+    name: Build and migration contracts
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Test build gate
+        run: npm run test:build
+
+      - name: Test scheduler domain
+        run: node scripts/tests/test-scheduler-domain.mjs
+
+      - name: Test migration compatibility
+        run: node scripts/tests/test-migrations.js
+
+  backend-fleet-contract:
+    name: Backend fleet contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout GUI
+        uses: actions/checkout@v4
+
+      - name: Checkout AutoWSGR
+        uses: actions/checkout@v4
+        with:
+          repository: ShiinaKuroko/AutoWSGR
+          ref: ShiinaKuroko
+          path: AutoWSGR
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v8.1.0
+        with:
+          enable-cache: true
+
+      - name: Install GUI dependencies
+        run: npm ci
+
+      - name: Install AutoWSGR dependencies
+        run: uv sync --project AutoWSGR --no-dev
+
+      - name: Build GUI
+        run: npm run build
+
+      - name: Test candidate-only GUI services
+        run: node scripts/tests/test-main-services.js
+
+      - name: Check fleet type snapshot
+        env:
+          AUTOWSGR_PYTHON: ${{ github.workspace }}/AutoWSGR/.venv/bin/python
+        run: npm run check:fleet-types
+
+      - name: Test GUI to AutoWSGR fleet contract
+        env:
+          AUTOWSGR_REPO: ${{ github.workspace }}/AutoWSGR
+          AUTOWSGR_PYTHON: ${{ github.workspace }}/AutoWSGR/.venv/bin/python
+        run: node scripts/tests/test-api-contract.js

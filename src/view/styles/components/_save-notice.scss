@@ -1,0 +1,59 @@
+.save-success-notice {
+  position: fixed;
+  top: calc(var(--nav-height) + 8px);
+  left: 50%;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 24px);
+  padding: 9px 18px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--success) 88%, #0f172a);
+  border: 1px solid color-mix(in srgb, var(--success) 72%, #fff);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translate(-50%, -8px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease,
+    visibility 0.18s ease;
+}
+
+.save-success-notice.is-visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0);
+}
+
+.save-success-notice.is-warning {
+  background: color-mix(in srgb, var(--warning) 88%, #0f172a);
+  border-color: color-mix(in srgb, var(--warning) 72%, #fff);
+}
+
+.save-success-notice-icon {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  color: var(--success);
+  background: #fff;
+  border-radius: 50%;
+}
+
+.save-success-notice.is-warning .save-success-notice-icon {
+  color: var(--warning);
+}
+
+.save-success-notice-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

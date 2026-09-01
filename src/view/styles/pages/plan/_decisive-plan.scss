@@ -1,0 +1,185 @@
+.decisive-plan-layout {
+  height: 100%;
+}
+
+.decisive-plan-layout > .card {
+  min-width: 0;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 8px;
+}
+
+.decisive-plan-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.decisive-plan-heading {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.decisive-plan-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 8px;
+
+  h2 {
+    flex: 0 0 auto;
+    margin: 0;
+    font-size: 14px;
+  }
+
+  p {
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    color: var(--text-muted);
+    font-size: 9px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.decisive-plan-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+
+  .btn {
+    height: 24px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+}
+
+.decisive-plan-controls {
+  display: flex;
+  flex: 0 0 auto;
+  min-height: 38px;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 6px;
+  padding: 5px 8px;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.decisive-plan-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+
+  .input {
+    width: 86px;
+    height: 25px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+}
+
+.decisive-plan-status {
+  margin-left: auto;
+  color: var(--success);
+  font-size: 9px;
+
+  &.is-dirty {
+    color: var(--warning);
+  }
+
+  &.is-error {
+    color: var(--danger);
+  }
+}
+
+.decisive-tier-heading {
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 26px;
+  margin: 0 0 3px;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.decisive-automation-note {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--danger);
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#decisive-level2-count {
+  color: var(--text-secondary);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.decisive-plan-card .fleet-slot.is-dragging {
+  opacity: 0.42;
+}
+
+.decisive-plan-library {
+  overflow: visible;
+}
+
+.decisive-ship-gallery {
+  &.is-locked .fleet-ship-card {
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+}
+
+@container (max-width: 620px) {
+  .decisive-plan-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .decisive-plan-title-line {
+    flex: 1 1 100%;
+  }
+
+  .decisive-plan-controls {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 7px 12px;
+  }
+
+  .decisive-plan-status {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .decisive-automation-note {
+    width: 100%;
+    margin-left: 0;
+    white-space: normal;
+  }
+}
+
+@container (max-width: 420px) {
+  .decisive-plan-title-line p {
+    display: none;
+  }
+
+  .decisive-plan-controls {
+    gap: 5px 8px;
+    padding: 4px 5px;
+  }
+}

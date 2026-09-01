@@ -1,0 +1,59 @@
+name: 3驱克劳85工程队
+ships:
+  - name: Z28·改
+    search_name: Z28
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: Z1·改, search_name: Z1, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z16·改, search_name: Z16, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z21·改, search_name: Z21, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z22·改, search_name: Z22, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z46·改, search_name: Z46, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z31·改, search_name: Z31, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: T-23·改
+    search_name: T-23
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: Z1·改, search_name: Z1, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z16·改, search_name: Z16, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z21·改, search_name: Z21, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z22·改, search_name: Z22, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z46·改, search_name: Z46, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z31·改, search_name: Z31, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 吕贝克·改
+    search_name: 吕贝克
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: Z1·改, search_name: Z1, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z16·改, search_name: Z16, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z21·改, search_name: Z21, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z22·改, search_name: Z22, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z46·改, search_name: Z46, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z31·改, search_name: Z31, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 克劳塞维茨·改
+    search_name: 克劳塞维茨
+    ship_type: [bc]
+    min_level: 100
+    relaxed: false
+  - name: 赛尔弗里吉·改
+    search_name: 赛尔弗里吉
+    ship_type: [dd]
+    min_level: 100
+    relaxed: false
+    candidates:
+      - {name: Z1·改, search_name: Z1, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z16·改, search_name: Z16, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z21·改, search_name: Z21, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z22·改, search_name: Z22, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z46·改, search_name: Z46, ship_type: [dd], min_level: 100, relaxed: false}
+      - {name: Z31·改, search_name: Z31, ship_type: [dd], min_level: 100, relaxed: false}
+  - name: 85工程
+    ship_type: [cv]
+    min_level: 100
+    relaxed: false

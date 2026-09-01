@@ -1,0 +1,52 @@
+{
+  "locale": "zh-CN",
+  "ship_types": {
+    "aadg": "防驱",
+    "ap": "补给",
+    "asdg": "导驱",
+    "av": "装母",
+    "bb": "战列",
+    "bbg": "导战",
+    "bbv": "航战",
+    "bc": "战巡",
+    "bg": "大巡",
+    "bm": "重炮",
+    "ca": "重巡",
+    "cav": "航巡",
+    "cg": "防巡",
+    "cl": "轻巡",
+    "clt": "雷巡",
+    "cv": "航母",
+    "cvl": "轻母",
+    "dd": "驱逐",
+    "kp": "导巡",
+    "sc": "炮潜",
+    "ss": "潜艇",
+    "ssg": "导潜"
+  },
+  "size_classes": {
+    "large": "大型舰",
+    "medium": "中型舰",
+    "small": "小型舰"
+  },
+  "role_classes": {
+    "main_force": "主力舰",
+    "escort": "护卫舰"
+  },
+  "countries": {
+    "china": "中国",
+    "france": "法国",
+    "germany": "德国",
+    "italy": "意大利",
+    "japan": "日本",
+    "other": "其他",
+    "soviet_union": "苏联",
+    "united_kingdom": "英国",
+    "united_states": "美国"
+  },
+  "variants": {
+    "normal": "普通",
+    "refit": "改造",
+    "special": "特殊"
+  }
+}

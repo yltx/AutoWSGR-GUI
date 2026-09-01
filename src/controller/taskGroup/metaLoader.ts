@@ -1,9 +1,16 @@
+/** 批量读取任务条目元数据并生成界面展示摘要。 */
 /**
  * metaLoader —— 异步加载任务组条目的元信息。
  */
 import type { TaskGroupItem } from '../../model/TaskGroupModel';
 import type { TemplateModel } from '../../model/TemplateModel';
-import type { TaskGroupItemMeta } from '../../view/taskGroup/TaskGroupView';
+import type { TaskGroupItemMeta } from '../../types/view.js';
+import { readTaskGroupItemFile } from './managedPlanReader';
+import { yamlCodec } from '../../adapter';
+import {
+  getTaskGroupRepository,
+  type TaskGroupRepository,
+} from '../../adapter/IpcAdapter';
 
 const REPAIR: Record<number, string> = { 1: '中破就修', 2: '大破才修' };
 const TYPE_LABELS: Record<string, string> = {
@@ -14,9 +21,10 @@ const TYPE_LABELS: Record<string, string> = {
 export async function loadItemMetas(
   items: ReadonlyArray<TaskGroupItem>,
   templateModel: TemplateModel,
+  repository: TaskGroupRepository | undefined =
+    getTaskGroupRepository(),
 ): Promise<(TaskGroupItemMeta | null)[]> {
-  const bridge = window.electronBridge;
-  if (!bridge) return items.map(() => null);
+  if (!repository) return items.map(() => null);
 
   return Promise.all(items.map(async (item): Promise<TaskGroupItemMeta | null> => {
     try {
@@ -34,20 +42,20 @@ export async function loadItemMetas(
         return meta;
       }
 
-      const content = await bridge.readFile(item.path!);
-      const parsed = (await import('js-yaml')).load(content) as Record<string, unknown>;
+      const { content } = await readTaskGroupItemFile(item, repository);
+      const parsed = yamlCodec.parse<Record<string, unknown>>(content);
       if (!parsed || typeof parsed !== 'object') return null;
 
       const meta: TaskGroupItemMeta = {};
-      if (item.autoFleetFallback) meta.autoFleetFallback = true;
 
       if ('chapter' in parsed && 'map' in parsed) {
         const ch = String(parsed.chapter);
         const mp = String(parsed.map);
         if ('event' in parsed || /^[EH]$/i.test(ch)) {
-          const match = mp.match(/^(\d+)([ab])?$/i);
-          const entrance = match?.[2]?.toLowerCase() === 'b' ? 'β' : 'α';
-          meta.mapName = `${ch.toUpperCase()}-Ex-${match?.[1] ?? mp}-${entrance}`;
+          const chapter = ch.toUpperCase();
+          meta.mapName = chapter === 'EX'
+            ? `EX-${mp.toUpperCase()}`
+            : `${chapter}${mp.toUpperCase()}`;
           meta.typeLabel = '活动出击';
         } else {
           const chapterNumber = Number(ch);
@@ -63,12 +71,20 @@ export async function loadItemMetas(
         else if (Array.isArray(rm)) meta.repairMode = REPAIR[rm[0]] ?? `修理${rm[0]}`;
       }
 
-      if ('task_type' in parsed && !('chapter' in parsed)) {
+      if ('task_type' in parsed && !('map' in parsed)) {
         meta.typeLabel = TYPE_LABELS[String(parsed.task_type)] ?? String(parsed.task_type);
       }
 
       if ('fleet' in parsed && Array.isArray(parsed.fleet)) {
         meta.fleet = (parsed.fleet as unknown[]).map(s => String(s || '')).filter(Boolean);
+      }
+
+      if ('fleet_presets' in parsed && Array.isArray(parsed.fleet_presets)) {
+        const presetIndex = item.fleetPresetIndex ?? 0;
+        const preset = parsed.fleet_presets[presetIndex];
+        if (preset && typeof preset === 'object' && 'name' in preset) {
+          meta.fleetPresetName = String(preset.name || '').trim() || undefined;
+        }
       }
 
       return meta;

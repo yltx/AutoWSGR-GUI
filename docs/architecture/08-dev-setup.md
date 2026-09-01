@@ -1,219 +1,205 @@
-# 开发环境搭建
+# 开发、构建与验证
 
-> 涉及文件：`package.json` · `tsconfig.json` · `scripts/` · `build/installer.nsh`
+## 前置环境
 
-## 前置要求
-
-| 工具 | 版本 | 说明 |
-|------|------|------|
-| **Node.js** | 18+ | 推荐使用 LTS 版本 |
-| **Python** | 3.12 / 3.13 | 用于运行 AutoWSGR 后端 |
-| **模拟器** | MuMu 12 / 雷电 / 蓝叠 | 运行战舰少女R |
-
----
-
-## 快速开始
+- Windows 10/11 x64
+- Node.js 22
+- npm
+- 仅在 external 后端或后端联调时需要本地 Python 3.12/3.13
 
 ```powershell
-# 1. 克隆仓库
-git clone https://github.com/yltx/AutoWSGR-GUI.git
-cd AutoWSGR-GUI
-
-# 2. 安装 Node 依赖
-npm install
-
-# 3. 开发模式运行
-npm run dev
+npm ci
+npm start
 ```
 
----
+`npm start` 会完整构建后启动 Electron。项目没有 HMR，源码修改后需要重新构建
+并启动。
 
-## NPM Scripts
+## 开发源与生成物
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | 编译 TypeScript + esbuild 打包 + 启动 Electron（开发日常使用） |
-| `npm run build` | 仅编译（`tsc` + `esbuild`），不运行 |
-| `npm start` | 等同于 `build` + `electron .`（含 chcp 65001） |
-| `npm run dist` | 完整打包：下载 Python + ADB → 编译 → electron-builder NSIS 安装包 |
-| `npm run pack` | 编译 + `electron-builder --dir`（生成目录，不打安装包） |
-| `npm run prepare-python` | 单独下载便携版 Python |
-| `npm run prepare-adb` | 单独下载 ADB 工具 |
+| 开发源 | 生成物 |
+|---|---|
+| `src/view/html/**/*.html` | `src/view/index.html` |
+| `src/view/styles/**/*.scss` | `src/view/styles/styles.css` |
+| `electron/**/*.ts`、`src/**/*.ts` | `dist/**` |
+| 编译后的 Renderer 模块 | `dist/renderer.bundle.js` |
 
----
+规则：
 
-## 构建流程
+1. 不手工修改 `src/view/index.html`。
+2. 不手工修改 `src/view/styles/styles.css`。
+3. 不提交或依赖手工修改的 `dist/**`。
+4. HTML/SCSS/TypeScript 改动后运行 `npm run build`。
+5. 生成的 HTML/CSS 是 Electron 运行入口，需要和源码一起提交。
 
-### 编译管线
+## 构建管线
 
 ```mermaid
 flowchart LR
-  TS["TypeScript 源码<br/>electron/ + src/"] -->|"tsc"| JS["dist/<br/>CommonJS 输出"]
-  SRC["src/view/*.ts<br/>(渲染进程)"] -->|"esbuild<br/>(scripts/bundle.js)"| Bundle["dist/renderer.bundle.js<br/>浏览器兼容单文件"]
+  HTMLSrc["src/view/html/index.html"] -->|"build-view-html.js"| HTML["src/view/index.html"]
+  SCSS["src/view/styles/main.scss"] -->|"sass"| CSS["src/view/styles/styles.css"]
+  TS["electron + src TypeScript"] -->|"tsc"| Dist["dist/electron + dist/src"]
+  Dist -->|"esbuild"| Bundle["dist/renderer.bundle.js"]
 ```
 
-- **tsc**：将所有 TypeScript 编译到 `dist/` 目录（主进程 + 渲染进程）
-- **esbuild**：将渲染进程代码打包为单个浏览器兼容的 `renderer.bundle.js`
+`scripts/build-view-html.js` 递归展开 `<!-- @include ... -->`，拒绝目录逃逸和循环
+include。`--check` 只检查生成文件是否过期。
 
-### 构建脚本
+`scripts/bundle.js` 从编译后的
+`dist/src/controller/app/AppController.js` 打包浏览器 IIFE。
 
-#### `scripts/bundle.js`
+## 常用命令
 
-用 esbuild 将 `src/` 下的渲染进程代码打包为 `dist/renderer.bundle.js`，配置 `platform: 'browser'`，排除 Node.js 内置模块。
+| 命令 | 用途 |
+|---|---|
+| `npm run build` | HTML、CSS、TypeScript 和 Renderer Bundle 完整构建 |
+| `npm run build:html` | 生成 `src/view/index.html` |
+| `npm run build:css` | 生成 `styles.css` |
+| `npm start` | 完整构建并启动 Electron |
+| `npm run dev` | 清理、构建并启动 Electron |
+| `npm run pack` | 生成 unpacked electron-builder 目录 |
+| `npm run dist` | 准备 Python/ADB 并生成稳定版 NSIS 安装包 |
+| `npm run prepare-python` | 下载便携 Python |
+| `npm run prepare-adb` | 下载 ADB |
+| `npm run check:fleet-types` | 校验 22 舰种快照 |
+| `npm run check:maps` | 校验地图资源同步 |
 
-#### `scripts/prepare-python.js`
+## 测试布局
 
-下载 Python 3.12.8 embed 发行版，解压到 `python/` 目录。在 `npm run dist` 时自动调用。
-
-#### `scripts/prepare-adb.js`
-
-下载 Android Platform-Tools（含 `adb.exe`），解压到 `adb/` 目录。在 `npm run dist` 时自动调用。
-
----
-
-## 打包配置
-
-### electron-builder
-
-打包配置在 `package.json` 的 `build` 字段中：
-
-```json
-{
-  "appId": "com.autowsgr.gui",
-  "productName": "AutoWSGR-GUI",
-  "directories": { "output": "release" },
-  "files": ["dist/**/*", "src/view/**/*", "scripts/**/*"],
-  "extraResources": [
-    { "from": "resource", "to": "resource" },
-    { "from": "plans", "to": "plans" },
-    { "from": "setup.bat", "to": "setup.bat" },
-    { "from": "python", "to": "python" },
-    { "from": "adb", "to": "adb" }
-  ]
-}
+```text
+scripts/tests/
+├─ fixtures/                  # 版本化输入语料
+├─ main-services/             # Main Service 分领域测试
+├─ test-support/              # 共享测试目录辅助
+├─ test-build-output-contract.js
+├─ test-renderer-dom-contract.js
+├─ test-renderer-architecture.js
+├─ test-main-services.js
+├─ test-main-ipc.js
+├─ test-migrations.js
+├─ test-api-contract.js
+├─ test-fleet-domain.mjs
+├─ test-scheduler-domain.mjs
+└─ ...
 ```
 
-**打包目标**：Windows NSIS 安装包 (`release/AutoWSGR-GUI-Setup-x.x.x.exe`)
+构建/测试脚本统一放在 `scripts/`，测试实现放在 `scripts/tests/`。不要把新测试
+重新放回 `scripts/test-*.js` 根目录旧布局。
 
-**包含内容**：
-- `dist/` — 编译后的 JS
-- `src/view/` — HTML/CSS
-- `resource/` — 内置方案 + 模板 + 地图
-- `python/` — 便携版 Python
-- `adb/` — ADB 工具
+## 测试命令
 
-### NSIS 自定义
+| 命令 | 覆盖范围 |
+|---|---|
+| `npm run test:build` | 构建、生成文件、DOM、架构和打包白名单总门禁 |
+| `npm run test:renderer-contract` | HTML 新鲜度、重复/缺失 DOM ID |
+| `npm run test:architecture-boundaries` | Controller/View 依赖和共享图库释放 |
+| `npm run test:settings` | Electron 设置页渲染、收集和持久化 |
+| `npm run test:scheduler-domain` | 调度身份、排序、重试、取消、额度 |
+| `npm run test:fleet-domain` | 编队草稿、候选和 DTO 往返 |
+| `npm run test:main-services` | Main 路径、配置、方案、环境和资料库 |
+| `npm run test:main-ipc` | preload、IPC 通道和同步/异步契约 |
+| `npm run test:migrations` | userData、旧方案、任务组和真实语料 |
+| `npm run test:api-contract` | GUI 与 AutoWSGR API/舰种契约 |
+| `npm run test:python-environment` | managed/external、CUDA 和环境一致性 |
+| `npm run test:backend-distribution` | 打包后端来源和更新策略 |
+| `npm run test:release-package` | 安装包运行时和资源 |
+| `npm run test:event-resources` | 活动资源和地图加载 |
+| `npm run test:map-intel` | 地图情报同步、校验和原子快照 |
 
-`build/installer.nsh` 包含 NSIS 安装程序的自定义脚本（如安装向导页面定制）。
+`test:build` 证明产品可以正确生成和连接，不代替业务领域测试或 Electron 交互
+回归。
 
----
+## PR CI
 
-## 目录约定
+`.github/workflows/pull-request-checks.yml` 当前有两个 job：
 
-| 目录 | 运行时 (开发) | 运行时 (打包) |
-|------|--------------|--------------|
-| `appRoot()` | 项目根目录 | `%LOCALAPPDATA%/autowsgr-gui/` 或安装目录 |
-| `resourceRoot()` | 同 appRoot | `resources/` (extraResources) |
-| `plans/` | 项目根 `plans/` | extraResources `plans/` |
-| `python/` | 项目根 `python/` | extraResources `python/` |
-| `adb/` | 项目根 `adb/` | extraResources `adb/` |
-| `usersettings.yaml` | 项目根 | appRoot |
-| `gui_settings.json` | 项目根 | appRoot |
-| `task_groups.json` | 项目根 | appRoot |
-| `templates/` | 项目根 | appRoot |
+### Windows 构建与迁移
 
----
-
-## 调试技巧
-
-### 后端日志
-
-- Python 后端使用 loguru 格式输出日志到 stdout
-- 主进程控制台（终端 / VS Code Debug Console）可看到带颜色的原始日志
-- 渲染进程日志面板可看到经过滤的 INFO 及以上级别日志
-- 启用配置页的"调试模式"可在日志面板显示 DEBUG 级别
-
-### IPC 调试
-
-- `electronBridge` 对象在渲染进程 DevTools 控制台中可直接访问：
-  ```javascript
-  // 在 DevTools Console 中
-  await window.electronBridge.checkEnvironment()
-  await window.electronBridge.getAppRoot()
-  ```
-
-### 热重载
-
-项目未配置 HMR。修改代码后需要：
-1. 终止 Electron 进程
-2. 运行 `npm run dev` 重新编译并启动
-
-### 常见问题
-
-| 问题 | 原因 | 解决 |
-|------|------|------|
-| Python 未找到 | 未安装 Python 3.12/3.13 或便携版缺失 | 运行 `npm run prepare-python` 或在配置页手动设置路径 |
-| 后端启动失败 | autowsgr 未安装 | 通过 GUI 环境检查自动安装，或手动 `pip install autowsgr` |
-| ADB 连接失败 | 模拟器串口不匹配 | 在配置页手动填写 ADB 串口 |
-| 端口冲突 | 8438 端口被占用 | 在配置页更改后端端口 |
-| TypeScript 编译错误 | 类型定义不匹配 | 确认 Node.js 类型版本与 `@types/node` 一致 |
-
----
-
-## 技术栈一览
-
-| 组件 | 技术 | 版本 |
-|------|------|------|
-| 桌面框架 | Electron | 33+ |
-| 前端语言 | TypeScript | 5.6+ |
-| 打包工具 | esbuild | 0.27+ |
-| 安装包 | electron-builder (NSIS) | 26+ |
-| 自动更新 | electron-updater | 6+ |
-| YAML 解析 | js-yaml | 4+ |
-| 样式预处理 | Sass (SCSS) | — |
-| 后端框架 | Python FastAPI + uvicorn | — |
-| 自动化核心 | autowsgr | 2.1.0+ |
-
----
-
-## SCSS 样式架构
-
-样式位于 `src/view/styles/`，采用三层组织：
-
-```
-styles/
-├── main.scss              # 入口：@use 引入所有子模块
-├── styles.css             # 编译产物
-├── base/                  # 基础层
-│   ├── _variables.scss    # CSS 变量、主题色、断点
-│   └── _base.scss         # 全局重置、基础样式
-├── components/            # 组件层（跨页面复用）
-│   ├── _buttons.scss      # 按钮样式
-│   ├── _forms.scss        # 表单控件
-│   ├── _modal.scss        # 模态弹窗
-│   ├── _nav.scss          # 导航栏
-│   ├── _autocomplete.scss # 自动补全下拉
-│   ├── _task-group.scss   # 任务组组件
-│   └── _template.scss     # 模板卡片/向导
-└── pages/                 # 页面层（特定页面布局）
-    ├── _config.scss       # 配置页
-    ├── main-page/         # 主页面
-    │   ├── _index.scss    # 入口
-    │   ├── _layout.scss   # 布局
-    │   ├── _log.scss      # 日志面板
-    │   └── _task-queue.scss # 任务队列
-    └── plan/              # 方案编辑页
-        ├── _index.scss    # 入口
-        ├── _layout.scss   # 布局
-        ├── _header.scss   # 头部
-        ├── _node-map.scss # 地图节点
-        ├── _node-types.scss # 节点类型图标
-        ├── _node-editor.scss # 节点编辑器
-        ├── _fleet-preset.scss # 编队预设
-        └── _task-config.scss # 任务配置区域
+```text
+npm ci
+npm run test:build
+node scripts/tests/test-scheduler-domain.mjs
+node scripts/tests/test-migrations.js
 ```
 
-**组织原则**：
-- `base/`：全局变量和重置，晚于 `main.scss` 中最先 @use
-- `components/`：跨页面复用的 UI 组件样式
-- `pages/`：特定页面的布局和元素样式，复杂页面进一步拆分为子目录
+`test:build` 已完成构建，后两个步骤直接运行编译产物测试，避免重复构建。
+
+### Linux 后端舰种契约
+
+```text
+Checkout GUI + AutoWSGR
+Node 22 + Python 3.12 + uv
+npm ci
+uv sync --project AutoWSGR --no-dev
+npm run build
+node scripts/tests/test-main-services.js
+npm run check:fleet-types
+node scripts/tests/test-api-contract.js
+```
+
+通过 `AUTOWSGR_REPO` 和 `AUTOWSGR_PYTHON` 指向候选 AutoWSGR 仓库。
+
+## 发布
+
+`.github/workflows/release.yml` 当前：
+
+1. 接受 `v*` tag 或手动触发。
+2. Stable 使用 `X.Y.Z` / `latest`，Alpha 使用
+   `X.Y.Z-alpha[.N]` / `alpha`。
+3. 校验仓库中已经审查的稳定后端固定提交，不跟随移动分支。
+4. `npm run dist` 并按有效版本输出到对应频道目录。
+5. `npm run test:release-package` 校验有效频道、安装包和更新清单。
+6. Stable 发布前要求同版本线 Alpha 桥已经发布，并将桥接 Alpha 资产附加到
+   Stable Release，供旧 Alpha 客户端迁移。
+7. Stable 完整资产同时发布到旧 `yltx/AutoWSGR-GUI` feed，供 1.4.x
+   客户端发现；目标权限和版本冲突必须在构建前预检。
+
+`build/electron-builder.release.cjs` 根据有效版本将输出放到 `release/latest`
+或 `release/alpha`，并打包 `build/backend-distribution.json`。本地候选可通过
+`AUTOWSGR_RELEASE_VERSION` 覆盖包内版本而不修改受跟踪版本文件。
+
+## 安装包边界
+
+`package.json.build.files` 只包含：
+
+```text
+dist/electron/**/*
+dist/src/shared/**/*
+dist/renderer.bundle.js
+src/view/index.html
+src/view/styles/styles.css
+```
+
+`src/view/html/**`、SCSS partial 和 TypeScript 源码不进入安装包。
+
+extraResources 包含只读 `resource/`、setup、调试依赖和明确白名单的舰船资料库
+工具；便携 Python、VC++ redist 和 ADB 作为 extraFiles 放到安装目录。
+
+## SCSS 结构
+
+```text
+src/view/styles/
+├─ main.scss
+├─ base/
+├─ components/
+├─ pages/
+│  ├─ main-page/
+│  ├─ config/
+│  └─ plan/
+└─ themes/
+```
+
+`pages/_config.scss` 和 `pages/plan/_fleet-planner.scss` 是聚合入口。移动选择器时
+保持加载顺序和视觉效果；共享样式只有在多个页面实际复用时才进入
+`components/`。
+
+## 提交前
+
+```powershell
+npm run test:build
+git diff --check
+git status --short
+```
+
+然后按改动范围增加专项测试。构建后确认生成的 HTML/CSS 已更新，且没有把
+`userData`、临时目录、release 或无关文件带入改动。

@@ -27,6 +27,10 @@ class FakeApi {
     this.callbacks = callbacks;
   }
 
+  connectWebSockets() {}
+
+  disconnectWebSockets() {}
+
   async taskStart(request) {
     this.started.push(request);
     this.calls.push(request.type);
@@ -55,7 +59,8 @@ class FakeApi {
 
 function makeScheduler(api) {
   const scheduler = new Scheduler(api);
-  scheduler.setStatus('idle');
+  scheduler.setAutoExpedition(false);
+  scheduler.recoverAfterTimeout();
   return scheduler;
 }
 
@@ -115,6 +120,7 @@ async function verifyExpeditionRoundBoundary() {
   assert.deepEqual(api.calls, ['normal_fight', 'normal_fight']);
   assert.equal(scheduler.currentRunningTask.remainingTimes, 9);
 
+  scheduler.setAutoExpedition(true);
   scheduler.handleExpeditionTrigger();
   assert.equal(api.stopCalls, 0, 'queuing an expedition must not stop the active round');
   assert.equal(scheduler.taskQueue[0].type, 'expedition');
@@ -127,6 +133,7 @@ async function verifyExpeditionRoundBoundary() {
   assert.equal(api.stopCalls, 0, 'round-boundary expedition scheduling must never call taskStop');
   assert.equal(scheduler.currentRunningTask.remainingTimes, 8);
   assert.equal(api.started[2].times, 1);
+  scheduler.setAutoExpedition(false);
 }
 
 (async () => {

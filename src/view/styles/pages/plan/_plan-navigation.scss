@@ -1,0 +1,58 @@
+/* ═══ 计划页二级导航 ═══ */
+#page-plan {
+  height: calc(100vh - var(--nav-height) - var(--page-block-space));
+  min-height: 0;
+}
+
+#page-plan.active {
+  display: flex;
+  flex-direction: column;
+}
+
+.plan-subtabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  margin-bottom: 6px;
+  padding: 3px;
+  overflow-x: auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.plan-subtab {
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+  }
+
+  &.active {
+    color: var(--text);
+    background: var(--bg-card-solid);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
+  }
+}
+
+.plan-tab-panel {
+  flex: 1 1 0;
+  min-height: 0;
+
+  &[hidden] {
+    display: none !important;
+  }
+}
+
+.plan-tab-panel.active {
+  display: block;
+}

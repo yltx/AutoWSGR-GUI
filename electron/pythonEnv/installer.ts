@@ -7,19 +7,25 @@ import { exec, spawn } from 'child_process';
 import { promisify } from 'util';
 import { getCtx, setCachedPythonCmd } from './context';
 import { findPython } from './finder';
-import { ensurePthFile, localSitePackages, pipEnv, ensurePip, ensureSslCertForPython } from './utils';
+import { ensurePthFile, pipEnv, ensurePip, ensureSslCertForPython } from './utils';
 import { ENV_READY_MARKER } from './envCheck';
+import {
+  buildPythonProcessEnv,
+  installTargetArgs,
+  type PythonEnvironment,
+  resolvePythonEnvironment,
+} from './environment';
+import {
+  BACKEND_RUNTIME_REQUIREMENTS,
+  SHIP_LIBRARY_REQUIREMENTS,
+} from './dependencies';
+import { MANAGED_AUTOWSGR_REQUIREMENT } from './backendRequirement';
 
 const execAsync = promisify(exec);
 
-/** PyPI 2.2.2 尚未包含 2026-07-30 活动支持，临时固定到上游已合入提交。 */
-const AUTOWSGR_REQUIREMENT = 'https://github.com/OpenWSGR/AutoWSGR/archive/a38252d3.zip';
-
-// ════════════════════════════════════════
 // 便携版 Python 安装
-// ════════════════════════════════════════
 
-/** 安装/初始化便携版 Python（已随应用打包，仅需确保 pip 就绪） */
+/** 安装或初始化便携版 Python。 */
 export async function installPortablePython(): Promise<{ success: boolean }> {
   const ctx = getCtx();
   setCachedPythonCmd(undefined); // 安装后需重新检测
@@ -27,30 +33,30 @@ export async function installPortablePython(): Promise<{ success: boolean }> {
   const pythonExe = path.join(pythonDir, 'python.exe');
 
   if (!fs.existsSync(pythonExe)) {
-    // 兜底: 如果打包产物缺失 python，尝试在线下载
+    // 打包产物缺失时尝试在线下载。
     ctx.sendProgress('WARNING 未找到内置 Python，尝试在线下载…');
     return downloadPortablePython();
   }
 
-  // 确保 ._pth 配置正确
+  // 确保 ._pth 配置正确。
   ensurePthFile();
 
-  // 检查 pip 是否可用
+  // 检查 pip 是否可用。
   try {
     await execAsync(`"${pythonExe}" -m pip --version`, { windowsHide: true, timeout: 15000 });
     const certFile = await ensureSslCertForPython(pythonExe);
     if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
     ctx.sendProgress('内置 Python + pip 就绪 ✓');
     return { success: true };
-  } catch { /* pip not available, install it */ }
+  } catch { /* pip 不可用时继续安装。 */ }
 
-  // pip 缺失则安装
+  // pip 缺失时执行安装。
   ctx.sendProgress('正在安装 pip…');
   const getPipPath = path.join(ctx.getTempDir(), 'get-pip.py');
   try {
     await execAsync(`curl -sSL -o "${getPipPath}" "https://bootstrap.pypa.io/get-pip.py"`, { windowsHide: true, timeout: 60000 });
     await execAsync(`"${pythonExe}" "${getPipPath}"`, { windowsHide: true, timeout: 120000 });
-    try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+    try { fs.unlinkSync(getPipPath); } catch { /* 忽略清理失败。 */ }
     const certFile = await ensureSslCertForPython(pythonExe);
     if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
     else ctx.sendProgress('WARNING 未检测到 TLS 根证书，后续联网操作可能失败');
@@ -62,7 +68,7 @@ export async function installPortablePython(): Promise<{ success: boolean }> {
   }
 }
 
-/** 兜底: 在线下载便携版 Python（仅在内置 Python 缺失时使用） */
+/** 在内置 Python 缺失时在线下载便携版。 */
 async function downloadPortablePython(): Promise<{ success: boolean }> {
   const ctx = getCtx();
   const pythonDir = path.join(ctx.appRoot(), 'python');
@@ -94,7 +100,7 @@ async function downloadPortablePython(): Promise<{ success: boolean }> {
 
   ensurePthFile();
 
-  // 安装 pip
+  // 安装 pip。
   ctx.sendProgress('正在安装 pip…');
   const getPipPath = path.join(ctx.getTempDir(), 'get-pip.py');
   try {
@@ -108,16 +114,14 @@ async function downloadPortablePython(): Promise<{ success: boolean }> {
     return { success: false };
   }
 
-  try { fs.unlinkSync(zipPath); } catch { /* ignore */ }
-  try { fs.unlinkSync(getPipPath); } catch { /* ignore */ }
+  try { fs.unlinkSync(zipPath); } catch { /* 忽略清理失败。 */ }
+  try { fs.unlinkSync(getPipPath); } catch { /* 忽略清理失败。 */ }
 
   ctx.sendProgress(`Python ${version} 便携版安装完成 ✓`);
   return { success: true };
 }
 
-// ════════════════════════════════════════
 // 更新检查
-// ════════════════════════════════════════
 
 interface UpdateCheckResult {
   gitAvailable: boolean;
@@ -127,7 +131,7 @@ interface UpdateCheckResult {
   remoteUrl: string;
 }
 
-/** 检查 autowsgr 包是否有可用更新 (对比本地已安装版本与 PyPI 最新版) */
+/** 比较本地与 PyPI 的 autowsgr 版本。 */
 export async function checkForUpdates(): Promise<UpdateCheckResult> {
   const result: UpdateCheckResult = {
     gitAvailable: false,
@@ -140,17 +144,17 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
   const pythonCmd = await findPython();
   if (!pythonCmd) return result;
 
-  result.gitAvailable = true; // reuse field: means "can check updates"
+  result.gitAvailable = true; // 复用字段表示可检查更新。
 
   try {
-    // 获取已安装版本
+    // 获取已安装版本。
     const { stdout: localVer } = await execAsync(
       `"${pythonCmd}" -c "import autowsgr; print(autowsgr.__version__)"`,
       { windowsHide: true, env: pipEnv() },
     );
-    result.currentBranch = localVer.trim(); // reuse field: current version
+    result.currentBranch = localVer.trim(); // 复用字段保存当前版本。
 
-    // 获取 PyPI 最新版本
+    // 获取 PyPI 最新版本。
     const { stdout: pipOut } = await execAsync(
       `"${pythonCmd}" -m pip index versions autowsgr`,
       { windowsHide: true, timeout: 15000, env: pipEnv() },
@@ -160,40 +164,96 @@ export async function checkForUpdates(): Promise<UpdateCheckResult> {
       const latestVer = m[1].replace(/,$/,'');
       result.hasUpdates = latestVer !== result.currentBranch;
     }
-  } catch { /* ignore */ }
+  } catch { /* 检查失败时返回默认结果。 */ }
 
   return result;
 }
 
-// ════════════════════════════════════════
 // 依赖安装与更新
-// ════════════════════════════════════════
 
-/** 自动安装依赖 (pip install autowsgr)，始终安装到项目目录，不动全局 */
+export interface DependencyInstallPlan {
+  buildArgs: string[];
+  toolArgs: string[];
+  backendArgs: string[];
+}
+
+/** 生成与运行环境一致的 pip 参数，供回归测试直接验证。 */
+export function buildDependencyInstallPlan(
+  environment: PythonEnvironment,
+  backendRequirement: string,
+): DependencyInstallPlan {
+  const targetArgs = installTargetArgs(environment);
+  return {
+    buildArgs: [
+      '-m', 'pip', 'install',
+      '--upgrade',
+      ...targetArgs,
+      'setuptools',
+      'hatchling',
+      'hatch-vcs',
+    ],
+    toolArgs: [
+      '-m', 'pip', 'install',
+      '--upgrade',
+      ...targetArgs,
+      ...SHIP_LIBRARY_REQUIREMENTS,
+      ...BACKEND_RUNTIME_REQUIREMENTS,
+    ],
+    backendArgs: [
+      '-m', 'pip', 'install',
+      '--upgrade',
+      '--no-build-isolation',
+      ...targetArgs,
+      backendRequirement,
+    ],
+  };
+}
+
+/** 自动安装依赖；安装目标由统一 Python 环境描述决定。 */
 export async function installDependencies(pythonCmd: string): Promise<{ success: boolean; output: string }> {
   const ctx = getCtx();
-  // 安装后环境变化，清除标记以便下次重新检查
-  try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* ignore */ }
+  let environment: PythonEnvironment;
+  try {
+    environment = resolvePythonEnvironment(pythonCmd);
+  } catch (error) {
+    return {
+      success: false,
+      output: error instanceof Error ? error.message : String(error),
+    };
+  }
+  const backendRequirement = environment.backendRoot
+    ?? MANAGED_AUTOWSGR_REQUIREMENT;
+  const installPlan = buildDependencyInstallPlan(
+    environment,
+    backendRequirement,
+  );
+
+  // 安装后清除环境标记，触发下次完整检查。
+  try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* 忽略清理失败。 */ }
 
   const certFile = await ensureSslCertForPython(pythonCmd);
   if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
   else ctx.sendProgress('WARNING 未检测到 TLS 根证书，后续联网操作可能失败');
 
-  // 确保 pip 可用
+  // 确保 pip 可用。
   if (!(await ensurePip(pythonCmd))) {
     return { success: false, output: 'pip 安装失败，无法安装依赖' };
   }
 
   const cwd = ctx.appRoot();
-  const targetDir = localSitePackages();
-  if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
+  if (
+    environment.installTarget
+    && !fs.existsSync(environment.installTarget)
+  ) {
+    fs.mkdirSync(environment.installTarget, { recursive: true });
+  }
 
   const runPip = (args: string[]): Promise<{ code: number; output: string }> => new Promise((resolve) => {
     const proc = spawn(pythonCmd, args, {
       cwd,
       windowsHide: true,
       stdio: 'pipe',
-      env: pipEnv(),
+      env: buildPythonProcessEnv(environment),
     });
 
     let output = '';
@@ -212,89 +272,25 @@ export async function installDependencies(pythonCmd: string): Promise<{ success:
   });
 
   ctx.sendProgress('正在安装后端构建依赖…');
-  const buildDeps = await runPip([
-    '-m', 'pip', 'install',
-    '--upgrade',
-    '--target', targetDir,
-    'setuptools',
-    'hatchling',
-    'hatch-vcs',
-  ]);
+  const buildDeps = await runPip(installPlan.buildArgs);
   if (buildDeps.code !== 0) {
     ctx.sendProgress('ERROR 后端构建依赖安装失败');
     return { success: false, output: buildDeps.output.slice(-500) };
   }
 
-  ctx.sendProgress('正在安装后端依赖到项目目录…');
-  const install = await runPip([
-      '-m', 'pip', 'install',
-      '--upgrade',
-      '--no-build-isolation',
-      '--target', targetDir,
-      AUTOWSGR_REQUIREMENT,
-  ]);
+  ctx.sendProgress('正在安装工具与后端运行依赖…');
+  const toolDeps = await runPip(installPlan.toolArgs);
+  if (toolDeps.code !== 0) {
+    ctx.sendProgress('ERROR 舰船资料库更新依赖安装失败');
+    return { success: false, output: toolDeps.output.slice(-500) };
+  }
+
+  const installLocation = environment.installTarget
+    ? 'GUI 项目目录'
+    : '当前 Python 环境';
+  ctx.sendProgress(`正在安装后端依赖到${installLocation}…`);
+  const install = await runPip(installPlan.backendArgs);
   if (install.code === 0) ctx.sendProgress('后端依赖安装完成 ✓');
   else ctx.sendProgress('ERROR 依赖安装失败');
   return { success: install.code === 0, output: install.output.slice(-500) };
-}
-
-/** 更新 autowsgr 包（仅升级 autowsgr 本体，不级联重装所有依赖） */
-export async function pullUpdates(): Promise<{ success: boolean; output: string }> {
-  const ctx = getCtx();
-  // 更新后清除环境标记
-  try { fs.unlinkSync(ENV_READY_MARKER()); } catch { /* ignore */ }
-  const pythonCmd = await findPython();
-  if (!pythonCmd) return { success: false, output: '找不到 Python' };
-
-  const certFile = await ensureSslCertForPython(pythonCmd);
-  if (certFile) ctx.sendProgress(`TLS 证书已就绪: ${certFile}`);
-  else ctx.sendProgress('WARNING 未检测到 TLS 根证书，后续联网操作可能失败');
-
-  try {
-    await execAsync(
-      `"${pythonCmd}" -m pip install --upgrade --target "${localSitePackages()}" hatchling hatch-vcs`,
-      { cwd: ctx.appRoot(), windowsHide: true, timeout: 120000, env: pipEnv() },
-    );
-  } catch (e) {
-    const output = e instanceof Error ? e.message : String(e);
-    return { success: false, output: `活动热修复构建依赖安装失败: ${output}` };
-  }
-
-  return new Promise((resolve) => {
-    const targetDir = localSitePackages();
-    if (!fs.existsSync(targetDir)) fs.mkdirSync(targetDir, { recursive: true });
-
-    // 先删除旧版 autowsgr，再重新安装（不带 --upgrade 避免级联更新依赖）
-    try {
-      for (const entry of fs.readdirSync(targetDir)) {
-        if (entry === 'autowsgr' || entry.startsWith('autowsgr-')) {
-          fs.rmSync(path.join(targetDir, entry), { recursive: true, force: true });
-        }
-      }
-    } catch { /* ignore cleanup errors */ }
-
-    const proc = spawn(pythonCmd, [
-      '-m', 'pip', 'install',
-      '--target', targetDir,
-      '--no-build-isolation',
-      '--no-deps',
-      '-i', 'https://pypi.tuna.tsinghua.edu.cn/simple',
-      '--trusted-host', 'pypi.tuna.tsinghua.edu.cn',
-      AUTOWSGR_REQUIREMENT,
-    ], {
-      cwd: ctx.appRoot(),
-      windowsHide: true,
-      stdio: 'pipe',
-      env: pipEnv(),
-    });
-    let output = '';
-    proc.stdout?.on('data', (d: Buffer) => { output += d.toString(); });
-    proc.stderr?.on('data', (d: Buffer) => { output += d.toString(); });
-    proc.on('close', (code) => {
-      resolve({ success: code === 0, output: output.slice(-500) });
-    });
-    proc.on('error', (err) => {
-      resolve({ success: false, output: err.message });
-    });
-  });
 }

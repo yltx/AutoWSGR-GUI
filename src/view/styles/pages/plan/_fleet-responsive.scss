@@ -1,0 +1,156 @@
+@media (max-width: 620px) {
+  .fleet-team-loader-content {
+    grid-template-columns: 1fr;
+    height: min(650px, calc(100vh - 230px));
+    overflow-y: auto;
+  }
+
+  .fleet-team-loader-list {
+    min-height: 120px;
+    max-height: 150px;
+  }
+
+  .fleet-team-loader-preview-column {
+    min-height: 420px;
+  }
+
+  .fleet-team-loader-tools {
+    grid-template-columns: 1fr;
+  }
+}
+
+@container (max-width: 620px) {
+  .fleet-planner-toolbar {
+    flex-wrap: wrap;
+    row-gap: 3px;
+    overflow-x: hidden;
+    white-space: normal;
+  }
+
+  .fleet-toolbar-level {
+    flex: 0 0 100%;
+  }
+}
+
+@container (max-width: 420px) {
+  .fleet-library-header {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .fleet-library-title span {
+    display: none;
+  }
+
+  .fleet-library-search-actions {
+    justify-self: stretch;
+  }
+
+  .fleet-library-filter-triggers {
+    flex-wrap: nowrap;
+  }
+
+  .fleet-planner-layout .fleet-filter-trigger {
+    flex: 1 1 0;
+    padding-right: 4px;
+    padding-left: 4px;
+  }
+
+  .fleet-filter-trigger-separator,
+  .fleet-filter-trigger-value {
+    display: none;
+  }
+}
+
+@container (min-width: 421px) and (max-width: 620px) {
+  .fleet-library-header {
+    grid-template-columns: minmax(88px, 1fr) minmax(230px, 320px);
+  }
+
+  .fleet-planner-layout .fleet-filter-trigger {
+    padding-right: 4px;
+    padding-left: 4px;
+    font-size: 10px;
+  }
+}
+
+@media (max-height: 600px) {
+  .fleet-planner-layout > .card {
+    padding: 6px;
+  }
+
+  .fleet-formation-heading {
+    min-height: 28px;
+  }
+
+  .fleet-formation-section {
+    padding: 3px;
+  }
+
+  .fleet-backup-section {
+    flex: 0 0 auto;
+    min-height: 216px;
+    margin-top: 4px;
+  }
+
+  .fleet-planner-fleet {
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .fleet-backup-scroll {
+    flex: 0 0 auto;
+    height: 206px;
+  }
+
+  .fleet-formation-heading,
+  .fleet-planner-layout .fleet-formation-tag {
+    margin-bottom: 3px;
+  }
+
+  .fleet-library-header {
+    margin-bottom: 4px;
+  }
+
+  .fleet-filter-popover {
+    max-height: calc(100vh - var(--nav-height) - 100px);
+  }
+}
+
+@media (max-width: 1120px) {
+  .fleet-preset-name-field .input {
+    width: 96px;
+  }
+}
+
+@media (max-height: 800px) {
+  .fleet-formation-section {
+    padding: 3px;
+  }
+
+  .fleet-planner-layout .fleet-formation-tag {
+    margin-bottom: 2px;
+  }
+
+  .fleet-formation-heading {
+    margin-bottom: 2px;
+  }
+
+  .fleet-backup-hint {
+    display: none;
+  }
+
+  .fleet-slot-scroll {
+    padding-bottom: 0;
+  }
+
+  .fleet-slot-rule {
+    gap: 3px 8px;
+    margin-top: 2px;
+    padding: 2px 5px;
+  }
+
+  .fleet-planner-note {
+    display: none;
+  }
+}

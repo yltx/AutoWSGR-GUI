@@ -1,0 +1,446 @@
+      <div class="plan-tab-panel" data-plan-panel="scheme" hidden>
+      <div class="plan-page-layout">
+        <div class="plan-page-main">
+      <!-- ═══ 方案选择器弹窗（多方案模板选择具体方案） ═══ -->
+      <div id="plan-selector-dialog" class="modal-overlay" style="display:none">
+        <div class="modal card" style="max-width:420px">
+          <h3 id="plan-selector-title">选择执行方案</h3>
+          <div id="plan-selector-list" class="plan-selector-list"></div>
+          <div id="plan-selector-times-row" class="form-group" style="display:none;margin-top:8px">
+            <label style="font-size:12px">执行次数</label>
+            <input type="number" id="plan-selector-times" class="input" min="1" max="99" value="1" style="width:80px">
+          </div>
+          <div class="modal-actions">
+            <button class="btn btn-primary" id="btn-plan-selector-confirm" style="display:none">确认</button>
+            <button class="btn" id="btn-plan-selector-cancel">取消</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ 任务预设详情面板 ═══ -->
+      <div id="task-preset-detail" class="card task-preset-panel" style="display:none">
+        <div class="task-preset-header">
+          <h2 id="tp-name"></h2>
+          <button class="btn btn-small btn-close-plan" id="btn-close-preset" title="关闭">✕</button>
+        </div>
+        <span class="badge" id="tp-type-badge"></span>
+
+        <!-- 演习配置 -->
+        <div id="tp-cfg-exercise" class="tp-cfg" style="display:none">
+          <div class="form-group">
+            <label>演习舰队</label>
+            <select id="tp-exercise-fleet" class="input">
+              <option value="1">第 1 舰队</option>
+              <option value="2">第 2 舰队</option>
+              <option value="3">第 3 舰队</option>
+              <option value="4">第 4 舰队</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tp-fleet-enable-ex"> 设置编队舰船</label>
+            <div class="fleet-grid" id="tp-fleet-grid-ex" style="display:none">
+              <div class="fleet-row"><span class="fleet-pos">1</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">2</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">3</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">4</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">5</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">6</span><input type="text" class="input fleet-ship tp-ship-ex" placeholder="舰船名称"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 战役配置 -->
+        <div id="tp-cfg-campaign" class="tp-cfg" style="display:none">
+          <div class="form-group">
+            <label>战役类型</label>
+            <select id="tp-campaign-name" class="input">
+              <option value="困难潜艇">困难潜艇</option>
+              <option value="困难航母">困难航母</option>
+              <option value="困难驱逐">困难驱逐</option>
+              <option value="困难巡洋">困难巡洋</option>
+              <option value="困难战列">困难战列</option>
+              <option value="简单航母">简单航母</option>
+              <option value="简单潜艇">简单潜艇</option>
+              <option value="简单驱逐">简单驱逐</option>
+              <option value="简单巡洋">简单巡洋</option>
+              <option value="简单战列">简单战列</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- 决战配置 -->
+        <div id="tp-cfg-decisive" class="tp-cfg" style="display:none">
+          <div class="form-group">
+            <label>决战章节</label>
+            <select id="tp-decisive-chapter" class="input">
+              <option value="1">第 1 章</option>
+              <option value="2">第 2 章</option>
+              <option value="3">第 3 章</option>
+              <option value="4">第 4 章</option>
+              <option value="5">第 5 章</option>
+              <option value="6">第 6 章</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>level1 舰船（每行一个）</label>
+            <textarea id="tp-decisive-level1" class="input" rows="4" placeholder="每行一个舰船名称"></textarea>
+          </div>
+          <div class="form-group">
+            <label>level2 舰船（每行一个）</label>
+            <textarea id="tp-decisive-level2" class="input" rows="3" placeholder="每行一个舰船名称"></textarea>
+          </div>
+          <div class="form-group">
+            <label>旗舰优先级（每行一个）</label>
+            <textarea id="tp-decisive-flagship" class="input" rows="2" placeholder="每行一个舰船名称"></textarea>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tp-decisive-quick-repair" checked> 启用快修（桶修）</label>
+          </div>
+        </div>
+        <div id="tp-cfg-fight" class="tp-cfg" style="display:none">
+          <div class="form-group">
+            <label>方案文件</label>
+            <input type="text" id="tp-fight-plan" class="input" readonly>
+          </div>
+          <div class="form-group">
+            <label>编队</label>
+            <select id="tp-fight-fleet" class="input">
+              <option value="1">第 1 舰队</option>
+              <option value="2">第 2 舰队</option>
+              <option value="3">第 3 舰队</option>
+              <option value="4">第 4 舰队</option>
+            </select>
+          </div>
+        </div>
+
+        <hr class="card-divider">
+
+        <div class="form-group" id="tp-times-group">
+          <label>执行次数</label>
+          <input type="number" id="tp-times" class="input" min="1" max="99" value="1">
+        </div>
+
+        <div class="plan-actions" style="margin-top:12px">
+          <button class="btn btn-primary btn-small" id="btn-tp-add-queue">加入队列</button>
+          <button class="btn btn-small" id="btn-tp-add-group">加入任务组</button>
+        </div>
+      </div>
+
+      <div id="plan-detail" class="plan-layout" style="display:none">
+        <div class="plan-left">
+          <section id="plan-task-config" class="card plan-config-card plan-task-config">
+            <div class="plan-module-header plan-config-primary-row">
+              <h3>出征配置</h3>
+              <label class="plan-preset-name">
+                <input
+                  type="text"
+                  id="plan-preset-name"
+                  class="input input-inline"
+                  maxlength="100"
+                  placeholder="当前配置名称"
+                  aria-label="出征配置名称"
+                >
+              </label>
+              <label class="plan-map-picker">
+                <select id="plan-edit-chapter" class="input input-inline" aria-label="章节">
+                  <option value="1">第 1 章</option>
+                  <option value="2">第 2 章</option>
+                  <option value="3">第 3 章</option>
+                  <option value="4">第 4 章</option>
+                  <option value="5">第 5 章</option>
+                  <option value="6">第 6 章</option>
+                  <option value="7">第 7 章</option>
+                  <option value="8">第 8 章</option>
+                  <option value="9">第 9 章</option>
+                  <option value="10">第 10 章</option>
+                </select>
+                <select id="plan-edit-map" class="input input-inline" aria-label="关卡">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                </select>
+              </label>
+            </div>
+            <div class="plan-task-config-grid">
+              <div class="plan-config-pair">
+                <label class="plan-task-config-row">
+                  <span>执行次数</span>
+                  <input type="number" id="plan-edit-times" class="input input-inline input-small" value="1" min="1" max="99999">
+                </label>
+                <label class="plan-task-config-row">
+                  <span>轮次间隔</span>
+                  <span class="plan-task-input-unit">
+                    <input type="number" id="plan-edit-gap" class="input input-inline input-small" value="0" min="0" max="9999">
+                    <span>秒</span>
+                  </span>
+                </label>
+              </div>
+              <div class="plan-config-pair">
+                <label class="plan-config-row">
+                  <span>使用舰队</span>
+                  <select id="plan-edit-fleet" class="input input-inline">
+                    <option value="1">第 1 舰队</option>
+                    <option value="2">第 2 舰队</option>
+                    <option value="3">第 3 舰队</option>
+                    <option value="4">第 4 舰队</option>
+                  </select>
+                </label>
+                <label class="plan-config-row">
+                  <span>战况处理</span>
+                  <select id="plan-edit-fight-cond" class="input input-inline">
+                    <option value="1">稳步前进</option>
+                    <option value="2">火力万岁</option>
+                    <option value="3">全力以赴</option>
+                    <option value="4">深入敌阵</option>
+                    <option value="5">以退为进</option>
+                  </select>
+                </label>
+              </div>
+              <div class="plan-config-pair">
+                <label class="plan-config-row">
+                  <span>维修策略</span>
+                  <select id="plan-edit-repair" class="input input-inline">
+                    <option value="1">中破就修</option>
+                    <option value="2">大破才修</option>
+                  </select>
+                </label>
+                <label class="plan-config-row">
+                  <span>维修方式</span>
+                  <select
+                    id="plan-edit-repair-method"
+                    class="input input-inline"
+                    title="泡澡维修会将血量达到 50% 或更低的舰船送入浴室"
+                  >
+                    <option value="quick">快速维修</option>
+                    <option value="bath">泡澡维修</option>
+                  </select>
+                </label>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>战利品检测</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-loot-enabled" aria-label="启用战利品检测">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value" id="plan-edit-loot-fields" hidden>
+                  今日战利品达到
+                  <input type="number" id="plan-edit-loot-ge" class="input input-inline input-small" value="1" min="1" max="50" disabled>
+                  个后停止
+                </span>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>完整采集战果</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-collect-result" aria-label="完整采集战果">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value">
+                  完整读取经验页 / 战绩页（关闭则快速穿行，节省时间）
+                </span>
+              </div>
+              <div class="plan-task-config-row plan-task-stop-row">
+                <span>掉落检测</span>
+                <label class="config-switch plan-task-stop-switch">
+                  <input type="checkbox" id="plan-edit-ship-enabled" aria-label="启用掉落检测">
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+                <span class="plan-task-stop-value" id="plan-edit-ship-fields" hidden>
+                  今日获得舰船达到
+                  <input type="number" id="plan-edit-ship-ge" class="input input-inline input-small" value="1" min="1" max="500" disabled>
+                  艘后停止
+                </span>
+              </div>
+            </div>
+          </section>
+
+          <section id="fleet-preset-section" class="card fleet-preset-card" style="display:none">
+            <div class="plan-module-header fleet-preset-header">
+              <h3 class="fleet-preset-title">编队配置</h3>
+              <button class="btn btn-small btn-primary" id="btn-open-fleet-selector" type="button">选择预设队伍</button>
+            </div>
+            <div id="fleet-binding-list" class="fleet-binding-list"></div>
+          </section>
+        </div>
+
+        <div class="plan-right">
+          <section id="plan-node-route-panel" class="card plan-right-mode plan-node-workspace">
+            <div class="plan-node-preview-frame">
+              <div class="plan-module-header plan-node-preview-header">
+                <h3 class="plan-node-preview-title">节点路线</h3>
+                <div class="plan-actions plan-actions-top">
+                  <button class="btn btn-small" id="btn-new-battle-plan">新建</button>
+                  <button class="btn btn-primary btn-small" id="btn-save-plan">保存</button>
+                  <button class="btn btn-small" id="btn-load-battle-plan">加载</button>
+                </div>
+              </div>
+              <div class="plan-node-preview-body">
+                <div class="node-list" id="node-list"></div>
+                <div
+                  class="plan-editor-area plan-node-info-area"
+                  id="plan-node-info-drawer"
+                  aria-hidden="true"
+                >
+                  <div id="node-editor-placeholder" class="node-editor-placeholder">
+                    <h3>节点信息</h3>
+                    <p>点击地图上的节点查看和编辑</p>
+                  </div>
+                  <div id="node-editor" class="node-editor" style="display:none">
+                <div class="node-editor-header">
+                  <div class="node-info-badge"></div>
+                  <div class="node-editor-title">
+                    <h3>节点 <span id="node-editor-id"></span></h3>
+                    <span class="node-editor-type"></span>
+                  </div>
+                  <div class="node-editor-toggles">
+                    <label class="config-switch node-enabled-switch">
+                      <input type="checkbox" id="node-edit-enabled" checked>
+                      <span class="config-switch-track" aria-hidden="true"></span>
+                      <span>启用节点</span>
+                    </label>
+                    <label class="node-enable-dependent">
+                      <input type="checkbox" id="node-edit-endpoint">
+                      终点节点
+                    </label>
+                  </div>
+                  <div class="node-editor-actions">
+                    <button class="btn btn-primary btn-small" id="btn-node-edit-save">应用</button>
+                    <button class="btn btn-small" id="btn-node-editor-close">✕</button>
+                  </div>
+                </div>
+                <p class="plan-task-hint node-editor-toggle-hint node-enable-dependent">关闭“启用”会从路线中移除；终点的战果判断选择“无”时，经过该节点即认定本轮完成。</p>
+                <div class="form-group node-setting-row node-enable-dependent">
+                  <span class="node-setting-label">迂回规则</span>
+                  <div id="node-edit-detour-group" class="node-inline-options" style="display:none">
+                    <label><input type="checkbox" id="node-edit-detour"> 迂回</label>
+                    <label><input type="checkbox" id="node-edit-sl-when-detour-fails"> 迂回失败 S/L</label>
+                  </div>
+                  <span id="node-edit-detour-help" class="plan-task-hint node-detour-help" style="display:none"></span>
+                </div>
+                <p id="node-editor-non-combat-note" class="plan-task-hint node-enable-dependent" style="display:none;margin:0 0 8px">该节点无战斗配置，仅支持启用或关闭。</p>
+                <div id="node-editor-combat-fields" class="node-enable-dependent">
+                  <div class="form-group node-formation-group" id="node-edit-formation" role="radiogroup" aria-label="阵型">
+                    <span class="node-setting-label">阵型选择</span>
+                    <label><input type="radio" name="node-edit-formation" value="1"> 单纵阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="2" checked> 复纵阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="3"> 轮型阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="4"> 梯形阵</label>
+                    <label><input type="radio" name="node-edit-formation" value="5"> 单横阵</label>
+                  </div>
+                  <div class="form-group node-setting-row node-battle-action-row">
+                    <span class="node-setting-label">战斗动作</span>
+                    <div class="node-inline-options">
+                      <label id="node-edit-proceed-label"><input type="checkbox" id="node-edit-proceed" checked> 前进</label>
+                      <label><input type="checkbox" id="node-edit-night"> 夜战</label>
+                      <label><input type="checkbox" id="node-edit-long-missile-support"> 远程打击</label>
+                      <span class="node-result-options node-enable-dependent" id="node-edit-result-group" role="radiogroup" aria-label="最低战果" hidden>
+                        <span class="node-result-label">战果判断：</span>
+                        <label><input type="radio" name="node-edit-result" value="" checked> 无</label>
+                        <label><input type="radio" name="node-edit-result" value="D"> D</label>
+                        <label><input type="radio" name="node-edit-result" value="C"> C</label>
+                        <label><input type="radio" name="node-edit-result" value="B"> B</label>
+                        <label><input type="radio" name="node-edit-result" value="A"> A</label>
+                        <label><input type="radio" name="node-edit-result" value="S"> S</label>
+                        <label><input type="radio" name="node-edit-result" value="SS"> SS</label>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <div class="node-rules-heading">
+                      <label for="node-edit-rules">索敌规则</label>
+                      <span class="plan-task-hint">
+                        动作支持: <code>detour</code>（迂回）, <code>retreat</code>（撤退）, <code>1-5</code>（指定阵型）；
+                        分隔符支持 <code>,</code> <code>，</code> <code>=></code> <code>-></code>。
+                      </span>
+                    </div>
+                    <textarea id="node-edit-rules" class="input node-rules-textarea" rows="4"
+                      placeholder="格式: 舰种代码 比较符 数量, 动作&#10;比较符: &gt; &gt;= &lt; &lt;= == !=（仅支持英文半角符号，不支持 ≥ ≤）&#10;动作: retreat（撤退）、detour（迂回）、1-5（指定阵型）&#10;示例: CV &gt;= 1, retreat&#10;多条件: DD &gt;= 1 and CL &gt;= 2, 4"></textarea>
+                  </div>
+                </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="fleet-selector-panel" class="card plan-right-mode fleet-selector-panel" hidden>
+            <div class="plan-right-header">
+              <div class="fleet-selector-heading">
+                <h3>选择队伍</h3>
+                <p>拖拽预设卡片到编队管理列表</p>
+              </div>
+              <button
+                class="fleet-selector-close"
+                id="btn-close-fleet-selector"
+                type="button"
+                aria-label="关闭选择队伍"
+                title="关闭"
+              >×</button>
+            </div>
+            <div class="fleet-selector-search-row">
+              <input
+                class="input"
+                id="plan-team-selector-search"
+                type="search"
+                placeholder="搜索预设名称"
+                autocomplete="off"
+              >
+              <span id="plan-team-selector-count">共读取 0 个舰队预设</span>
+            </div>
+            <div class="fleet-team-loader-tools fleet-selector-tools">
+              <div class="fleet-team-loader-system-filter">
+                <span>过滤系统预设</span>
+                <label class="config-switch">
+                  <input type="checkbox" id="plan-team-selector-filter-system" checked>
+                  <span class="config-switch-track" aria-hidden="true"></span>
+                </label>
+              </div>
+              <div class="fleet-team-loader-sort">
+                <span>排序方式</span>
+                <div class="fleet-team-loader-sort-controls">
+                  <div class="fleet-team-loader-sort-fields">
+                    <button
+                      class="fleet-team-loader-sort-option"
+                      data-plan-team-sort-field="name"
+                      type="button"
+                    >名称</button>
+                    <button
+                      class="fleet-team-loader-sort-option active"
+                      data-plan-team-sort-field="modifiedAt"
+                      type="button"
+                    >修改时间</button>
+                  </div>
+                  <label class="fleet-sort-direction">
+                    <span>倒序</span>
+                    <input type="checkbox" id="plan-team-selector-sort-asc">
+                    <span class="fleet-sort-track" aria-hidden="true"></span>
+                    <span>正序</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <div class="fleet-selector-content">
+              <div
+                id="fleet-preset-list"
+                class="fleet-team-loader-list fleet-selector-team-list"
+                aria-label="编队预设列表"
+              ></div>
+              <div class="fleet-team-preview">
+                <div class="fleet-team-preview-heading">
+                  <h3 id="fleet-team-preview-title">编队预览</h3>
+                  <p class="fleet-team-preview-hint">点击主编队位置，查看该位置对应的备选队列。</p>
+                </div>
+                <div id="fleet-team-main-preview" class="fleet-team-main-preview"></div>
+                <h4 id="fleet-team-backup-title">【位置1】的备选队列</h4>
+                <div id="fleet-team-backup-preview" class="fleet-team-backup-preview"></div>
+              </div>
+            </div>
+            <p class="fleet-dialog-status" id="plan-team-selector-status"></p>
+          </section>
+        </div>
+      </div>
+
+        </div>
+      </div>
+      </div>

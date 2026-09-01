@@ -1,4 +1,10 @@
-import type { NodeViewObject, MapNodeType, MapEdgeVO } from '../../types/view';
+/** 绘制作战地图节点与连线并发出节点选择意图。 */
+import type { NodeViewObject, MapNodeType, MapEdgeVO } from '../../types/view.js';
+
+import {
+  captureScrollPosition,
+  restoreScrollPosition,
+} from '../shared/scrollPosition';
 
 export const FORMATION_SHORT: Record<string, string> = {
   '单纵阵': '单纵',
@@ -42,36 +48,94 @@ export function escapeHtml(str: string): string {
 
 export class MapView {
   private nodeListEl: HTMLElement;
+  private mapStageEl: HTMLElement | null = null;
+  private mapAspectRatio = 1;
+  private resizeObserver: ResizeObserver;
+  private disposed = false;
   onNodeClick?: (nodeId: string) => void;
 
   constructor() {
     this.nodeListEl = document.getElementById('node-list')!;
+    this.resizeObserver = new ResizeObserver(
+      () => this.updateMapStageSize(),
+    );
+    this.resizeObserver.observe(this.nodeListEl);
   }
 
-  renderNodes(allNodes: NodeViewObject[] | undefined, selectedNodes: NodeViewObject[], edges: MapEdgeVO[] | undefined): void {
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    this.resizeObserver.disconnect();
+  }
+
+  renderNodes(
+    allNodes: NodeViewObject[] | undefined,
+    selectedNodes: NodeViewObject[],
+    edges: MapEdgeVO[] | undefined,
+    mapAspectRatio?: number,
+  ): void {
+    const scrollPosition = captureScrollPosition(this.nodeListEl);
     this.nodeListEl.innerHTML = '';
+    this.mapStageEl = null;
 
     if (allNodes && edges) {
       this.nodeListEl.classList.add('map-canvas');
+      this.mapAspectRatio =
+        mapAspectRatio
+        && Number.isFinite(mapAspectRatio)
+        && mapAspectRatio > 0
+          ? mapAspectRatio
+          : 1;
+
+      const stage = document.createElement('div');
+      stage.classList.add('map-stage');
+      this.mapStageEl = stage;
+      this.nodeListEl.appendChild(stage);
 
       const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
       svg.classList.add('map-edges');
       svg.setAttribute('viewBox', '0 0 100 100');
       svg.setAttribute('preserveAspectRatio', 'none');
       this.renderEdges(svg, edges);
-      this.nodeListEl.appendChild(svg);
+      stage.appendChild(svg);
 
       const selectedSet = new Set(selectedNodes.map(n => n.id));
       for (const node of allNodes) {
         const chip = this.createMapNode(node, selectedSet.has(node.id));
-        this.nodeListEl.appendChild(chip);
+        stage.appendChild(chip);
       }
+      this.updateMapStageSize();
     } else {
       this.nodeListEl.classList.remove('map-canvas');
       for (const node of selectedNodes) {
         this.nodeListEl.appendChild(this.createNodeChip(node));
       }
     }
+    restoreScrollPosition(this.nodeListEl, scrollPosition);
+  }
+
+  private updateMapStageSize(): void {
+    if (!this.mapStageEl) return;
+
+    const containerWidth = this.nodeListEl.clientWidth;
+    const containerHeight =
+      this.nodeListEl.clientHeight - 10;
+    if (containerWidth <= 0 || containerHeight <= 0) return;
+
+    let stageWidth = containerWidth;
+    let stageHeight =
+      stageWidth / this.mapAspectRatio;
+
+    if (stageHeight > containerHeight) {
+      stageHeight = containerHeight;
+      stageWidth =
+        stageHeight * this.mapAspectRatio;
+    }
+
+    this.mapStageEl.style.width =
+      `${stageWidth}px`;
+    this.mapStageEl.style.height =
+      `${stageHeight}px`;
   }
 
   clearSelection(): void {

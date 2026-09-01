@@ -1,4 +1,5 @@
-import type { LogEntryVO } from '../../types/view';
+/** 追加、筛选并滚动展示运行日志。 */
+import type { LogEntryVO } from '../../types/view.js';
 
 /** 每种日志级别对应的 SVG 图标 (16x16) */
 const LOG_ICONS: Record<string, string> = {
@@ -112,10 +113,10 @@ export class LogView {
       const cls = g === 'SS' ? 'grade-ss' : g === 'S' ? 'grade-s' : g === 'A' ? 'grade-a' : 'grade-low';
       return `评价=<span class="log-grade ${cls}">${g}</span>`;
     });
-    msgHtml = msgHtml.replace(/MVP[:：]\s*(.+?)(?=\s*[,，|]|$)/, (m, name) => {
+    msgHtml = msgHtml.replace(/MVP[:：]\s*(.+?)(?=\s*[,，|]|$)/, (_match, name) => {
       return `<span class="log-mvp">MVP: ${name}</span>`;
     });
-    msgHtml = msgHtml.replace(/掉落[:：]\s*(.+?)(?=\s*$)/, (m, name) => {
+    msgHtml = msgHtml.replace(/掉落[:：]\s*(.+?)(?=\s*$)/, (_match, name) => {
       return `掉落: <span class="log-ship-drop-name">${name}</span>`;
     });
 

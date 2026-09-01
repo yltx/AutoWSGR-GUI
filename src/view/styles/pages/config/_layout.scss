@@ -1,0 +1,177 @@
+/* ═══ 配置页布局 ═══ */
+#page-config {
+  --config-control-height: 28px;
+  --config-text-field-width: 320px;
+  --config-short-field-width: 84px;
+  --config-row-width: 460px;
+
+  height: calc(100vh - var(--nav-height) - var(--page-block-space));
+  overflow: auto;
+
+  input.input:not([type='range']):not([type='color']),
+  select.input {
+    height: var(--config-control-height);
+    min-height: var(--config-control-height);
+    padding: 0 8px;
+    font-size: 11px;
+    line-height: 1.2;
+  }
+
+  select.input {
+    width: var(--config-select-width, 124px);
+    min-width: 0;
+    max-width: min(100%, var(--config-select-width, 124px));
+    flex: 0 1 var(--config-select-width, 124px);
+  }
+
+  textarea.input {
+    padding: 6px 8px;
+    font-size: 11px;
+    line-height: 1.4;
+  }
+
+  .color-picker {
+    width: 36px;
+    height: var(--config-control-height);
+  }
+
+  .accent-label {
+    font-size: 11px;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: var(--config-control-height);
+    min-height: var(--config-control-height);
+    padding: 0 10px;
+    font-size: 11px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+}
+
+.config-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.config-navigation-row {
+  position: sticky;
+  z-index: 20;
+  top: 0;
+  display: flex;
+  align-items: center;
+  width: min(100%, 1080px);
+  gap: 8px;
+  margin: 0 auto 5px;
+  padding: 4px 0;
+  background: var(--bg);
+}
+
+.config-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 3px;
+  padding: 3px;
+  overflow-x: auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.config-tab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  height: var(--config-control-height);
+  padding: 0 12px;
+  border: none;
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-secondary);
+    background: var(--bg-hover);
+  }
+
+  &.active {
+    color: var(--text);
+    background: var(--bg-card-solid);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+  }
+}
+
+.config-tab-description {
+  flex: 1 1 260px;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-list-panels {
+  width: min(100%, 1080px);
+  margin: 0 auto;
+  padding-bottom: 10px;
+
+  [hidden] {
+    display: none !important;
+  }
+}
+
+.config-list-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.config-list-section {
+  overflow: hidden;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.config-section-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-inset);
+  border-bottom: 1px solid var(--border);
+
+  h3 {
+    flex: 0 0 auto;
+    margin: 0;
+    color: var(--text);
+    font-size: 13px;
+  }
+
+  p {
+    flex: 1 1 260px;
+    min-width: 0;
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+}
+
+.config-setting-list {
+  display: flex;
+  flex-direction: column;
+}

@@ -1,3 +1,4 @@
+/** 提供统一日志级别、频道和控制台输出格式。 */
 /**
  * Logger —— 集中式前端日志工具。
  *
@@ -41,13 +42,12 @@ function dateTag(): string {
 class LoggerImpl {
   private opts: LoggerOptions | null = null;
   private buffer: string[] = [];
-  private flushTimer: ReturnType<typeof setInterval> | null = null;
 
   /** 初始化 Logger（应在 AppController.initAsync 中调用一次） */
   init(opts: LoggerOptions): void {
     this.opts = opts;
     // 定时 flush，避免频繁 IPC
-    this.flushTimer = setInterval(() => this.flush(), 2000);
+    setInterval(() => this.flush(), 2000);
   }
 
   info(message: string, channel = 'GUI'): void {
@@ -72,6 +72,11 @@ class LoggerImpl {
     this.log(l, channel, message);
   }
 
+  /** 仅写入日志文件和控制台，不推送到 UI 面板（用于原始输出等不适合展示的内容） */
+  logToFile(message: string): void {
+    this.log('error', 'GUI', message, false);
+  }
+
   /** 手动刷新缓冲区到文件 */
   flush(): void {
     if (!this.opts || this.buffer.length === 0) return;
@@ -83,7 +88,7 @@ class LoggerImpl {
     });
   }
 
-  private log(level: LogLevel, channel: string, message: string): void {
+  private log(level: LogLevel, channel: string, message: string, showInUi = true): void {
     const ts = formatTimestamp();
 
     // 1. 文件
@@ -101,7 +106,7 @@ class LoggerImpl {
     }
 
     // 3. UI
-    this.opts?.uiCallback(level, channel, message);
+    if (showInUi) this.opts?.uiCallback(level, channel, message);
   }
 }
 

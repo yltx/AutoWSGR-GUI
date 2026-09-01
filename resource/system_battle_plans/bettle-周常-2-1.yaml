@@ -1,0 +1,28 @@
+chapter: 2
+map: 1
+selected_nodes: ['0', B, D, F]
+endpoint_nodes: [F]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  B:
+    enemy_rules:
+      - [SS >= 1, 5]
+  D:
+    enemy_rules:
+      - [SS >= 1, 5]
+  F:
+    formation: 2
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+result: S
+fleet_id: 3
+fleet_presets:
+  - name: 4日驱周常队
+  - name: 4德驱周常队

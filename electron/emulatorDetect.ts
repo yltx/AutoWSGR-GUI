@@ -1,6 +1,5 @@
 /**
- * 模拟器自动检测 (Windows 注册表)。
- * 从 main.ts 提取，无外部依赖。
+ * 通过 Windows 注册表检测已安装的模拟器。
  */
 import * as path from 'path';
 import * as fs from 'fs';
@@ -13,13 +12,14 @@ export interface EmulatorDetectResult {
   adbPath: string;
 }
 
+/** 读取注册表中的单个值。 */
 export function readRegistryValue(keyPath: string, valueName: string): string | null {
   try {
     const output = execSync(
       `reg query "${keyPath}" /v "${valueName}"`,
       { encoding: 'utf-8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] },
     );
-    // 输出格式: "    ValueName    REG_SZ    Value"
+    // reg query 输出格式为“名称、类型、值”。
     const match = output.match(new RegExp(`${valueName}\\s+REG_\\w+\\s+(.+)`));
     return match ? match[1].trim() : null;
   } catch {
@@ -27,6 +27,7 @@ export function readRegistryValue(keyPath: string, valueName: string): string | 
   }
 }
 
+/** 读取注册表下的直接子键。 */
 export function readRegistrySubKeys(keyPath: string): string[] {
   try {
     const output = execSync(
@@ -42,10 +43,11 @@ export function readRegistrySubKeys(keyPath: string): string[] {
   }
 }
 
+/** 按 MuMu、雷电、蓝叠的顺序检测模拟器。 */
 export function detectEmulator(): EmulatorDetectResult | null {
   if (process.platform !== 'win32') return null;
 
-  // ── MuMu 12 ──
+  // MuMu 12
   // 用单次 reg query /s 递归搜索 Uninstall 下的 UninstallString，
   // 再从输出中筛选含 MuMu 的条目，避免逐键启动子进程。
   const uninstallBase = 'HKLM\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall';
@@ -54,11 +56,11 @@ export function detectEmulator(): EmulatorDetectResult | null {
       `reg query "${uninstallBase}" /s /v UninstallString`,
       { encoding: 'utf-8', windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'], timeout: 5000 },
     );
-    // 输出格式: 键路径行 + 空行 + "    UninstallString    REG_SZ    value" + 空行 ...
+    // 输出由注册表键路径和 UninstallString 值交替组成。
     for (const line of output.split('\n')) {
       const trimmed = line.trim();
       if (trimmed.startsWith('HKEY')) {
-        // 键路径行: 当前实现不需要使用具体键名, 仅保留以便未来扩展或调试
+        // 当前检测不需要具体键名。
         continue;
       }
       if (/UninstallString/i.test(trimmed) && /MuMu/i.test(trimmed)) {
@@ -80,9 +82,9 @@ export function detectEmulator(): EmulatorDetectResult | null {
         }
       }
     }
-  } catch { /* Uninstall 注册表扫描失败, 继续检测其他模拟器 */ }
+  } catch { /* 扫描失败时继续检测其他模拟器。 */ }
 
-  // ── 雷电模拟器 ──
+  // 雷电模拟器
   try {
     const leidianSubs = readRegistrySubKeys('HKLM\\SOFTWARE\\leidian');
     for (const subKey of leidianSubs) {
@@ -100,9 +102,9 @@ export function detectEmulator(): EmulatorDetectResult | null {
         }
       }
     }
-  } catch { /* 未安装 */ }
+  } catch { /* 未安装时继续检测。 */ }
 
-  // ── 蓝叠 ──
+  // 蓝叠
   for (const regKey of ['HKLM\\SOFTWARE\\BlueStacks_nxt_cn', 'HKLM\\SOFTWARE\\BlueStacks_nxt']) {
     const installDir = readRegistryValue(regKey, 'InstallDir');
     if (installDir) {

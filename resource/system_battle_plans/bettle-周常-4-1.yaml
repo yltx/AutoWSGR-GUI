@@ -1,0 +1,39 @@
+chapter: 4
+map: 1
+selected_nodes: ['0', A, B, C, D, F, G, I]
+endpoint_nodes: [I]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 2, night: false, proceed: true}
+node_args:
+  A:
+    enemy_rules:
+      - [SS >= 1, 5]
+  B:
+    enemy_rules:
+      - [SS >= 1, 5]
+  C:
+    enemy_rules:
+      - [SS >= 1, 5]
+  D:
+    enemy_rules:
+      - [SS >= 1, 5]
+  F:
+    enemy_rules:
+      - [SS >= 1, 5]
+  G:
+    enemy_rules:
+      - [SS >= 1, 5]
+  I:
+    formation: 4
+    night: true
+    long_missile_support: false
+    proceed: true
+    detour: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 3
+fleet_id: 3
+result: S
+fleet_presets:
+  - name: 85工程+3德驱队

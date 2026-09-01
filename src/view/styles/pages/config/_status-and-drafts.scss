@@ -1,0 +1,145 @@
+/* ═══ ADB 状态指示器 ═══ */
+.adb-status {
+  display: inline-block;
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin-left: 8px;
+  vertical-align: middle;
+}
+.adb-status-online {
+  color: var(--success);
+  background: var(--success-bg);
+}
+.adb-status-offline {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+.adb-status-unknown {
+  color: var(--text-muted);
+  background: var(--bg-inset);
+}
+
+.config-hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 2px 0;
+  line-height: 1.25;
+}
+
+.config-draft-warning {
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  color: var(--warning);
+  background: var(--warning-bg);
+  border-radius: var(--radius);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.config-draft-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 8px;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 9px 10px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+
+  strong {
+    color: var(--text);
+    font-size: 12px;
+  }
+
+  span {
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1.4;
+  }
+}
+.intensify-material-types {
+  min-height: 104px;
+}
+
+.intensify-protected-ships {
+  min-height: 64px;
+  resize: vertical;
+}
+
+.intensify-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.intensify-status {
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--surface-soft);
+}
+
+.intensify-status-ok {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.intensify-status-error {
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.intensify-occurrences,
+.intensify-candidate-preview {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-inset);
+
+  &[hidden] {
+    display: none;
+  }
+}
+
+.intensify-occurrence-group {
+  display: grid;
+  gap: 6px;
+}
+
+.intensify-occurrence-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.intensify-occurrence-item {
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  background: var(--surface);
+  text-align: left;
+}
+
+.intensify-occurrence-item.is-selected {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+.intensify-candidate-preview p {
+  margin: 0;
+}

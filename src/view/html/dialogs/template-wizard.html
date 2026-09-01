@@ -1,0 +1,219 @@
+  <!-- 模板创建向导 -->
+  <div id="template-wizard" class="modal-overlay" style="display:none">
+    <div class="modal card wizard-modal">
+      <div class="wizard-header">
+        <h3 id="wizard-title">创建模板</h3>
+        <div class="wizard-steps">
+          <div class="wizard-step active" data-step="1">
+            <span class="wizard-step-num">1</span>
+            <span class="wizard-step-label">选择类型</span>
+          </div>
+          <div class="wizard-step-line"></div>
+          <div class="wizard-step" data-step="2">
+            <span class="wizard-step-num">2</span>
+            <span class="wizard-step-label">配置</span>
+          </div>
+          <div class="wizard-step-line"></div>
+          <div class="wizard-step" data-step="3">
+            <span class="wizard-step-num">3</span>
+            <span class="wizard-step-label">命名</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤1：选择模板类型 -->
+      <div class="wizard-page" id="wizard-step-1">
+        <div class="template-type-grid">
+          <label class="template-type-card">
+            <input type="radio" name="tpl-type" value="normal_fight" checked>
+            <div class="template-type-inner">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M14.5 3a.5.5 0 0 1 .5.5v9a.5.5 0 0 1-.5.5h-13a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h13zm-13-1A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2h-13z"/><path d="M7 5.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0zM7 9.5a.5.5 0 0 1 .5-.5h5a.5.5 0 0 1 0 1h-5a.5.5 0 0 1-.5-.5zm-1.496-.854a.5.5 0 0 1 0 .708l-1.5 1.5a.5.5 0 0 1-.708 0l-.5-.5a.5.5 0 1 1 .708-.708l.146.147 1.146-1.147a.5.5 0 0 1 .708 0z"/></svg>
+              <span>普通出击</span>
+              <small>选择地图方案文件</small>
+            </div>
+          </label>
+          <label class="template-type-card">
+            <input type="radio" name="tpl-type" value="event_fight">
+            <div class="template-type-inner">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0a.75.75 0 0 1 .67.415l1.64 3.28 3.623.527a.75.75 0 0 1 .416 1.279l-2.621 2.555.619 3.608a.75.75 0 0 1-1.088.79L8 10.742l-3.24 1.703a.75.75 0 0 1-1.088-.79l.619-3.608L1.67 5.492a.75.75 0 0 1 .416-1.279l3.623-.527 1.64-3.28A.75.75 0 0 1 8 0z"/></svg>
+              <span>活动出击</span>
+              <small>选择活动方案文件</small>
+            </div>
+          </label>
+          <label class="template-type-card">
+            <input type="radio" name="tpl-type" value="exercise">
+            <div class="template-type-inner">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M11 6.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zm-3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zm-5 3a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1zm3 0a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM1 4v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V4H1z"/></svg>
+              <span>演习</span>
+              <small>选择演习舰队</small>
+            </div>
+          </label>
+          <label class="template-type-card">
+            <input type="radio" name="tpl-type" value="campaign">
+            <div class="template-type-inner">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M3.5 0a.5.5 0 0 1 .5.5V1h8V.5a.5.5 0 0 1 1 0V1h1a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2h1V.5a.5.5 0 0 1 .5-.5zM2 2a1 1 0 0 0-1 1v1h14V3a1 1 0 0 0-1-1H2zm13 3H1v9a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V5z"/><path d="M11 7.5a.5.5 0 0 1 .5-.5h1a.5.5 0 0 1 .5.5v1a.5.5 0 0 1-.5.5h-1a.5.5 0 0 1-.5-.5v-1z"/></svg>
+              <span>战役</span>
+              <small>选择战役类型</small>
+            </div>
+          </label>
+          <label class="template-type-card" style="display:none">
+            <input type="radio" name="tpl-type" value="decisive">
+            <div class="template-type-inner">
+              <svg width="24" height="24" viewBox="0 0 16 16" fill="currentColor"><path d="M2.5.5A.5.5 0 0 1 3 0h10a.5.5 0 0 1 .5.5c0 .538-.012 1.05-.034 1.536a3 3 0 1 1-1.133 5.89c-.79 1.865-1.878 2.777-2.833 3.011v2.173l1.425.356c.194.048.377.135.537.255L13.3 15.1a.5.5 0 0 1-.3.9H3a.5.5 0 0 1-.3-.9l1.838-1.379c.16-.12.343-.207.537-.255L6.5 13.11v-2.173c-.955-.234-2.043-1.146-2.833-3.012a3 3 0 1 1-1.132-5.89A33.076 33.076 0 0 1 2.5.5zm.099 2.54a2 2 0 0 0 .72 3.935c-.333-1.398-.588-2.797-.72-3.935zm10.083 3.935a2 2 0 0 0 .72-3.935c-.133 1.138-.388 2.537-.72 3.935zM3.504 1c.007.517.026 1.006.056 1.469.13 2.028.457 3.546.87 4.667C5.294 9.48 6.484 10 7 10a.5.5 0 0 1 .5.5v2.61a1 1 0 0 1-.757.97l-1.426.356a.5.5 0 0 0-.179.085L4.5 15h7l-.638-.479a.501.501 0 0 0-.18-.085l-1.425-.356a1 1 0 0 1-.757-.97V10.5A.5.5 0 0 1 9 10c.516 0 1.706-.52 2.57-2.864.413-1.12.74-2.64.87-4.667.03-.463.049-.952.056-1.469H3.504z"/></svg>
+              <span>决战</span>
+              <small>配置决战章节</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- 步骤2：类型专属配置 -->
+      <div class="wizard-page" id="wizard-step-2" style="display:none">
+        <!-- 普通出击 -->
+        <div class="wizard-config" id="wizard-cfg-normal_fight">
+          <div class="form-group">
+            <label>可选方案文件 <small style="color:var(--text-muted)">(可添加多个，使用时选择)</small></label>
+            <div id="tpl-plan-list" class="tpl-plan-list"></div>
+            <div class="input-row" style="margin-top:4px">
+              <button class="btn btn-small" id="btn-tpl-browse-plan">+ 浏览添加</button>
+              <button class="btn btn-small" id="btn-tpl-scan-plans">从方案目录扫描</button>
+            </div>
+            <!-- 向后兼容：隐藏的单路径输入 -->
+            <input type="hidden" id="tpl-plan-path">
+          </div>
+          <div class="form-group">
+            <label>编队</label>
+            <select id="tpl-fleet" class="input">
+              <option value="1">第 1 舰队</option>
+              <option value="2">第 2 舰队</option>
+              <option value="3">第 3 舰队</option>
+              <option value="4">第 4 舰队</option>
+            </select>
+            <p class="config-hint" style="margin:4px 0 0;font-size:11px">第1分队可自动改编，但槽位0必须配置舰船。</p>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tpl-fleet-enable-nf"> 设置编队舰船</label>
+            <div class="fleet-grid" id="tpl-fleet-grid-nf" style="display:none">
+              <div class="fleet-row"><span class="fleet-pos">1</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">2</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">3</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">4</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">5</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">6</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 演习 -->
+        <div class="wizard-config" id="wizard-cfg-exercise" style="display:none">
+          <div class="form-group">
+            <label>演习舰队</label>
+            <select id="tpl-exercise-fleet" class="input">
+              <option value="1">第 1 舰队</option>
+              <option value="2">第 2 舰队</option>
+              <option value="3">第 3 舰队</option>
+              <option value="4">第 4 舰队</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tpl-fleet-enable-ex"> 设置编队舰船</label>
+            <div class="fleet-grid" id="tpl-fleet-grid-ex" style="display:none">
+              <div class="fleet-row"><span class="fleet-pos">1</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">2</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">3</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">4</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">5</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">6</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 战役 -->
+        <div class="wizard-config" id="wizard-cfg-campaign" style="display:none">
+          <div class="form-group">
+            <label>战役类型</label>
+            <select id="tpl-campaign-type" class="input">
+              <option value="困难潜艇">困难潜艇</option>
+              <option value="困难航母">困难航母</option>
+              <option value="困难驱逐">困难驱逐</option>
+              <option value="困难巡洋">困难巡洋</option>
+              <option value="困难战列">困难战列</option>
+              <option value="简单航母">简单航母</option>
+              <option value="简单潜艇">简单潜艇</option>
+              <option value="简单驱逐">简单驱逐</option>
+              <option value="简单巡洋">简单巡洋</option>
+              <option value="简单战列">简单战列</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tpl-fleet-enable-cp"> 设置编队舰船</label>
+            <div class="fleet-grid" id="tpl-fleet-grid-cp" style="display:none">
+              <div class="fleet-row"><span class="fleet-pos">1</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">2</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">3</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">4</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">5</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+              <div class="fleet-row"><span class="fleet-pos">6</span><input type="text" class="input fleet-ship" placeholder="舰船名称"></div>
+            </div>
+          </div>
+        </div>
+        <!-- 决战 -->
+        <div class="wizard-config" id="wizard-cfg-decisive" style="display:none">
+          <div class="form-group">
+            <label>章节</label>
+            <select id="tpl-decisive-chapter" class="input">
+              <option value="1">第 1 章</option>
+              <option value="2">第 2 章</option>
+              <option value="3">第 3 章</option>
+              <option value="4">第 4 章</option>
+              <option value="5">第 5 章</option>
+              <option value="6">第 6 章</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>level1 舰船 (每行一个)</label>
+            <textarea id="tpl-decisive-level1" class="input" rows="3" placeholder="例：胡德&#10;纳尔逊"></textarea>
+          </div>
+          <div class="form-group">
+            <label>level2 舰船 (每行一个)</label>
+            <textarea id="tpl-decisive-level2" class="input" rows="3" placeholder="例：俾斯麦"></textarea>
+          </div>
+          <div class="form-group">
+            <label>旗舰优先级 (每行一个)</label>
+            <textarea id="tpl-decisive-flagship" class="input" rows="2" placeholder="例：胡德&#10;纳尔逊"></textarea>
+          </div>
+          <div class="form-group">
+            <label><input type="checkbox" id="tpl-decisive-quick-repair" checked> 启用快修（桶修）</label>
+            <small style="color:var(--text-muted)">开启后在决战中自动使用快速修理工具修复受损舰船</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- 步骤3：命名与默认参数 -->
+      <div class="wizard-page" id="wizard-step-3" style="display:none">
+        <div class="form-group">
+          <label>模板名称</label>
+          <input type="text" id="tpl-name" class="input" placeholder="例：7-4捞胖次">
+        </div>
+        <div class="form-group">
+          <label>默认执行次数</label>
+          <input type="number" id="tpl-default-times" class="input" value="1" min="1" max="999">
+        </div>
+        <div class="form-group" id="tpl-stop-condition-group">
+          <label>停止条件 (可选)</label>
+          <div class="input-row">
+            <label style="font-size:12px;white-space:nowrap">战利品 ≥</label>
+            <input type="number" id="tpl-stop-loot" class="input" min="-1" value="-1" style="width:80px">
+            <label style="font-size:12px;white-space:nowrap">舰船 ≥</label>
+            <input type="number" id="tpl-stop-ship" class="input" min="-1" value="-1" style="width:80px">
+          </div>
+          <small style="color:var(--text-muted)">设为 -1 表示不启用</small>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn" id="btn-wizard-prev" style="display:none">上一步</button>
+        <div style="flex:1"></div>
+        <button class="btn" id="btn-wizard-cancel">取消</button>
+        <button class="btn btn-primary" id="btn-wizard-next">下一步</button>
+      </div>
+    </div>
+  </div>

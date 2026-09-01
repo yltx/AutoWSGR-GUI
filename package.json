@@ -1,22 +1,48 @@
 {
   "name": "wsgrgui",
-  "version": "1.4.4",
-  "description": "AutoWSGR 图形界面 — MVP",
+  "version": "2.1.1",
+  "description": "AutoWSGR YAML 管理与自动化桌面界面",
   "main": "dist/electron/main.js",
   "scripts": {
+    "build:html": "node scripts/build-view-html.js",
     "build:css": "sass src/view/styles/main.scss src/view/styles/styles.css --no-source-map --style=expanded",
-    "clean": "node -e \"fs.rmSync('dist/src',{recursive:true,force:true});fs.rmSync('dist/electron',{recursive:true,force:true});console.log('dist cleaned')\" ",
-    "build": "npm run clean && npm run build:css && tsc && node scripts/bundle.js",
+    "clean": "node -e \"fs.rmSync('dist',{recursive:true,force:true});console.log('dist cleaned')\"",
+    "clean:release": "node -e \"fs.rmSync('release',{recursive:true,force:true});console.log('release cleaned')\"",
+    "build": "npm run clean && npm run build:html && npm run build:css && tsc && node scripts/bundle.js",
     "typecheck": "tsc --noEmit",
     "test": "npm run build && node scripts/test-ship-library-contract.js && node scripts/test-scheduler-round-boundary.js",
+    "sync:fleet-types": "node scripts/sync-fleet-ship-types.js",
+    "check:fleet-types": "node scripts/sync-fleet-ship-types.js --check",
+    "sync:maps": "node scripts/sync-map-resources.js",
+    "check:maps": "node scripts/sync-map-resources.js --check",
+    "test:build": "npm run build && node scripts/tests/test-build-output-contract.js && node scripts/build-view-html.js --check && node scripts/tests/test-renderer-dom-contract.js && node scripts/tests/test-renderer-architecture.js",
+    "test:migrations": "npm run build && node scripts/tests/test-migrations.js",
+    "test:api-contract": "npm run check:fleet-types && npm run build && node scripts/tests/test-api-contract.js",
+    "test:fleet-domain": "npm run build && node scripts/tests/test-fleet-domain.mjs",
+    "test:plan-management-delete": "node scripts/tests/test-plan-management-delete-scope.mjs",
+    "test:scheduler-domain": "npm run build && node scripts/tests/test-scheduler-domain.mjs",
+    "test:daily-sortie-stats": "node scripts/tests/test-daily-sortie-stats.mjs",
+    "test:ship-library-updater": "node scripts/tests/run-python-unittest.js tools/ship_library \"test_*.py\" \"ship library updater\"",
+    "test:ocr-log-analyzer": "node scripts/tests/run-python-unittest.js tools \"test_ocr_log_analyzer.py\" \"OCR log analyzer\"",
+    "test:map-intel": "node scripts/tests/run-python-unittest.js tools/map_intel \"test_*.py\" \"map intelligence\"",
+    "test:event-resources": "node scripts/tests/test-event-20260730-resources.js && node scripts/tests/test-event-map-loader.js",
+    "test:settings": "npm run build && electron scripts/tests/test-settings-persistence.js",
+    "test:architecture-boundaries": "npm run build && node scripts/tests/test-renderer-architecture.js",
+    "test:renderer-contract": "node scripts/build-view-html.js --check && node scripts/tests/test-renderer-dom-contract.js",
+    "test:main-services": "npm run build && node scripts/tests/test-main-services.js",
+    "test:main-ipc": "npm run build && node scripts/tests/test-main-ipc.js",
+    "test:python-environment": "npm run build && node scripts/tests/test-python-environment.js",
+    "test:backend-distribution": "npm run build && node scripts/tests/test-backend-distribution.js",
+    "test:release-package": "node scripts/tests/test-release-package.js",
     "start": "chcp 65001 >nul && npm run build && electron .",
-    "dev": "chcp 65001 >nul && npm run clean && npm run build:css && tsc && node scripts/bundle.js && electron .",
+    "dev": "chcp 65001 >nul && npm run clean && npm run build:html && npm run build:css && tsc && node scripts/bundle.js && electron .",
     "prepare-python": "node scripts/prepare-python.js",
     "prepare-adb": "node scripts/prepare-adb.js",
-    "pack": "npm run build && electron-builder --dir",
-    "dist": "npm run prepare-python && npm run prepare-adb && npm run build && electron-builder"
+    "pack": "npm run clean:release && npm run build && electron-builder --dir --config build/electron-builder.release.cjs --publish never",
+    "dist": "npm run clean:release && npm run prepare-python && npm run prepare-adb && npm run build && electron-builder --config build/electron-builder.release.cjs --publish never"
   },
   "devDependencies": {
+    "@electron/asar": "^3.4.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^22.0.0",
     "electron": "^33.0.0",
@@ -27,7 +53,8 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "jszip": "^3.10.1"
   },
   "build": {
     "appId": "com.autowsgr.gui",
@@ -36,9 +63,11 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
-      "src/view/**/*",
-      "scripts/**/*",
+      "dist/electron/**/*",
+      "dist/src/shared/**/*",
+      "dist/renderer.bundle.js",
+      "src/view/index.html",
+      "src/view/styles/styles.css",
       "!node_modules/.cache"
     ],
     "extraResources": [
@@ -46,14 +75,13 @@
         "from": "resource",
         "to": "resource",
         "filter": [
-          "**/*"
-        ]
-      },
-      {
-        "from": "plans",
-        "to": "plans",
-        "filter": [
-          "**/*"
+          "**/*",
+          "!**/__pycache__/**/*",
+          "!**/*.py[cod]",
+          "!builtin_plans/**/*",
+          "!user_battle_plans/**/*",
+          "!user_daily_plans/**/*",
+          "!user_team_plans/**/*"
         ]
       },
       {
@@ -63,6 +91,14 @@
       {
         "from": "debug_deps.bat",
         "to": "debug_deps.bat"
+      },
+      {
+        "from": "tools/ship_library",
+        "to": "tools/ship_library",
+        "filter": [
+          "update_ship_library.py",
+          "native_fleet_types.py"
+        ]
       }
     ],
     "extraFiles": [
@@ -115,7 +151,8 @@
     "publish": {
       "provider": "github",
       "owner": "yltx",
-      "repo": "AutoWSGR-GUI"
+      "repo": "AutoWSGR-GUI",
+      "channel": "latest"
     }
   }
 }

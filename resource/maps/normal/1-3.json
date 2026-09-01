@@ -1,0 +1,85 @@
+{
+  "0": {
+    "type": "Start",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.239,
+      0.748
+    ],
+    "next": [
+      "A",
+      "B"
+    ]
+  },
+  "A": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.349,
+      0.591
+    ],
+    "next": [
+      "C"
+    ]
+  },
+  "B": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.452,
+      0.803
+    ],
+    "next": [
+      "C",
+      "D"
+    ]
+  },
+  "C": {
+    "type": "Resource",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.494,
+      0.56
+    ],
+    "next": [
+      "D",
+      "E"
+    ]
+  },
+  "D": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.618,
+      0.697
+    ],
+    "next": [
+      "F"
+    ]
+  },
+  "E": {
+    "type": "Normal",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.442,
+      0.335
+    ],
+    "next": []
+  },
+  "F": {
+    "type": "Boss",
+    "detour": false,
+    "night": false,
+    "position": [
+      0.655,
+      0.397
+    ],
+    "next": []
+  }
+}

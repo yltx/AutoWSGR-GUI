@@ -1,0 +1,35 @@
+  <!-- 首次运行引导向导 -->
+  <div id="setup-wizard" class="modal-overlay" style="display:none">
+    <div class="modal card" style="max-width:460px">
+      <h3>欢迎使用 AutoWSGR GUI</h3>
+      <p style="margin:0 0 16px;font-size:13px;color:var(--text-secondary)">
+        首次运行需要配置模拟器连接信息。请确认以下设置后点击「确定」开始使用。
+      </p>
+      <div class="form-group">
+        <label>模拟器类型</label>
+        <select id="setup-emu-type" class="input">
+          <option value="雷电">雷电</option>
+          <option value="蓝叠">蓝叠</option>
+          <option value="MuMu">MuMu</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ADB 端口 (serial) <span style="color:var(--accent)">*必填</span></label>
+        <div class="input-row">
+          <input type="text" id="setup-emu-serial" class="input" placeholder="如 127.0.0.1:16384">
+          <button class="btn btn-small" id="btn-setup-check-adb">检测</button>
+        </div>
+        <span id="setup-serial-hint" class="config-hint" style="color:var(--text-secondary)">
+          请先启动模拟器，然后点击「检测」自动获取，或手动填写。
+        </span>
+      </div>
+      <div class="form-group">
+        <label>Python 解释器路径 <span style="font-size:12px;color:var(--text-secondary)">(推荐留空)</span></label>
+        <input type="text" id="setup-python-path" class="input" placeholder="留空将自动使用内置 Python，推荐留空">
+        <span class="config-hint">仅高级用户需要手动指定，留空即可。</span>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="btn-setup-confirm">确定</button>
+      </div>
+    </div>
+  </div>
