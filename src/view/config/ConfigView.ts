@@ -91,6 +91,7 @@ export class ConfigView {
   private intensifyTargetShip = element<HTMLInputElement>('cfg-intensify-target');
   private intensifyMaterialTypes = element<HTMLSelectElement>('cfg-intensify-material-types');
   private intensifyUnlimitedMaterials = element<HTMLInputElement>('cfg-intensify-unlimited-materials');
+  private intensifyReuseTargetBaseline = element<HTMLInputElement>('cfg-intensify-reuse-target-baseline');
   private intensifyMaxMaterials = element<HTMLInputElement>('cfg-intensify-max-materials');
   private intensifyProtectedShips = element<HTMLTextAreaElement>('cfg-intensify-protected-ships');
   private intensifyStatus = element<HTMLElement>('cfg-intensify-status');
@@ -263,11 +264,14 @@ export class ConfigView {
     this.lootStopCount.value = String(vo.lootStopCount);
     this.intensifyTargetShip.value = vo.intensifyTargetShip ?? '';
     for (const option of Array.from(this.intensifyMaterialTypes.options)) {
-      option.selected = (vo.intensifyMaterialShipTypes ?? ['DD']).includes(
+      option.selected = (vo.intensifyMaterialShipTypes ?? []).includes(
         option.value,
       );
     }
     this.intensifyUnlimitedMaterials.checked = vo.intensifyMaxMaterials === null;
+    this.intensifyReuseTargetBaseline.checked = Boolean(
+      vo.intensifyReuseTargetInventoryBaseline,
+    );
     if (vo.intensifyMaxMaterials !== null) {
       this.intensifyMaxMaterials.value = String(vo.intensifyMaxMaterials);
     }
@@ -365,6 +369,7 @@ export class ConfigView {
       intensifyProtectedShips: this.parseShipNames(
         this.intensifyProtectedShips.value,
       ),
+      intensifyReuseTargetInventoryBaseline: this.intensifyReuseTargetBaseline.checked,
       logLevel: this.logLevel.value as ConfigViewObject['logLevel'],
       logRoot: this.logRoot.value.trim() || 'logs',
       themeMode: this.themeMode.value as ConfigViewObject['themeMode'],

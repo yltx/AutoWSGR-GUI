@@ -55,6 +55,7 @@ export class OperationsController {
       material_ship_types: policy.material_ship_types.length > 0 ? [...policy.material_ship_types] : null,
       max_materials: policy.max_materials,
       protected_ships: [...policy.protected_ships],
+      reuse_target_inventory_baseline: policy.reuse_target_inventory_baseline,
     };
   }
 

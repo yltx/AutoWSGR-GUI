@@ -143,6 +143,7 @@ export interface IntensifyRequest {
   /** null 表示单批素材数量不设上限。 */
   max_materials: number | null;
   protected_ships: string[];
+  reuse_target_inventory_baseline?: boolean;
 }
 
 export interface AutoIntensifyRequest {
@@ -150,6 +151,7 @@ export interface AutoIntensifyRequest {
   /** null 表示单批素材数量不设上限。 */
   max_materials: number | null;
   protected_ships: string[];
+  reuse_target_inventory_baseline?: boolean;
 }
 
 export interface IntensifyPreviewData extends IntensifyRequest {

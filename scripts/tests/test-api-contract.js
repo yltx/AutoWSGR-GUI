@@ -97,6 +97,7 @@ async function verifyIntensifyApiContract() {
       material_ship_types: ['DD', 'CL'],
       max_materials: null,
       protected_ships: ['海伦娜'],
+      reuse_target_inventory_baseline: false,
     }),
   );
   const completion = new Promise(resolve => {
@@ -113,6 +114,7 @@ async function verifyIntensifyApiContract() {
     material_ship_types: ['DD', 'CL'],
     max_materials: null,
     protected_ships: ['海伦娜'],
+    reuse_target_inventory_baseline: false,
   }]);
   await intensifyApi.intensifyPreview(intensifyPolicy);
   await intensifyApi.createIntensifySnapshotSession();

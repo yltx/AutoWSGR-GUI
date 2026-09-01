@@ -47,6 +47,7 @@ export interface ConfigViewObject {
   /** null 表示单批素材数量不设上限。 */
   intensifyMaxMaterials: number | null;
   intensifyProtectedShips: string[];
+  intensifyReuseTargetInventoryBaseline: boolean;
   logLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
   logRoot: string;
   themeMode: 'dark' | 'light' | 'system';

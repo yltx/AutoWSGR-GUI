@@ -358,6 +358,7 @@ export class ConfigController {
       intensifyMaterialShipTypes: cfg.intensify.material_ship_types,
       intensifyMaxMaterials: cfg.intensify.max_materials,
       intensifyProtectedShips: cfg.intensify.protected_ships,
+      intensifyReuseTargetInventoryBaseline: cfg.intensify.reuse_target_inventory_baseline ?? false,
       logLevel: cfg.log.level,
       logRoot: cfg.log.root,
       themeMode: getThemeMode(),
@@ -606,6 +607,7 @@ export class ConfigController {
         material_ship_types: collected.intensifyMaterialShipTypes,
         max_materials: collected.intensifyMaxMaterials,
         protected_ships: collected.intensifyProtectedShips,
+        reuse_target_inventory_baseline: collected.intensifyReuseTargetInventoryBaseline,
       },
     });
     model.updateGuiAutomation({

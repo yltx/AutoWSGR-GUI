@@ -80,6 +80,7 @@ const DEFAULT_SETTINGS: UserSettings = {
     material_ship_types: [],
     max_materials: 4,
     protected_ships: [],
+    reuse_target_inventory_baseline: false,
   },
 };
 
@@ -313,6 +314,9 @@ export class ConfigModel {
           : 4;
       base.intensify.protected_ships = this.stringList(
         intensify.protected_ships,
+      );
+      base.intensify.reuse_target_inventory_baseline = Boolean(
+        intensify.reuse_target_inventory_baseline,
       );
     }
 

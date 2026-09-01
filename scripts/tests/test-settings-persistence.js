@@ -174,6 +174,7 @@ async function runRendererTest(root, tempDirectory) {
     intensifyMaterialShipTypes: ['CL', 'DD'],
     intensifyMaxMaterials: 4,
     intensifyProtectedShips: ['海伦娜'],
+    intensifyReuseTargetInventoryBaseline: true,
     logLevel: 'WARNING',
     logRoot: 'C:\\SettingsTest\\logs',
     themeMode: 'light',
@@ -1390,6 +1391,7 @@ async function runRendererTest(root, tempDirectory) {
     material_ship_types: ['AP', 'BBG'],
     max_materials: 99,
     protected_ships: ['海伦娜'],
+    reuse_target_inventory_baseline: false,
   }, '强化策略必须复用 canonical 舰种并保留任意正整数素材上限');
   const unlimitedIntensifyModel = new ConfigModel();
   unlimitedIntensifyModel.loadFromYaml([
@@ -2424,6 +2426,7 @@ async function runRendererTest(root, tempDirectory) {
     material_ship_types: sample.intensifyMaterialShipTypes,
     max_materials: sample.intensifyMaxMaterials,
     protected_ships: sample.intensifyProtectedShips,
+    reuse_target_inventory_baseline: sample.intensifyReuseTargetInventoryBaseline,
     backend_options: {
       recognition: 'strict',
     },
@@ -2685,6 +2688,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-intensify-target',
     'cfg-intensify-material-types',
     'cfg-intensify-unlimited-materials',
+    'cfg-intensify-reuse-target-baseline',
     'cfg-intensify-max-materials',
     'cfg-intensify-protected-ships',
     'cfg-log-level',

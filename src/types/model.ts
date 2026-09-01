@@ -92,6 +92,8 @@ export interface IntensifyPolicy {
   /** null 表示单批素材数量不设上限。 */
   max_materials: number | null;
   protected_ships: string[];
+  /** 开启后复用目标库会话基线，跳过全量重复扫描。 */
+  reuse_target_inventory_baseline?: boolean;
 }
 
 export interface UserSettings {
