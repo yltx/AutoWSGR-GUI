@@ -143,10 +143,17 @@ export class SettingsController {
       this.intensifySession = result.data;
       this.selectedIntensifyTargetRef = null;
       this.renderIntensifyInventory();
-      configView.setIntensifyStatus(
-        `只读快照已创建，有效期至 ${new Date(result.data.expiresAt).toLocaleTimeString()}。请选择一个目标 occurrence 和素材 occurrences。`,
-        'ok',
-      );
+      if (result.data.materialTotal === 0) {
+        configView.setIntensifyStatus(
+          `只读快照已创建（目标 ${result.data.targetTotal} 艘，素材库当前为空 0 艘）。`,
+          'ok',
+        );
+      } else {
+        configView.setIntensifyStatus(
+          `只读快照已创建（目标 ${result.data.targetTotal} 艘，素材 ${result.data.materialTotal} 艘），有效期至 ${new Date(result.data.expiresAt).toLocaleTimeString()}。请选择一个目标 occurrence 和素材 occurrences。`,
+          'ok',
+        );
+      }
     } catch (error) {
       if (generation !== this.intensifyRequestGeneration) return;
       this.intensifySession = null;
