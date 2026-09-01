@@ -75,6 +75,8 @@ export class ConfigView {
   private emuSerial = element<HTMLInputElement>('cfg-emu-serial');
   private gameApp = element<HTMLSelectElement>('cfg-game-app');
   private updateMode = element<HTMLSelectElement>('cfg-update-mode');
+  private guiUpdateButton = element<HTMLButtonElement>('btn-check-updates');
+  private guiUpdateActive = false;
   private allowTestUpdates = element<HTMLInputElement>('cfg-allow-test-updates');
   private autoExpedition = element<HTMLInputElement>('cfg-auto-expedition');
   private expeditionInterval = element<HTMLInputElement>('cfg-expedition-interval');
@@ -160,6 +162,7 @@ export class ConfigView {
       this.updateDebugAdvancedVisibility();
       this.updateBackendRepoVisibility();
     });
+    this.updateMode.addEventListener('change', () => this.updateUpdateButtons());
     this.backendStartupMode.addEventListener('change', () => this.updateBackendRepoVisibility());
     this.cudaPath.addEventListener('input', () => {
       const hasPath = this.cudaPath.value.trim().length > 0;
@@ -321,6 +324,7 @@ export class ConfigView {
 
     this.updateDebugAdvancedVisibility();
     this.updateBackendRepoVisibility();
+    this.updateUpdateButtons();
   }
 
   /** 收集并校验当前表单。 */
@@ -645,8 +649,23 @@ export class ConfigView {
     this.runtimeView.setAdbConnectionLoading(action, loading);
   }
 
+  private updateUpdateButtons(): void {
+    this.guiUpdateButton.disabled = (
+      this.updateMode.value === 'auto'
+      || this.guiUpdateActive
+    );
+  }
+
   setUpdateCheckLoading(loading: boolean): void {
+    this.guiUpdateActive = loading;
     this.runtimeView.setUpdateCheckLoading(loading);
+    this.updateUpdateButtons();
+  }
+
+  /** 由更新状态事件驱动：检查/下载/安装中置位，结束后复位并重算按钮置灰。 */
+  setGuiUpdateActive(active: boolean): void {
+    this.guiUpdateActive = active;
+    this.updateUpdateButtons();
   }
 
   setGuiUpdateStatus(status: GuiUpdateStatus): void {

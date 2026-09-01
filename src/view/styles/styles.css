@@ -993,6 +993,7 @@ input[type=checkbox]:focus-visible {
   --battle-overview-expanded-height: 260px;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: minmax(var(--battle-overview-collapsed-height), var(--battle-overview-expanded-height));
   align-items: stretch;
   gap: 5px;
   flex: 0 0 auto;
@@ -1005,24 +1006,28 @@ input[type=checkbox]:focus-visible {
 }
 
 .battle-overview-grid > :is(#task-area-card, .fleet-preview-card) {
-  min-height: var(--battle-overview-collapsed-height);
-  max-height: var(--battle-overview-expanded-height);
+  height: 100%;
+  min-height: 0;
 }
 
 .fleet-preview-card {
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 8px !important;
 }
 
 .fleet-preview-card h3 {
+  flex: 0 0 auto;
   margin-bottom: 5px;
   font-size: 14px;
+  text-align: center;
 }
 
 .current-fleet-stage {
   display: flex;
+  flex: 0 0 auto;
   min-height: 54px;
   align-items: flex-start;
 }
@@ -1110,7 +1115,12 @@ input[type=checkbox]:focus-visible {
 
 /* ═══ 今日出征统计 ═══ */
 .daily-sortie-stats {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
   padding-top: 7px;
   margin-top: 7px;
   border-top: 1px solid var(--border);
@@ -1118,6 +1128,7 @@ input[type=checkbox]:focus-visible {
 
 .daily-sortie-heading {
   display: flex;
+  flex: 0 0 auto;
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
@@ -1139,6 +1150,7 @@ input[type=checkbox]:focus-visible {
 
 .daily-sortie-summary {
   display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   align-items: stretch;
   gap: 4px;
@@ -1218,6 +1230,7 @@ input[type=checkbox]:focus-visible {
 
 .daily-grade-row {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 3px;
   margin-top: 4px;
@@ -1236,6 +1249,7 @@ input[type=checkbox]:focus-visible {
 }
 
 .daily-drop-notice {
+  flex: 0 0 auto;
   padding: 5px 7px;
   margin-top: 5px;
   color: #ff5c78;
@@ -1256,6 +1270,11 @@ input[type=checkbox]:focus-visible {
 }
 
 .daily-ship-details {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
   padding: 6px 7px;
   margin-top: 5px;
   background: var(--bg-inset);
@@ -1268,10 +1287,12 @@ input[type=checkbox]:focus-visible {
 }
 
 .daily-ship-details-title {
+  flex: 0 0 auto;
   margin-bottom: 4px;
   color: var(--text-secondary);
   font-size: 10px;
   font-weight: 600;
+  text-align: center;
 }
 
 @keyframes daily-drop-led-flow {
@@ -1289,9 +1310,10 @@ input[type=checkbox]:focus-visible {
 }
 .daily-ship-drop-list {
   display: flex;
+  flex: 1 1 auto;
   flex-wrap: wrap;
   gap: 3px 10px;
-  max-height: 58px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -7901,8 +7923,11 @@ input[type=checkbox]:focus-visible {
 }
 
 .task-list-loader-dialog {
+  display: flex;
   width: min(900px, 100vw - 40px);
   height: min(520px, 100vh - 40px);
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .task-list-loader-content {

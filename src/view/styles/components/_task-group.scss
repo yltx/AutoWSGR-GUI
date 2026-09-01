@@ -289,8 +289,11 @@
 }
 
 .task-list-loader-dialog {
+  display: flex;
   width: min(900px, calc(100vw - 40px));
   height: min(520px, calc(100vh - 40px));
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .task-list-loader-content {

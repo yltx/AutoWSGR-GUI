@@ -69,6 +69,11 @@ export class SettingsController {
       }
     });
     this.gateway?.onUpdateStatus((status) => {
+      configView.setGuiUpdateActive(
+        status.status === 'checking'
+        || status.status === 'downloading'
+        || status.status === 'installing',
+      );
       configView.setGuiUpdateStatus(status);
     });
 
