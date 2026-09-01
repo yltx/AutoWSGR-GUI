@@ -164,6 +164,9 @@ type CoreDepProbeResult = {
   requests: boolean;
   beautifulSoup: boolean;
   maafw: boolean;
+  cffi: boolean;
+  rendercanvas: boolean;
+  wgpu: boolean;
   autowsgr: string | null;
   backendRuntimeContract: boolean;
 };
@@ -254,6 +257,9 @@ async function probeCoreDependencies(
       requests: Boolean(depResult.requests),
       beautifulSoup: Boolean(depResult.beautifulSoup),
       maafw: Boolean(depResult.maafw),
+      cffi: Boolean(depResult.cffi),
+      rendercanvas: Boolean(depResult.rendercanvas),
+      wgpu: Boolean(depResult.wgpu),
       autowsgr: depResult.autowsgr == null || !usesExpectedAutowsgr
         ? null
         : String(depResult.autowsgr),

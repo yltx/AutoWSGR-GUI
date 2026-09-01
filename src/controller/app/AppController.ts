@@ -134,7 +134,12 @@ export class AppController {
         this.configCtrl?.hasUnsavedChanges() ?? false
       ),
     });
-    this.operationsCtrl = new OperationsController(this.api, this.mainView, Logger);
+    this.operationsCtrl = new OperationsController(
+      this.api,
+      this.mainView,
+      Logger,
+      () => this.configModel.current.intensify,
+    );
 
     const cfg = this.configModel.current.daily_automation;
     const gui = this.configModel.currentGuiAutomation;

@@ -22,6 +22,7 @@ import {
   buildBackendBootstrap,
   buildBackendCapabilityProbe,
   selectBackendOcrGpuMode,
+  selectBackendWsgNccGpu,
   type BackendOcrGpuMode,
   type ResolvedBackendOcrGpuMode,
 } from './BackendRuntimeContract';
@@ -338,6 +339,11 @@ export async function startBackend(): Promise<void> {
         : ''
     }`,
   );
+  const wsgNccGpu = selectBackendWsgNccGpu(requestedOcrGpuMode);
+  ctx.sendToRenderer(
+    'backend-log',
+    `[GUI] WSG-NCC WebGPU: ${wsgNccGpu ? '尝试启用（不可用时自动回退 CPU）' : '关闭'}`,
+  );
   const resourceEnv = buildResourceEnvironment(
     runtimeEnv,
     ctx.resourceRoot(),
@@ -358,6 +364,7 @@ export async function startBackend(): Promise<void> {
     resourceEnv,
     {
       ocrGpuMode: resolvedOcrGpuMode,
+      wsgNccGpu,
       saveImages: saveBackendScreenshots,
     },
   );

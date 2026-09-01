@@ -44,7 +44,8 @@ export interface ConfigViewObject {
   lootStopCount: number;
   intensifyTargetShip: string;
   intensifyMaterialShipTypes: string[];
-  intensifyMaxMaterials: number;
+  /** null 表示单批素材数量不设上限。 */
+  intensifyMaxMaterials: number | null;
   intensifyProtectedShips: string[];
   logLevel: 'DEBUG' | 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
   logRoot: string;
@@ -55,7 +56,6 @@ export interface ConfigViewObject {
   backendStartupMode: 'managed' | 'external';
   backendRepoPath: string;
   ocrGpuMode: 'auto' | 'cpu' | 'cuda';
-  ocrGpu: boolean;
   ocrMirror: 'origin' | 'github' | 'tencent' | 'modelscope';
   enhancedShipOcr: boolean;
   ocrConfidence: number;

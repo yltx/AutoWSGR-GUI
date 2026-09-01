@@ -124,11 +124,19 @@ ws://localhost:<backend_port>
 | 游戏状态 | `/api/game/context`、`acquisition` |
 | 建造/奖励/食堂 | `/api/build/*`、`/api/reward/collect`、`/api/cook` |
 | 修理/解体 | `/api/repair/*`、`/api/destroy` |
-| 强化只读预览 | `/api/intensify/snapshot-sessions`、`/api/intensify/snapshot-preview` |
+| 自动强化 | `/api/intensify` |
+| 强化只读预览 | `/api/intensify/preview`、`/api/intensify/snapshot-sessions`、`/api/intensify/snapshot-preview` |
 | 健康检查 | `/api/health` |
 
 具体请求类型定义在 `src/types/api.ts`。新增字段先确认 AutoWSGR 正式 API 契约，
 再修改 GUI DTO 和契约 fixture。
+
+自动强化与手动只读预览使用不同 DTO。`AutoIntensifyRequest` 只发送
+`material_ship_types`、`max_materials` 和 `protected_ships`；主页自动强化按钮每次从
+`ConfigModel.current.intensify` 读取已保存策略，不发送手动预览专用的 `target_ship`。
+`IntensifyRequest` 继续用于 `/api/intensify/preview`。`max_materials` /
+`maximum_materials` 使用 `number | null`：正整数是有限单批上限，`null` 是明确的不限量，
+不得使用魔法数字；有限值也没有 GUI 私设的 12 艘上限。
 
 强化扫描 Session 由后端持有并设有短期 TTL。GUI 只能使用 Session 响应公开的
 opaque target/material occurrence refs，不发送设备 serial、资源路径、扫描结果、proof

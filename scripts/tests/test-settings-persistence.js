@@ -183,7 +183,6 @@ async function runRendererTest(root, tempDirectory) {
     backendStartupMode: 'external',
     backendRepoPath: 'C:\\SettingsTest\\AutoWSGR',
     ocrGpuMode: 'cuda',
-    ocrGpu: true,
     ocrMirror: 'github',
     enhancedShipOcr: true,
     ocrConfidence: 0.73,
@@ -221,11 +220,36 @@ async function runRendererTest(root, tempDirectory) {
   const delaySection = sectionByTitle('全局延迟');
   const automationSection = sectionByTitle('自动化设置');
   const fleetSection = sectionByTitle('舰队设置');
-  const ocrSection = sectionByTitle('OCR 设置');
+  const ocrSection = sectionByTitle('识别设置');
+  rendererAssert.match(
+    ocrSection?.textContent ?? '',
+    /统一控制 EasyOCR 与 WSG-NCC：自动模式分别检测 CUDA 与 WebGPU，CPU 模式关闭两者的 GPU 加速/,
+    '识别加速必须精确说明 EasyOCR CUDA 与 WSG-NCC WebGPU 策略',
+  );
+  rendererAssert.match(
+    ocrSection?.textContent ?? '',
+    /独立的 CPU-only 舰名文字 OCR 路径，不受识别加速设置影响，也不参与 WSG-NCC 舰船卡身份识别/,
+    'FastOCR 必须明确为独立且不受加速模式影响的 CPU 文字识别路径',
+  );
   rendererAssert.equal(
     automationSection?.parentElement,
     behaviorPanel,
     '自动化设置必须位于脚本行为面板',
+  );
+  rendererAssert.deepStrictEqual(
+    Array.from(document.getElementById('cfg-ocr-gpu-mode').options)
+      .map(option => [option.value, option.textContent]),
+    [
+      ['auto', '自动检测可用 GPU（推荐）'],
+      ['cuda', '强制 EasyOCR 使用 CUDA'],
+      ['cpu', '全部强制使用 CPU'],
+    ],
+    '识别加速选项必须保持 auto/cuda/cpu 存储值并精确说明技术行为',
+  );
+  rendererAssert.match(
+    ocrSection?.textContent ?? '',
+    /为 EasyOCR 指定 CUDA Toolkit 或 PyTorch CUDA Runtime.*不影响 WSG-NCC 的 WebGPU 检测/,
+    'CUDA 路径必须限定为 EasyOCR\/PyTorch，不能暗示控制 WSG-NCC',
   );
   rendererAssert.equal(
     systemPanel?.contains(automationSection),
@@ -371,6 +395,45 @@ async function runRendererTest(root, tempDirectory) {
       ?.textContent,
     '今日剩余执行次数：3',
     '已修改但未保存的每日次数不得被旧配置刷新覆盖',
+  );
+  view.render(sample);
+
+  const unlimitedMaterialsInput = document.getElementById(
+    'cfg-intensify-unlimited-materials',
+  );
+  const finiteMaterialsInput = document.getElementById(
+    'cfg-intensify-max-materials',
+  );
+  rendererAssert.equal(unlimitedMaterialsInput.checked, false);
+  rendererAssert.equal(finiteMaterialsInput.disabled, false);
+  finiteMaterialsInput.value = '7';
+  unlimitedMaterialsInput.checked = true;
+  unlimitedMaterialsInput.dispatchEvent(new Event('change'));
+  rendererAssert.equal(finiteMaterialsInput.disabled, true);
+  rendererAssert.equal(
+    view.collect().intensifyMaxMaterials,
+    null,
+    '不限制单批素材时必须收集为 null，不能使用数字哨兵',
+  );
+  view.render({ ...sample, intensifyMaxMaterials: null });
+  rendererAssert.equal(
+    finiteMaterialsInput.value,
+    '7',
+    '无限模式重渲染不得清空最近一次有限素材上限',
+  );
+  unlimitedMaterialsInput.checked = false;
+  unlimitedMaterialsInput.dispatchEvent(new Event('change'));
+  rendererAssert.equal(finiteMaterialsInput.disabled, false);
+  rendererAssert.equal(
+    view.collect().intensifyMaxMaterials,
+    7,
+    '退出无限模式必须恢复最近一次有限素材上限',
+  );
+  finiteMaterialsInput.value = '99';
+  rendererAssert.equal(
+    view.collect().intensifyMaxMaterials,
+    99,
+    '有限素材上限不得继续被旧版 12 艘上限截断',
   );
   view.render(sample);
 
@@ -1325,9 +1388,28 @@ async function runRendererTest(root, tempDirectory) {
   rendererAssert.deepStrictEqual(model.current.intensify, {
     target_ship: '胡德',
     material_ship_types: ['AP', 'BBG'],
-    max_materials: 12,
+    max_materials: 99,
     protected_ships: ['海伦娜'],
-  }, '强化策略必须复用 canonical 舰种并限制素材上限');
+  }, '强化策略必须复用 canonical 舰种并保留任意正整数素材上限');
+  const unlimitedIntensifyModel = new ConfigModel();
+  unlimitedIntensifyModel.loadFromYaml([
+    'intensify:',
+    '  target_ship: 胡德',
+    '  material_ship_types: [DD]',
+    '  max_materials: null',
+    '  protected_ships: [海伦娜]',
+    '',
+  ].join('\n'));
+  rendererAssert.equal(
+    unlimitedIntensifyModel.current.intensify.max_materials,
+    null,
+    'YAML null 必须加载为不限制单批素材数量',
+  );
+  rendererAssert.equal(
+    yaml.load(unlimitedIntensifyModel.toYaml()).intensify.max_materials,
+    null,
+    '不限制单批素材数量必须兼容持久化为 YAML null',
+  );
 
   const guiSettings = {
     preserved_key: 'keep',
@@ -1671,90 +1753,6 @@ async function runRendererTest(root, tempDirectory) {
   const controller = new ConfigController(host);
   const originalFetch = window.fetch;
   const intensifyFetchCalls = [];
-  window.fetch = async (...args) => {
-    intensifyFetchCalls.push(args);
-    const url = String(args[0] ?? '');
-    if (url.endsWith('/api/intensify/snapshot-sessions')) {
-      return {
-        ok: true,
-        json: async () => ({
-          success: true,
-          data: {
-            sessionId: 'snapshot-session',
-            createdAt: '2026-08-24T03:00:00+00:00',
-            expiresAt: '2026-08-24T03:10:00+00:00',
-            targetTotal: 2,
-            targetRevision: 'target-revision',
-            materialTotal: 3,
-            materialViewportCount: 1,
-            targets: [{
-              ref: 'target:target-revision:0:0:0:0.1000:0.2000',
-              shipId: 7,
-              identity: '胡德',
-              occurrence: 0,
-              current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
-            }, {
-              ref: 'target:target-revision:0:0:1:0.2000:0.2000',
-              shipId: 8,
-              identity: '俾斯麦',
-              occurrence: 0,
-              current: { firepower: 2, torpedo: 0, armor: 4, antiAir: 3 },
-            }],
-            materials: [{
-              ref: 'material:material-revision:0:0:0:0.1000:0.2000',
-              shipId: 11,
-              identity: '萤火虫',
-              index: 0,
-            }, {
-              ref: 'material:material-revision:0:0:1:0.2000:0.2000',
-              shipId: 12,
-              identity: '吹雪',
-              index: 1,
-            }, {
-              ref: 'material:material-revision:0:0:2:0.3000:0.2000',
-              shipId: 13,
-              identity: '白雪',
-              index: 2,
-            }],
-          },
-        }),
-      };
-    }
-    return {
-      ok: true,
-      json: async () => ({
-        success: true,
-        data: {
-          targetRevision: 'target-revision',
-          materialRevision: 'material-revision',
-          executionPath: 'direct',
-          executable: false,
-          targets: [{
-            ref: 'target:target-revision:0:0:0:0.1000:0.2000',
-            shipId: 7,
-            identity: '胡德',
-            occurrence: 0,
-            current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
-            maximum: { firepower: 5, torpedo: 6, armor: 7, antiAir: 8 },
-            deficit: { firepower: 4, torpedo: 4, armor: 4, antiAir: 4 },
-            projectedGains: { firepower: 1, torpedo: 0, armor: 2, antiAir: 0 },
-            projected: { firepower: 2, torpedo: 2, armor: 5, antiAir: 4 },
-            needsIntensify: true,
-          }],
-          materials: [{
-            ref: 'material:material-revision:0:0:0:0.1000:0.2000',
-            identity: '萤火虫',
-            index: 0,
-            contribution: { firepower: 25, torpedo: 0, armor: 50, antiAir: 0 },
-            rarity: 2,
-            requiresConfirmation: false,
-            eligible: true,
-            reason: 'allowlisted_nonzero_contribution',
-          }],
-        },
-      }),
-    };
-  };
   try {
     const settingsController = new SettingsController({
       configView: view,
@@ -1768,6 +1766,104 @@ async function runRendererTest(root, tempDirectory) {
     }, null);
     settingsController.bindActions();
     settingsController.bindActions();
+
+    window.fetch = async (...args) => ({
+      ok: false,
+      status: 409,
+      json: async () => ({ detail: '设备正由 api:expedition-check 使用' }),
+    });
+    document.getElementById('btn-intensify-scan')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.match(
+      document.getElementById('cfg-intensify-status')?.textContent ?? '',
+      /设备正由 api:expedition-check 使用/,
+      '扫描设备忙时必须显示后端具体占用原因，而不是通用扫描失败',
+    );
+    intensifyFetchCalls.length = 0;
+    window.fetch = async (...args) => {
+      intensifyFetchCalls.push(args);
+      const url = String(args[0] ?? '');
+      if (url.endsWith('/api/intensify/snapshot-sessions')) {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            data: {
+              sessionId: 'snapshot-session',
+              createdAt: '2026-08-24T03:00:00+00:00',
+              expiresAt: '2026-08-24T03:10:00+00:00',
+              targetTotal: 2,
+              targetRevision: 'target-revision',
+              materialTotal: 3,
+              materialViewportCount: 1,
+              targets: [{
+                ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+                shipId: 7,
+                identity: '胡德',
+                occurrence: 0,
+                current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
+              }, {
+                ref: 'target:target-revision:0:0:1:0.2000:0.2000',
+                shipId: 8,
+                identity: '俾斯麦',
+                occurrence: 0,
+                current: { firepower: 2, torpedo: 0, armor: 4, antiAir: 3 },
+              }],
+              materials: [{
+                ref: 'material:material-revision:0:0:0:0.1000:0.2000',
+                shipId: 11,
+                identity: '萤火虫',
+                index: 0,
+              }, {
+                ref: 'material:material-revision:0:0:1:0.2000:0.2000',
+                shipId: 12,
+                identity: '吹雪',
+                index: 1,
+              }, {
+                ref: 'material:material-revision:0:0:2:0.3000:0.2000',
+                shipId: 13,
+                identity: '白雪',
+                index: 2,
+              }],
+            },
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: {
+            targetRevision: 'target-revision',
+            materialRevision: 'material-revision',
+            executionPath: 'direct',
+            executable: false,
+            targets: [{
+              ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+              shipId: 7,
+              identity: '胡德',
+              occurrence: 0,
+              current: { firepower: 1, torpedo: 2, armor: 3, antiAir: 4 },
+              maximum: { firepower: 5, torpedo: 6, armor: 7, antiAir: 8 },
+              deficit: { firepower: 4, torpedo: 4, armor: 4, antiAir: 4 },
+              projectedGains: { firepower: 1, torpedo: 0, armor: 2, antiAir: 0 },
+              projected: { firepower: 2, torpedo: 2, armor: 5, antiAir: 4 },
+              needsIntensify: true,
+            }],
+            materials: [{
+              ref: 'material:material-revision:0:0:0:0.1000:0.2000',
+              identity: '萤火虫',
+              index: 0,
+              contribution: { firepower: 25, torpedo: 0, armor: 50, antiAir: 0 },
+              rarity: 2,
+              requiresConfirmation: false,
+              eligible: true,
+              reason: 'allowlisted_nonzero_contribution',
+            }],
+          },
+        }),
+      };
+    };
 
     view.setIntensifyStatus('等待测试点击', 'unknown');
     const collectedBeforeInventory = view.collect();
@@ -1925,6 +2021,63 @@ async function runRendererTest(root, tempDirectory) {
       '素材上限任意变化都必须要求重新生成候选预览',
     );
 
+    const unlimitedMaterialsToggle = document.getElementById(
+      'cfg-intensify-unlimited-materials',
+    );
+    const changeCallCountBeforeUnlimited = intensifyFetchCalls.length;
+    maximumMaterialsInput.value = '2';
+    unlimitedMaterialsToggle.checked = true;
+    unlimitedMaterialsToggle.dispatchEvent(new Event('change'));
+    rendererAssert.equal(
+      intensifyFetchCalls.length,
+      changeCallCountBeforeUnlimited,
+      '无限开关重复绑定不得触发额外 API 请求',
+    );
+    rendererAssert.equal(maximumMaterialsInput.disabled, true);
+    Array.from(document.querySelectorAll(
+      '#cfg-intensify-material-occurrences button',
+    )).filter(button => !button.classList.contains('is-selected'))
+      .forEach(button => button.click());
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      3,
+      '无限模式必须允许选择 Session 中的全部素材 occurrence',
+    );
+    document.getElementById('btn-intensify-preview')?.click();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rendererAssert.deepStrictEqual(
+      JSON.parse(String(intensifyFetchCalls.at(-1)?.[1]?.body)),
+      {
+        session_id: 'snapshot-session',
+        selected_target_ref: 'target:target-revision:0:0:0:0.1000:0.2000',
+        allowed_material_identities: ['萤火虫', '吹雪', '白雪'],
+        maximum_materials: null,
+        selected_material_refs: [
+          'material:material-revision:0:0:0:0.1000:0.2000',
+          'material:material-revision:0:0:1:0.2000:0.2000',
+          'material:material-revision:0:0:2:0.3000:0.2000',
+        ],
+      },
+      '无限模式的只读 Preview 请求必须发送 maximum_materials=null',
+    );
+    unlimitedMaterialsToggle.checked = false;
+    unlimitedMaterialsToggle.dispatchEvent(new Event('change'));
+    rendererAssert.equal(maximumMaterialsInput.disabled, false);
+    rendererAssert.equal(
+      maximumMaterialsInput.value,
+      '2',
+      '退出无限模式必须保留切换前的有限数值',
+    );
+    rendererAssert.equal(
+      document.querySelectorAll(
+        '#cfg-intensify-material-occurrences button.is-selected',
+      ).length,
+      2,
+      '恢复有限模式必须按保留数值确定性裁剪 occurrence',
+    );
+
     let resolveStalePreview;
     window.fetch = async (...args) => {
       intensifyFetchCalls.push(args);
@@ -2015,6 +2168,7 @@ async function runRendererTest(root, tempDirectory) {
   } finally {
     window.fetch = originalFetch;
   }
+  view.render(sample);
 
   const yamlBeforeFailedCommit = rendererFs.readFileSync(
     rendererPath.join(tempDirectory, 'usersettings.yaml'),
@@ -2189,7 +2343,7 @@ async function runRendererTest(root, tempDirectory) {
     },
   });
   rendererAssert.deepStrictEqual(savedYaml.ocr, {
-    gpu: sample.ocrGpu,
+    gpu: sample.ocrGpuMode === 'cuda',
     mirror: sample.ocrMirror,
     enhanced_ship_ocr: sample.enhancedShipOcr,
     ship_name_match_confidence: sample.ocrConfidence,
@@ -2325,6 +2479,64 @@ async function runRendererTest(root, tempDirectory) {
     level1: ['当前主力'],
     level2: ['当前替补'],
   });
+
+  const accelerationMode = document.getElementById('cfg-ocr-gpu-mode');
+  rendererAssert.equal(
+    document.getElementById('cfg-ocr-gpu'),
+    null,
+    'OCR 设置不得继续显示独立“使用 GPU”开关',
+  );
+  accelerationMode.value = 'auto';
+  await controller.saveConfig();
+  let savedAutoYaml = yaml.load(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'usersettings.yaml'),
+    'utf8',
+  ));
+  let savedAutoGui = JSON.parse(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'gui_settings.json'),
+    'utf8',
+  ));
+  rendererAssert.equal(savedAutoGui.ocr_gpu_mode, 'auto');
+  rendererAssert.equal(
+    savedAutoYaml.ocr.gpu,
+    false,
+    '自动检测模式必须兼容写入 ocr.gpu=false，由运行时模式完成 CUDA 检测',
+  );
+  accelerationMode.value = 'cpu';
+  await controller.saveConfig();
+  savedAutoYaml = yaml.load(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'usersettings.yaml'),
+    'utf8',
+  ));
+  savedAutoGui = JSON.parse(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'gui_settings.json'),
+    'utf8',
+  ));
+  rendererAssert.equal(savedAutoGui.ocr_gpu_mode, 'cpu');
+  rendererAssert.equal(savedAutoYaml.ocr.gpu, false);
+  accelerationMode.value = 'cuda';
+  await controller.saveConfig();
+  savedAutoYaml = yaml.load(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'usersettings.yaml'),
+    'utf8',
+  ));
+  savedAutoGui = JSON.parse(rendererFs.readFileSync(
+    rendererPath.join(tempDirectory, 'gui_settings.json'),
+    'utf8',
+  ));
+  rendererAssert.equal(savedAutoGui.ocr_gpu_mode, 'cuda');
+  rendererAssert.equal(
+    savedAutoYaml.ocr.gpu,
+    true,
+    '强制 CUDA 模式必须兼容写入 ocr.gpu=true',
+  );
+  view.render({ ...sample, ocrGpuMode: 'auto' });
+  rendererAssert.equal(
+    view.collect().ocrGpuMode,
+    'auto',
+    '重新渲染必须保留权威加速模式值',
+  );
+  view.render(sample);
 
   failLegacyDecisiveMigration = true;
   const failedNotices = await runWithAutoClosedAlert(
@@ -2472,6 +2684,7 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-loot-stop-count',
     'cfg-intensify-target',
     'cfg-intensify-material-types',
+    'cfg-intensify-unlimited-materials',
     'cfg-intensify-max-materials',
     'cfg-intensify-protected-ships',
     'cfg-log-level',
@@ -2496,7 +2709,6 @@ async function runRendererTest(root, tempDirectory) {
     'cfg-ocr-mirror',
     'cfg-ocr-gpu-mode',
     'cfg-cuda-path',
-    'cfg-ocr-gpu',
     'cfg-enhanced-ship-ocr',
     'cfg-ocr-confidence-range',
     'cfg-ocr-confidence',

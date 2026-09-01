@@ -48,6 +48,10 @@ const {
   buildRequirementProbeScript,
 } = require('../../dist/electron/pythonEnv/updater.js');
 const {
+  BACKEND_RUNTIME_REQUIREMENTS,
+  PYTHON_DEPENDENCY_SPECS,
+} = require('../../dist/electron/pythonEnv/dependencies.js');
+const {
   buildBackendRuntimeContractProbeLines,
 } = require('../../dist/electron/pythonEnv/backendContractProbe.js');
 const {
@@ -55,6 +59,7 @@ const {
   buildBackendBootstrap,
   buildBackendCapabilityProbe,
   selectBackendOcrGpuMode,
+  selectBackendWsgNccGpu,
 } = require(
   '../../dist/electron/services/BackendRuntimeContract.js',
 );
@@ -130,6 +135,15 @@ try {
     true,
   );
   assert.equal(
+    managedPlan.toolArgs.includes('cffi>=1.17,<3'),
+    true,
+  );
+  assert.equal(
+    managedPlan.toolArgs.includes('rendercanvas>=2.4,<3'),
+    true,
+  );
+  assert.equal(managedPlan.toolArgs.includes('wgpu==0.32.0'), true);
+  assert.equal(
     MANAGED_AUTOWSGR_COMMIT,
     'b9cfa72e4be10418b5f21e9f68388505a6515925',
   );
@@ -152,14 +166,31 @@ try {
     runtimeInstallArgs.includes('maafw>=5.12.3,<6.0'),
     true,
   );
+  assert.equal(
+    runtimeInstallArgs.includes('cffi>=1.17,<3'),
+    true,
+  );
+  assert.equal(
+    runtimeInstallArgs.includes('rendercanvas>=2.4,<3'),
+    true,
+  );
+  assert.equal(runtimeInstallArgs.includes('wgpu==0.32.0'), true);
   assert.equal(runtimeInstallArgs.includes(localSite), true);
   assert.equal(runtimeInstallArgs.includes('--no-deps'), true);
   assert.equal(runtimeInstallArgs.includes('--upgrade'), true);
   const requirementProbe = buildRequirementProbeScript(
     localSite,
-    ['maafw>=5.12.3,<6.0'],
+    [
+      'maafw>=5.12.3,<6.0',
+      'cffi>=1.17,<3',
+      'rendercanvas>=2.4,<3',
+      'wgpu==0.32.0',
+    ],
     true,
   );
+  assert.match(requirementProbe, /cffi>=1\.17,<3/);
+  assert.match(requirementProbe, /rendercanvas>=2\.4,<3/);
+  assert.match(requirementProbe, /wgpu==0\.32\.0/);
   assert.match(requirementProbe, /metadata\.distribution/);
   assert.match(requirementProbe, /specifier\.contains/);
   assert.match(requirementProbe, /roots\.extend/);
@@ -186,6 +217,18 @@ try {
       line => line.includes("_ocr_values != [True, False]"),
     ),
     true,
+  );
+  const wgpuDependency = PYTHON_DEPENDENCY_SPECS.find(
+    dependency => dependency.key === 'wgpu',
+  );
+  assert.deepEqual(wgpuDependency, {
+    key: 'wgpu',
+    importName: 'wgpu.backends.wgpu_native',
+    packageName: 'wgpu==0.32.0',
+  });
+  assert.deepEqual(
+    BACKEND_RUNTIME_REQUIREMENTS.slice(-3),
+    ['cffi>=1.17,<3', 'rendercanvas>=2.4,<3', 'wgpu==0.32.0'],
   );
 
   state.mode = 'external';
@@ -261,14 +304,38 @@ try {
     cudaRuntimeEnv,
     {
       ocrGpuMode: 'cuda',
+      wsgNccGpu: true,
       saveImages: true,
     },
   );
   assert.equal(settingsEnv.AUTOWSGR_OCR_GPU_MODE, 'cuda');
+  assert.equal(settingsEnv.AUTOWSGR_WSG_NCC_GPU, 'true');
   assert.equal(settingsEnv.AUTOWSGR_SAVE_IMAGES, 'true');
+  const cpuSettingsEnv = applyBackendRuntimeSettings(
+    cudaRuntimeEnv,
+    {
+      ocrGpuMode: 'cpu',
+      wsgNccGpu: false,
+      saveImages: false,
+    },
+  );
+  assert.equal(cpuSettingsEnv.AUTOWSGR_WSG_NCC_GPU, 'false');
+  const autoCpuFallbackSettingsEnv = applyBackendRuntimeSettings(
+    cudaRuntimeEnv,
+    {
+      ocrGpuMode: 'cpu',
+      wsgNccGpu: true,
+      saveImages: false,
+    },
+  );
+  assert.equal(autoCpuFallbackSettingsEnv.AUTOWSGR_OCR_GPU_MODE, 'cpu');
+  assert.equal(autoCpuFallbackSettingsEnv.AUTOWSGR_WSG_NCC_GPU, 'true');
   assert.equal(selectBackendOcrGpuMode('auto', true), 'cuda');
   assert.equal(selectBackendOcrGpuMode('auto', false), 'cpu');
   assert.equal(selectBackendOcrGpuMode('cpu', true), 'cpu');
+  assert.equal(selectBackendWsgNccGpu('auto'), true);
+  assert.equal(selectBackendWsgNccGpu('cuda'), true);
+  assert.equal(selectBackendWsgNccGpu('cpu'), false);
   assert.throws(
     () => selectBackendOcrGpuMode('cuda', false),
     /未检测到可用 CUDA/,
@@ -286,6 +353,7 @@ try {
   const bootstrap = buildBackendBootstrap(external, 16710);
   assert.match(bootstrap, /AUTOWSGR_SAVE_IMAGES/);
   assert.match(bootstrap, /AUTOWSGR_OCR_GPU_MODE/);
+  assert.match(bootstrap, /AUTOWSGR_WSG_NCC_GPU/);
   assert.match(bootstrap, /port=16710/);
   assert.doesNotMatch(bootstrap, /__func__/);
   assert.doesNotMatch(bootstrap, /_image_dir/);

@@ -368,7 +368,6 @@ export class ConfigController {
         this.gateway?.getBackendStartupMode() ?? 'managed',
       backendRepoPath: this.gateway?.getBackendRepoPath() ?? '',
       ocrGpuMode: this.gateway?.getOcrGpuMode() ?? 'auto',
-      ocrGpu: cfg.ocr.gpu,
       ocrMirror: cfg.ocr.mirror,
       enhancedShipOcr: cfg.ocr.enhanced_ship_ocr,
       ocrConfidence: cfg.ocr.ship_name_match_confidence,
@@ -568,7 +567,9 @@ export class ConfigController {
       account: { game_app: collected.gameApp },
       ocr: {
         ...model.current.ocr,
-        gpu: collected.ocrGpu,
+        // 旧版后端仍读取 ocr.gpu；仅显式 CUDA 模式映射为 true，
+        // auto/cpu 均由权威加速模式决定并兼容写为 false。
+        gpu: collected.ocrGpuMode === 'cuda',
         mirror: collected.ocrMirror,
         enhanced_ship_ocr: collected.enhancedShipOcr,
         ship_name_match_confidence: collected.ocrConfidence,

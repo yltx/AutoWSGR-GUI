@@ -395,10 +395,11 @@ async function testCudaEnvironmentService() {
   };
   const runtimeSettings = applyBackendRuntimeSettings(
     { PYTHONPATH: 'shared-python-path' },
-    { ocrGpuMode: 'cpu', saveImages: false },
+    { ocrGpuMode: 'cpu', wsgNccGpu: false, saveImages: false },
   );
   assert.equal(runtimeSettings.PYTHONPATH, 'shared-python-path');
   assert.equal(runtimeSettings.AUTOWSGR_OCR_GPU_MODE, 'cpu');
+  assert.equal(runtimeSettings.AUTOWSGR_WSG_NCC_GPU, 'false');
   assert.equal(runtimeSettings.AUTOWSGR_SAVE_IMAGES, 'false');
   const capabilityProbe = buildBackendCapabilityProbe(
     contractEnvironment,
@@ -410,6 +411,7 @@ async function testCudaEnvironmentService() {
     contractEnvironment,
     16710,
   );
+  assert.match(backendBootstrap, /AUTOWSGR_WSG_NCC_GPU/);
   assert.match(backendBootstrap, /port=16710/);
   assert.doesNotMatch(backendBootstrap, /__func__|_patched_|_image_dir/);
 

@@ -24,6 +24,7 @@ import type {
   TaskRequest,
   GameContextData,
   GameAcquisitionData,
+  AutoIntensifyRequest,
   IntensifyRequest,
   IntensifyPreviewData,
   IntensifySnapshotPreviewData,
@@ -227,7 +228,7 @@ export class ApiClient {
   }
 
   /** 执行自动强化（自动扫描、规划并执行强化） */
-  async autoIntensify(policy?: IntensifyRequest): Promise<ApiResponse> {
+  async autoIntensify(policy: AutoIntensifyRequest): Promise<ApiResponse> {
     return this.request('POST', '/api/intensify', policy);
   }
 
@@ -238,7 +239,22 @@ export class ApiClient {
 
   /** 扫描完整目标与素材库存并创建短期只读 Session；请求没有 body。 */
   async createIntensifySnapshotSession(): Promise<ApiResponse<IntensifySnapshotSessionData>> {
-    return this.request('POST', '/api/intensify/snapshot-sessions');
+    if (!this.http.requestWithStatus) {
+      return this.request('POST', '/api/intensify/snapshot-sessions');
+    }
+    Logger.debug('HTTP POST /api/intensify/snapshot-sessions', 'api');
+    const result = await this.http.requestWithStatus<
+      ApiResponse<IntensifySnapshotSessionData> & { detail?: unknown }
+    >('POST', '/api/intensify/snapshot-sessions');
+    if (result.status >= 400) {
+      const detail = result.data.detail;
+      throw new Error(
+        typeof detail === 'string' && detail.trim()
+          ? detail
+          : `HTTP ${result.status}`,
+      );
+    }
+    return result.data;
   }
 
   /** 使用服务端 Session 和 exact occurrence refs 生成不可执行候选预览。 */

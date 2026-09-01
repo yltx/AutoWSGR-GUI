@@ -90,6 +90,7 @@ export class ConfigView {
   private lootStopCount = element<HTMLInputElement>('cfg-loot-stop-count');
   private intensifyTargetShip = element<HTMLInputElement>('cfg-intensify-target');
   private intensifyMaterialTypes = element<HTMLSelectElement>('cfg-intensify-material-types');
+  private intensifyUnlimitedMaterials = element<HTMLInputElement>('cfg-intensify-unlimited-materials');
   private intensifyMaxMaterials = element<HTMLInputElement>('cfg-intensify-max-materials');
   private intensifyProtectedShips = element<HTMLTextAreaElement>('cfg-intensify-protected-ships');
   private intensifyStatus = element<HTMLElement>('cfg-intensify-status');
@@ -113,7 +114,6 @@ export class ConfigView {
   private backendStartupMode = element<HTMLInputElement>('cfg-use-external-backend');
   private backendRepoPath = element<HTMLInputElement>('cfg-backend-repo-path');
   private ocrGpuMode = element<HTMLSelectElement>('cfg-ocr-gpu-mode');
-  private ocrGpu = element<HTMLInputElement>('cfg-ocr-gpu');
   private ocrMirror = element<HTMLSelectElement>('cfg-ocr-mirror');
   private enhancedShipOcr = element<HTMLInputElement>('cfg-enhanced-ship-ocr');
   private ocrConfidence = element<HTMLInputElement>('cfg-ocr-confidence');
@@ -171,14 +171,18 @@ export class ConfigView {
     this.bindNumberRange(this.delayMinRange, this.delayMin);
     this.bindNumberRange(this.delayMaxRange, this.delayMax);
     this.bindNumberRange(this.ocrConfidenceRange, this.ocrConfidence);
-
-    this.ocrGpuMode.addEventListener('change', () => {
-      if (this.ocrGpuMode.value === 'cpu') this.ocrGpu.checked = false;
-      if (this.ocrGpuMode.value === 'cuda') this.ocrGpu.checked = true;
-    });
-    this.ocrGpu.addEventListener('change', () => {
-      this.ocrGpuMode.value = this.ocrGpu.checked ? 'cuda' : 'cpu';
-    });
+    const handleIntensifyMaterialLimitChange = () => {
+      this.updateIntensifyMaxMaterialsAvailability();
+      this.intensifyActions?.onIntensifyMaxMaterialsChange();
+    };
+    this.intensifyUnlimitedMaterials.addEventListener(
+      'change',
+      handleIntensifyMaterialLimitChange,
+    );
+    this.intensifyMaxMaterials.addEventListener(
+      'change',
+      handleIntensifyMaterialLimitChange,
+    );
 
     document.querySelectorAll<HTMLSelectElement>(
       '#page-config select.input',
@@ -224,10 +228,7 @@ export class ConfigView {
       'input',
       () => actions.onAccentColorInput(this.accentColor.value),
     );
-    this.intensifyMaxMaterials.addEventListener(
-      'change',
-      actions.onIntensifyMaxMaterialsChange,
-    );
+
   }
 
   /** 用 ViewObject 填充表单。 */
@@ -266,7 +267,11 @@ export class ConfigView {
         option.value,
       );
     }
-    this.intensifyMaxMaterials.value = String(vo.intensifyMaxMaterials ?? 4);
+    this.intensifyUnlimitedMaterials.checked = vo.intensifyMaxMaterials === null;
+    if (vo.intensifyMaxMaterials !== null) {
+      this.intensifyMaxMaterials.value = String(vo.intensifyMaxMaterials);
+    }
+    this.updateIntensifyMaxMaterialsAvailability();
     this.intensifyProtectedShips.value = (
       vo.intensifyProtectedShips ?? []
     ).join('\n');
@@ -280,7 +285,6 @@ export class ConfigView {
     this.backendStartupMode.checked = vo.backendStartupMode === 'external';
     this.backendRepoPath.value = vo.backendRepoPath;
     this.ocrGpuMode.value = vo.ocrGpuMode;
-    this.ocrGpu.checked = vo.ocrGpu;
     this.ocrMirror.value = vo.ocrMirror;
     this.enhancedShipOcr.checked = vo.enhancedShipOcr;
     this.setRangeValue(this.ocrConfidenceRange, this.ocrConfidence, vo.ocrConfidence);
@@ -357,9 +361,7 @@ export class ConfigView {
         this.intensifyMaterialTypes.selectedOptions,
         option => option.value,
       ),
-      intensifyMaxMaterials: Math.trunc(
-        this.clamp(this.intensifyMaxMaterials.value, 1, 12, 4),
-      ),
+      intensifyMaxMaterials: this.getIntensifyMaxMaterials(),
       intensifyProtectedShips: this.parseShipNames(
         this.intensifyProtectedShips.value,
       ),
@@ -372,7 +374,6 @@ export class ConfigView {
       backendStartupMode: this.backendStartupMode.checked ? 'external' : 'managed',
       backendRepoPath: this.backendRepoPath.value.trim(),
       ocrGpuMode: this.ocrGpuMode.value as ConfigViewObject['ocrGpuMode'],
-      ocrGpu: this.ocrGpu.checked,
       ocrMirror: this.ocrMirror.value as ConfigViewObject['ocrMirror'],
       enhancedShipOcr: this.enhancedShipOcr.checked,
       ocrConfidence: this.clamp(this.ocrConfidence.value, 0, 1, 0.65),
@@ -571,8 +572,15 @@ export class ConfigView {
   setPlanRoot(path: string): void { this.planRoot.value = path; }
   setCudaPath(path: string): void { this.cudaPath.value = path; }
   getEmulatorSerial(): string { return this.emuSerial.value.trim(); }
-  getIntensifyMaxMaterials(): number {
-    return Math.trunc(this.clamp(this.intensifyMaxMaterials.value, 1, 12, 4));
+  getIntensifyMaxMaterials(): number | null {
+    if (this.intensifyUnlimitedMaterials.checked) return null;
+    const parsed = Number(this.intensifyMaxMaterials.value);
+    return Number.isFinite(parsed) ? Math.max(1, Math.trunc(parsed)) : 4;
+  }
+  private updateIntensifyMaxMaterialsAvailability(): void {
+    const unlimited = this.intensifyUnlimitedMaterials.checked;
+    this.intensifyMaxMaterials.disabled = unlimited;
+    this.intensifyMaxMaterials.setAttribute('aria-disabled', String(unlimited));
   }
   getCudaPath(): string { return this.cudaPath.value.trim(); }
   getPythonPath(): string { return this.pythonPath.value.trim(); }

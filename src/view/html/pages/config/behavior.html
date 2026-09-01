@@ -31,7 +31,7 @@
                 </div>
               </div>
               <div class="config-setting-row">
-                <div class="config-setting-copy"><strong>素材策略</strong><span>保留舰种策略与单次上限；本页只按扫描结果显式选择素材 occurrence，不会执行强化。</span></div>
+                <div class="config-setting-copy"><strong>素材策略</strong><span>限制每批素材数量，或明确设为不限制；自动强化与本页只读预览都会使用这里保存的策略。</span></div>
                 <div class="config-setting-control config-setting-control-stack">
                   <select id="cfg-intensify-material-types" class="input intensify-material-types" multiple size="5">
                     <option value="AP">补给 AP</option><option value="AV">装母 AV</option>
@@ -46,7 +46,12 @@
                     <option value="KP">导巡 KP</option><option value="SC">炮潜 SC</option>
                     <option value="SS">潜艇 SS</option><option value="SSG">导潜 SSG</option>
                   </select>
-                  <label>单次素材上限 <input type="number" id="cfg-intensify-max-materials" class="input config-inline-number" min="1" max="12" value="4"></label>
+                  <label>单批素材上限 <input type="number" id="cfg-intensify-max-materials" class="input config-inline-number" min="1" step="1" value="4"></label>
+                  <label class="config-switch">
+                    <input type="checkbox" id="cfg-intensify-unlimited-materials">
+                    <span class="config-switch-track" aria-hidden="true"></span>
+                    <span>不限制每批素材数量（保存为 null）</span>
+                  </label>
                 </div>
               </div>
               <div class="config-setting-row">
@@ -301,8 +306,8 @@
 
           <section class="config-list-section">
             <div class="config-section-heading">
-              <h3>OCR 设置</h3>
-              <p>管理识别模型、运行硬件和舰名匹配规则。</p>
+              <h3>识别设置</h3>
+              <p>管理文字 OCR、WSG-NCC 舰船识别、运行硬件和舰名匹配规则。</p>
             </div>
             <div class="config-setting-list">
               <div class="config-setting-row">
@@ -321,21 +326,21 @@
               </div>
               <div class="config-setting-row">
                 <div class="config-setting-copy">
-                  <strong>加速模式</strong>
-                  <span>启动后端时自动检测、强制使用 CUDA 或强制使用 CPU。</span>
+                  <strong>识别加速</strong>
+                  <span>统一控制 EasyOCR 与 WSG-NCC：自动模式分别检测 CUDA 与 WebGPU，CPU 模式关闭两者的 GPU 加速。</span>
                 </div>
                 <div class="config-setting-control">
                   <select id="cfg-ocr-gpu-mode" class="input">
-                    <option value="auto">自动检测 CUDA（推荐）</option>
-                    <option value="cuda">强制使用 CUDA</option>
-                    <option value="cpu">强制使用 CPU</option>
+                    <option value="auto">自动检测可用 GPU（推荐）</option>
+                    <option value="cuda">强制 EasyOCR 使用 CUDA</option>
+                    <option value="cpu">全部强制使用 CPU</option>
                   </select>
                 </div>
               </div>
               <div class="config-setting-row">
                 <div class="config-setting-copy">
                   <strong>CUDA 路径</strong>
-                  <span>指定 CUDA Toolkit 或 PyTorch CUDA Runtime 目录，留空时使用系统环境。</span>
+                  <span>为 EasyOCR 指定 CUDA Toolkit 或 PyTorch CUDA Runtime 目录，留空时使用系统环境；不影响 WSG-NCC 的 WebGPU 检测。</span>
                 </div>
                 <div class="config-setting-control">
                   <div class="input-row config-cuda-path-row">
@@ -350,27 +355,14 @@
               </div>
               <div class="config-setting-row">
                 <div class="config-setting-copy">
-                  <strong>硬件识别</strong>
-                  <span>后端 OCR 的 GPU 开关，接入时会与上面的加速模式统一，避免两个设置冲突。</span>
-                </div>
-                <div class="config-setting-control">
-                  <label class="config-switch">
-                    <input type="checkbox" id="cfg-ocr-gpu">
-                    <span class="config-switch-track" aria-hidden="true"></span>
-                    <span>使用 GPU</span>
-                  </label>
-                </div>
-              </div>
-              <div class="config-setting-row">
-                <div class="config-setting-copy">
-                  <strong>增强船只识别</strong>
-                  <span>开启后将提升选船识别率。</span>
+                  <strong>舰名文字识别（FastOCR，CPU-only）</strong>
+                  <span>独立的 CPU-only 舰名文字 OCR 路径，不受识别加速设置影响，也不参与 WSG-NCC 舰船卡身份识别。</span>
                 </div>
                 <div class="config-setting-control">
                   <label class="config-switch">
                     <input type="checkbox" id="cfg-enhanced-ship-ocr">
                     <span class="config-switch-track" aria-hidden="true"></span>
-                    <span>启用 FastOCR</span>
+                    <span>启用 CPU FastOCR</span>
                   </label>
                 </div>
               </div>

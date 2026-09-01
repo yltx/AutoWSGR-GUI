@@ -89,7 +89,8 @@ export interface GuiAutomationSettings {
 export interface IntensifyPolicy {
   target_ship: string;
   material_ship_types: string[];
-  max_materials: number;
+  /** null 表示单批素材数量不设上限。 */
+  max_materials: number | null;
   protected_ships: string[];
 }
 

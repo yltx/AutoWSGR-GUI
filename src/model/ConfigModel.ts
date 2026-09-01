@@ -77,7 +77,7 @@ const DEFAULT_SETTINGS: UserSettings = {
   remove_equipment_mode: true,
   intensify: {
     target_ship: '',
-    material_ship_types: ['DD'],
+    material_ship_types: [],
     max_materials: 4,
     protected_ships: [],
   },
@@ -305,10 +305,12 @@ export class ConfigModel {
       ).map(normalizeFleetShipTypeCode).filter(
         (item): item is string => item !== null && item !== 'ss_or_ssg',
       ).map(item => item.toUpperCase());
-      base.intensify.max_materials = Math.max(
-        1,
-        Math.min(12, Math.trunc(Number(intensify.max_materials) || 4)),
-      );
+      const maximumMaterials = Number(intensify.max_materials);
+      base.intensify.max_materials = intensify.max_materials === null
+        ? null
+        : Number.isFinite(maximumMaterials)
+          ? Math.max(1, Math.trunc(maximumMaterials))
+          : 4;
       base.intensify.protected_ships = this.stringList(
         intensify.protected_ships,
       );

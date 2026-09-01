@@ -59,6 +59,24 @@ for (const filePath of collectFiles(viewRoot, '.ts')) {
 }
 
 const htmlIdSet = new Set(htmlIds);
+if (!htmlIdSet.has('cfg-ocr-gpu-mode')) {
+  throw new Error('OCR acceleration mode control is not mounted');
+}
+if (htmlIdSet.has('cfg-ocr-gpu')) {
+  throw new Error('Legacy independent OCR GPU control must not be mounted');
+}
+if (!htmlIdSet.has('cfg-intensify-unlimited-materials')) {
+  throw new Error('Unlimited intensify material batch control is not mounted');
+}
+if (!/id=["']cfg-intensify-unlimited-materials["'][^>]*type=["']checkbox["']|type=["']checkbox["'][^>]*id=["']cfg-intensify-unlimited-materials["']/.test(html)) {
+  throw new Error('Unlimited intensify material batch control must be an explicit checkbox');
+}
+const intensifyMaximumInput = html.match(
+  /<input\b[^>]*id=["']cfg-intensify-max-materials["'][^>]*>/,
+)?.[0];
+if (!intensifyMaximumInput || /\bmax\s*=/.test(intensifyMaximumInput)) {
+  throw new Error('Finite intensify material batch control must not impose a maximum');
+}
 const missingIds = Array.from(referencedIds)
   .filter(([id]) => !htmlIdSet.has(id) && !intentionallyUnmountedIds.has(id))
   .map(([id, files]) => `${id} (${Array.from(new Set(files)).join(', ')})`);

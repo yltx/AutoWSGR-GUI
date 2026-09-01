@@ -18,6 +18,7 @@ export type ResolvedBackendOcrGpuMode = Exclude<
 
 export interface BackendRuntimeSettings {
   ocrGpuMode: ResolvedBackendOcrGpuMode;
+  wsgNccGpu: boolean;
   saveImages: boolean;
 }
 
@@ -32,6 +33,13 @@ export function selectBackendOcrGpuMode(
   if (cudaAvailable) return 'cuda';
   if (requestedMode === 'auto') return 'cpu';
   throw new Error('已强制使用 CUDA，但未检测到可用 CUDA');
+}
+
+/** WSG-NCC 使用 WebGPU；非 CPU 模式均尝试 GPU，并由运行时安全回退。 */
+export function selectBackendWsgNccGpu(
+  requestedMode: BackendOcrGpuMode,
+): boolean {
+  return requestedMode !== 'cpu';
 }
 
 function pythonLiteral(value: string): string {
@@ -80,6 +88,7 @@ export function applyBackendRuntimeSettings(
   return {
     ...baseEnv,
     AUTOWSGR_OCR_GPU_MODE: settings.ocrGpuMode,
+    AUTOWSGR_WSG_NCC_GPU: settings.wsgNccGpu ? 'true' : 'false',
     AUTOWSGR_SAVE_IMAGES: settings.saveImages ? 'true' : 'false',
   };
 }
@@ -115,6 +124,7 @@ export function buildBackendBootstrap(
     ...sourceVerification(environment),
     "print('[Bootstrap] autowsgr=' + str(_autowsgr_file))",
     "print('[Bootstrap] ocr_gpu_mode=' + os.environ.get('AUTOWSGR_OCR_GPU_MODE', 'cpu'))",
+    "print('[Bootstrap] wsg_ncc_gpu=' + os.environ.get('AUTOWSGR_WSG_NCC_GPU', 'false'))",
     "print('[Bootstrap] save_backend_screenshots=' + os.environ.get('AUTOWSGR_SAVE_IMAGES', 'false'))",
     'import uvicorn',
     `uvicorn.run('autowsgr.server.main:app', host='127.0.0.1', port=${port})`,

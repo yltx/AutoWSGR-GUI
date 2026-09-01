@@ -140,7 +140,15 @@ export interface TaskResult {
 export interface IntensifyRequest {
   target_ship: string;
   material_ship_types: string[] | null;
-  max_materials: number;
+  /** null 表示单批素材数量不设上限。 */
+  max_materials: number | null;
+  protected_ships: string[];
+}
+
+export interface AutoIntensifyRequest {
+  material_ship_types: string[] | null;
+  /** null 表示单批素材数量不设上限。 */
+  max_materials: number | null;
   protected_ships: string[];
 }
 
@@ -187,7 +195,8 @@ export interface IntensifySnapshotPreviewRequest {
   session_id: string;
   selected_target_ref: string;
   allowed_material_identities: string[];
-  maximum_materials: number;
+  /** null 表示按当前显式选择预览，不限制素材 occurrence 数量。 */
+  maximum_materials: number | null;
   selected_material_refs: string[];
 }
 

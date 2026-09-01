@@ -224,7 +224,10 @@ export class SettingsController {
     const maximum = this.host.configView.getIntensifyMaxMaterials();
     if (this.selectedIntensifyMaterialRefs.has(ref)) {
       this.selectedIntensifyMaterialRefs.delete(ref);
-    } else if (this.selectedIntensifyMaterialRefs.size < maximum) {
+    } else if (
+      maximum === null
+      || this.selectedIntensifyMaterialRefs.size < maximum
+    ) {
       this.selectedIntensifyMaterialRefs.add(ref);
     } else {
       this.host.configView.setIntensifyStatus(`单次最多选择 ${maximum} 艘素材舰。`, 'unknown');
@@ -239,15 +242,19 @@ export class SettingsController {
     const session = this.intensifySession;
     if (!session) return;
     const maximum = this.host.configView.getIntensifyMaxMaterials();
-    const retainedRefs = this.selectedMaterials(session)
-      .slice(0, maximum)
-      .map(item => item.ref);
+    const selectedMaterials = this.selectedMaterials(session);
+    const retainedRefs = (maximum === null
+      ? selectedMaterials
+      : selectedMaterials.slice(0, maximum)
+    ).map(item => item.ref);
     this.selectedIntensifyMaterialRefs.clear();
     retainedRefs.forEach(ref => this.selectedIntensifyMaterialRefs.add(ref));
     this.intensifyRequestGeneration += 1;
     this.host.configView.setIntensifyLoading(null);
     this.host.configView.setIntensifyStatus(
-      `素材上限已更新，当前保留前 ${retainedRefs.length} 个 occurrence，请重新生成候选预览。`,
+      maximum === null
+        ? `素材上限已设为不限制，当前保留 ${retainedRefs.length} 个 occurrence，请重新生成候选预览。`
+        : `素材上限已更新，当前保留前 ${retainedRefs.length} 个 occurrence，请重新生成候选预览。`,
       'unknown',
     );
     this.renderIntensifyInventory();

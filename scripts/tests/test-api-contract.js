@@ -38,6 +38,9 @@ const {
   TYPE_LABELS,
 } = require('../../dist/src/shared/fleetShipTypes.js');
 const { ApiClient } = require('../../dist/src/model/ApiClient.js');
+const {
+  OperationsController,
+} = require('../../dist/src/controller/app/OperationsController.js');
 
 const intensifyCalls = [];
 const intensifyApi = new ApiClient(
@@ -56,19 +59,92 @@ const intensifyPolicy = {
   max_materials: 4,
   protected_ships: ['海伦娜'],
 };
+const unlimitedIntensifyPolicy = {
+  material_ship_types: ['DD'],
+  max_materials: null,
+  protected_ships: ['海伦娜'],
+};
 
 async function verifyIntensifyApiContract() {
+  await intensifyApi.autoIntensify(unlimitedIntensifyPolicy);
+  const operationCalls = [];
+  const mainView = {
+    onOperation: null,
+    setOperationLoading: () => {},
+    setOpsStatus: () => {},
+    setOpsAvailability: () => {},
+  };
+  const operations = new OperationsController(
+    {
+      expeditionCheck: async () => ({ success: true }),
+      rewardCollect: async () => ({ success: true }),
+      buildCollect: async () => ({ success: true }),
+      cook: async () => ({ success: true }),
+      repairBath: async () => ({ success: true }),
+      autoIntensify: async request => {
+        operationCalls.push(request);
+        return { success: true };
+      },
+    },
+    mainView,
+    {
+      info: () => {},
+      warn: () => {},
+      error: () => {},
+    },
+    () => ({
+      target_ship: '手动预览目标不应发送',
+      material_ship_types: ['DD', 'CL'],
+      max_materials: null,
+      protected_ships: ['海伦娜'],
+    }),
+  );
+  const completion = new Promise(resolve => {
+    const originalSetOperationLoading = mainView.setOperationLoading;
+    mainView.setOperationLoading = (operation, loading) => {
+      originalSetOperationLoading(operation, loading);
+      if (operation === 'intensify' && !loading) resolve();
+    };
+  });
+  operations.bindOpsActions();
+  mainView.onOperation('intensify');
+  await completion;
+  assert.deepEqual(operationCalls, [{
+    material_ship_types: ['DD', 'CL'],
+    max_materials: null,
+    protected_ships: ['海伦娜'],
+  }]);
   await intensifyApi.intensifyPreview(intensifyPolicy);
   await intensifyApi.createIntensifySnapshotSession();
+  const busyIntensifyApi = new ApiClient(
+    'http://test.invalid',
+    {
+      request: async () => ({ success: false }),
+      requestWithStatus: async () => ({
+        status: 409,
+        data: { detail: '设备正由 api:expedition-check 使用' },
+      }),
+    },
+    {},
+  );
+  await assert.rejects(
+    () => busyIntensifyApi.createIntensifySnapshotSession(),
+    /设备正由 api:expedition-check 使用/,
+  );
   const snapshotPreviewRequest = {
     session_id: 'snapshot-session',
     selected_target_ref: 'target:revision:0:0:0:0.1000:0.2000',
     allowed_material_identities: ['萤火虫'],
-    maximum_materials: 2,
+    maximum_materials: null,
     selected_material_refs: ['material:revision:0:0:0:0.1000:0.2000'],
   };
   await intensifyApi.intensifySnapshotPreview(snapshotPreviewRequest);
   assert.deepEqual(intensifyCalls, [
+    {
+      method: 'POST',
+      requestPath: '/api/intensify',
+      body: unlimitedIntensifyPolicy,
+    },
     {
       method: 'POST',
       requestPath: '/api/intensify/preview',

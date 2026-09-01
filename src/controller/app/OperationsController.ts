@@ -1,5 +1,9 @@
 /** 编排远征收取、奖励领取等常用自动化操作。 */
-import type { ApiResponse } from '../../types/api.js';
+import type {
+  ApiResponse,
+  AutoIntensifyRequest,
+} from '../../types/api.js';
+import type { IntensifyPolicy } from '../../types/model.js';
 import { ApiClient } from '../../model/ApiClient';
 import { MainView } from '../../view/main/MainView';
 import type { OperationName } from '../../view/main/StatusBar';
@@ -15,6 +19,7 @@ export class OperationsController {
     private readonly api: ApiClient,
     private readonly mainView: MainView,
     private readonly logger: typeof Logger,
+    private readonly getIntensifyPolicy: () => IntensifyPolicy,
   ) {
     this.operations = {
       expedition: {
@@ -39,8 +44,17 @@ export class OperationsController {
       },
       intensify: {
         label: '自动强化',
-        run: () => this.api.autoIntensify(),
+        run: () => this.api.autoIntensify(this.autoIntensifyRequest()),
       },
+    };
+  }
+
+  private autoIntensifyRequest(): AutoIntensifyRequest {
+    const policy = this.getIntensifyPolicy();
+    return {
+      material_ship_types: policy.material_ship_types.length > 0 ? [...policy.material_ship_types] : null,
+      max_materials: policy.max_materials,
+      protected_ships: [...policy.protected_ships],
     };
   }
 
@@ -64,10 +78,11 @@ export class OperationsController {
         this.logger.info(`${label}完成`);
         this.mainView.setOpsStatus(`${label}完成`);
       } else {
+        const err = response.error ?? response.message ?? '未知错误';
         this.logger.warn(
-          `${label}失败: ${response.message ?? '未知错误'}`,
+          `${label}失败: ${err}`,
         );
-        this.mainView.setOpsStatus(`${label}失败`);
+        this.mainView.setOpsStatus(`${label}失败: ${err}`);
       }
     } catch (error) {
       const message = error instanceof Error

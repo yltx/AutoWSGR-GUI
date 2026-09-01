@@ -66,17 +66,27 @@ external 仓库无效时直接失败，不能回退 managed，也不能把 GUI s
 - `ocr_gpu_mode`: `auto | cpu | cuda`
 - `cuda_path`
 
-启动前使用同一 Python 探测 `torch.cuda.is_available()`。最终只向后端传明确
-模式 `cpu` 或 `cuda`：
+`ocr_gpu_mode` 是唯一的用户侧识别加速设置，但 EasyOCR 与 WSG-NCC 使用不同的
+GPU 技术并独立解析：
 
-- 强制 `cpu` 始终使用 CPU。
-- `auto` 有 CUDA 时用 CUDA，否则用 CPU。
-- 强制 `cuda` 但探测失败时直接报错。
+- EasyOCR 在启动前使用同一 Python 探测 `torch.cuda.is_available()`，最终只向后端
+  传明确模式 `cpu` 或 `cuda`。
+- WSG-NCC 使用 WebGPU（Windows 下由 `wgpu-native` 选择 DX12/Vulkan），`auto` 和
+  `cuda` 均尝试 GPU；GPU adapter/device/shader 不可用时由识别器安全回退 CPU。
+- 强制 `cpu` 同时关闭 EasyOCR CUDA 和 WSG-NCC WebGPU。
+- 强制 `cuda` 但 EasyOCR 的 CUDA 探测失败时直接报错。
+- FastOCR 是独立的 CPU-only 舰名文字识别路径，不受此设置影响，也不参与
+  WSG-NCC 舰船卡身份识别。
+
+managed Python 依赖契约显式安装并导入检查 `cffi>=1.17,<3`、
+`rendercanvas>=2.4,<3` 和 `wgpu==0.32.0`；健康检查只导入
+`wgpu.backends.wgpu_native`，不要求机器必须存在 GPU adapter。
 
 正式环境变量：
 
 ```text
 AUTOWSGR_OCR_GPU_MODE=cpu|cuda
+AUTOWSGR_WSG_NCC_GPU=true|false
 AUTOWSGR_SAVE_IMAGES=true|false
 AUTOWSGR_SHIP_LIBRARY=<resource>/resource/ship-library
 AUTOWSGR_STRENGTHEN_DATA=<resource>/resource/strengthen.json
