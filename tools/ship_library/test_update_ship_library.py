@@ -104,7 +104,7 @@ class WikiShipTypeTest(unittest.TestCase):
         )
 
     def test_wiki_ship_name_is_corrected_to_game_text(self) -> None:
-        ships = module_ships("DD", "DD")
+        ships = module_ships("DD", "DD", "DD", "DD")
         ships[1]["name"] = "塞尔弗里奇"
         ships[2]["name"] = "塞尔弗里奇·改"
         ships[3]["name"] = "让巴尔"
