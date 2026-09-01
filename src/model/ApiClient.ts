@@ -247,7 +247,8 @@ export class ApiClient {
       ApiResponse<IntensifySnapshotSessionData> & { detail?: unknown }
     >('POST', '/api/intensify/snapshot-sessions');
     if (result.status >= 400) {
-      const detail = result.data.detail;
+      const payload = result.data as unknown as Record<string, unknown> | undefined;
+      const detail = payload?.detail ?? payload?.error ?? payload?.message;
       throw new Error(
         typeof detail === 'string' && detail.trim()
           ? detail
