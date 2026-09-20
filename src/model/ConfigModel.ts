@@ -416,9 +416,10 @@ export class ConfigModel {
       this.guiAutomation.lootPlanId,
     );
     const fallbackLootPlan = lootPlans[0] ?? DEFAULT_LOOT_PLANS[0];
+    // 支持小数分钟 (如 15.2 = 15 分 12 秒)，不做整数截断
     this.guiAutomation.expeditionInterval = Math.max(
       1,
-      Math.min(120, Math.trunc(this.guiAutomation.expeditionInterval || 15)),
+      Math.min(120, Number(this.guiAutomation.expeditionInterval) || 15),
     );
     this.guiAutomation.battleTimes = DAILY_CAMPAIGN_TIMES;
     this.guiAutomation.autoDecisive =

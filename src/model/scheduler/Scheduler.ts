@@ -116,7 +116,8 @@ export class Scheduler {
   /** 更新远征检查间隔（分钟），立即重启定时器 */
   setExpeditionInterval(minutes: number): void {
     const clamped = Math.max(1, Math.min(120, minutes));
-    this.expeditionTimer.setInterval(clamped * 60 * 1000);
+    // 分钟可为小数，换算成毫秒时取整，避免 15.2 * 60000 得到 911999.99...
+    this.expeditionTimer.setInterval(Math.round(clamped * 60 * 1000));
   }
 
   /** 开关自动远征检查；运行中修改时立即启停定时器 */

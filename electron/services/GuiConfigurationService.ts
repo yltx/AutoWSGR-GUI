@@ -438,12 +438,10 @@ export class GuiConfigurationService {
       settings?.decisiveTemplateId,
     );
     const normalized: GuiAutomationSettings = {
+      // 支持小数分钟 (如 15.2 = 15 分 12 秒)，不做整数截断
       expeditionInterval: Math.max(
         1,
-        Math.min(
-          120,
-          Math.trunc(Number(settings?.expeditionInterval) || 15),
-        ),
+        Math.min(120, Number(settings?.expeditionInterval) || 15),
       ),
       battleTimes: DAILY_CAMPAIGN_TIMES,
       autoDecisive: settings?.autoDecisive === true,

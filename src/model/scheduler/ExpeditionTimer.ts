@@ -47,6 +47,10 @@ export class ExpeditionTimer {
       const remaining = Math.max(0, this._intervalMs - elapsed);
       this.callbacks.onTick?.(Math.ceil(remaining / 1000));
     }, EXPEDITION_TIMER_TICK_MS);
+
+    // 首个 tick 要等 1 秒才会触发，这里先立即发布一次，
+    // 让倒计时从完整间隔 (如 15:12) 开始显示，而不是一上来就少 1 秒。
+    this.callbacks.onTick?.(Math.ceil(this._intervalMs / 1000));
   }
 
   stop(): void {
