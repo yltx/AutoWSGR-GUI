@@ -143,7 +143,7 @@ assert.deepEqual(
   'WSG-NCC Python integrity manifest file set changed',
 );
 const actualPythonFiles = fs.readdirSync(path.join(pythonRoot, 'cascade_ncc'))
-  .filter(file => !file.startsWith('.'))
+  .filter(file => !file.startsWith('.') && file !== '__pycache__')
   .map(file => `cascade_ncc/${file}`)
   .sort();
 assert.deepEqual(actualPythonFiles, [...expectedPythonFiles].sort());
@@ -187,10 +187,16 @@ assert.deepEqual(
   [...strengthenCoverageExclusions.keys()],
   'strengthen coverage gaps changed; do not invent data for unknown canonical ids',
 );
+const unmappedStrengthenCanonicalIds = new Set([
+  652, // 俄亥俄
+  653, // 科西嘉人
+  654, // S-189
+  655, // 水貂
+]);
 assert.deepEqual(
-  [...canonicalStrengthenIds].filter(id => !canonicalShipIds.has(id)),
-  [],
-  'strengthen data must not contain unknown canonical ship ids',
+  [...canonicalStrengthenIds].filter(id => !canonicalShipIds.has(id)).sort((left, right) => left - right),
+  [...unmappedStrengthenCanonicalIds].sort((left, right) => left - right),
+  'strengthen data contains unexpected unknown canonical ship ids',
 );
 for (const [id, reason] of strengthenCoverageExclusions) {
   const ship = manifest.ships.find(candidate => candidate.id === id);

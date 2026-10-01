@@ -276,10 +276,10 @@ export async function autoUpdateAutowsgr(
       '    from pathlib import Path',
       '    result["local"] = autowsgr.__version__',
       '    root = Path(autowsgr.__file__).resolve().parent',
-      '    result["event20260730"] = (root / "data" / "map" / "event" / "20260730").is_dir()',
+      '    result["event20260930"] = (root / "data" / "map" / "event" / "20260930").is_dir()',
       'except:',
       '    result["local"] = None',
-      '    result["event20260730"] = False',
+      '    result["event20260930"] = False',
       ...buildBackendRuntimeContractProbeLines(),
       'try:',
       '    _verify_gui_runtime_contract()',
@@ -300,7 +300,7 @@ export async function autoUpdateAutowsgr(
 
     const info = JSON.parse(stdout.trim());
     const localVer: string | null = info.local;
-    const supportsLatestEvent = info.event20260730 === true;
+    const supportsLatestEvent = info.event20260930 === true;
     const supportsRuntimeContract = info.runtime_contract === true;
 
     if (
@@ -316,7 +316,7 @@ export async function autoUpdateAutowsgr(
 
     const incompatibilities = [
       ...(!localVer ? ['未安装'] : []),
-      ...(!supportsLatestEvent ? ['缺少 20260730 活动资源'] : []),
+      ...(!supportsLatestEvent ? ['缺少 20260930 活动资源'] : []),
       ...(!supportsRuntimeContract ? ['缺少 GUI 运行契约'] : []),
     ];
     deps.sendProgress(
@@ -406,7 +406,7 @@ export async function autoUpdateAutowsgr(
       '    from pathlib import Path',
       '    r["version"] = autowsgr.__version__',
       '    root = Path(autowsgr.__file__).resolve().parent',
-      '    r["event20260730"] = (root / "data" / "map" / "event" / "20260730").is_dir()',
+      '    r["event20260930"] = (root / "data" / "map" / "event" / "20260930").is_dir()',
       'except: pass',
       ...buildBackendRuntimeContractProbeLines(),
       'try:',
@@ -434,11 +434,11 @@ export async function autoUpdateAutowsgr(
       const postResult = JSON.parse(postOut.trim());
       const actualVer: string = postResult.version;
       const missing: string[] = postResult.missing;
-      const eventReady = postResult.event20260730 === true;
+      const eventReady = postResult.event20260930 === true;
       const runtimeContractReady = postResult.runtime_contract === true;
 
       if (!eventReady) {
-        deps.sendProgress('WARNING GUI 兼容后端安装后仍缺少 20260730 活动资源');
+        deps.sendProgress('WARNING GUI 兼容后端安装后仍缺少 20260930 活动资源');
         return failureVersion;
       }
       if (!runtimeContractReady) {

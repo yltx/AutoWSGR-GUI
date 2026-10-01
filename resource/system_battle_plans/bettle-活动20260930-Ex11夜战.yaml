@@ -1,0 +1,31 @@
+# 20260930 最强之舟 Ex-11(H-5) A-C-D 3连夜战 (最高性价比练级点)
+# 编队带路要求: 全队无战巡(BC=0)，总索敌>=300
+# 推荐编队: 高练度主力阵容，高索敌，D点夜战后撤退
+chapter: H
+map: 5
+event: '20260930'
+selected_nodes: ['0', A, C, D]
+fight_condition: 1
+repair_mode: 1
+node_defaults: {formation: 4, night: true, proceed: true}
+node_args:
+  A:
+    formation: 4
+    night: true
+    proceed: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  C:
+    formation: 4
+    night: true
+    proceed: true
+    enemy_rules:
+      - [SS >= 1, 5]
+  D:
+    formation: 4
+    night: true
+    proceed: false
+    enemy_rules:
+      - [SS >= 1, 5]
+times: 99
+result: A

@@ -105,5 +105,22 @@
     "flagship_priority": [],
     "use_quick_repair": true,
     "defaultTimes": 1
+  },
+  {
+    "id": "builtin_event_20260930",
+    "name": "活动·最强之舟 (20260930)",
+    "type": "event_fight",
+    "builtin": true,
+    "createdAt": "2026-10-01T00:00:00.000Z",
+    "description": "20260930 最强之舟活动练级：Ex-1/Ex-7 炸鱼(4SS)、Ex-2/Ex-8 两连夜战、Ex-5/Ex-11 三连夜战",
+    "planPaths": [
+      "resource/system_battle_plans/bettle-活动20260930-Ex1炸鱼.yaml",
+      "resource/system_battle_plans/bettle-活动20260930-Ex7炸鱼.yaml",
+      "resource/system_battle_plans/bettle-活动20260930-Ex2夜战.yaml",
+      "resource/system_battle_plans/bettle-活动20260930-Ex8夜战.yaml",
+      "resource/system_battle_plans/bettle-活动20260930-Ex5夜战.yaml",
+      "resource/system_battle_plans/bettle-活动20260930-Ex11夜战.yaml"
+    ],
+    "defaultTimes": 99
   }
 ]

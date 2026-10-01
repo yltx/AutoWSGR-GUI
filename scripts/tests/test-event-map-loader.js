@@ -115,8 +115,9 @@ async function main() {
     .map(option => option.value);
   assert.deepEqual(
     eventChapterOptions.slice(0, 2),
-    ['event:20260730:E', 'event:20260730:H'],
+    ['event:20260930:E', 'event:20260930:H'],
   );
+  assert.equal(eventChapterOptions.includes('event:20260730:E'), true);
   assert.equal(eventChapterOptions.includes('event:20260212:E'), true);
   view.updateMapOptions('event:20260730:E');
   assert.equal(view.mapSelect.value, '1a');
