@@ -25,6 +25,7 @@ export const NATIVE_FLEET_SHIP_TYPE_LABELS: Readonly<
   "sc": "炮潜",
   "ss": "潜艇",
   "ssg": "导潜",
+  "aabg": "防战",
 });
 
 export const NATIVE_FLEET_SHIP_TYPE_CODES: readonly string[] =

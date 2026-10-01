@@ -57,6 +57,7 @@ LEGACY_WIKI_TYPE_TO_CANONICAL_CODE = {
     "CGAA": "cg",
     "DDG": "asdg",
     "DDGAA": "aadg",
+    "BBGAA": "aabg",
 }
 LEGACY_ONLY_WIKI_TYPE_CODES = frozenset(
     set(LEGACY_WIKI_TYPE_TO_CANONICAL_CODE) - {"CG"},
@@ -72,7 +73,7 @@ ROLE_LABELS_ZH = {
     "escort": "护卫舰",
 }
 SIZE_TYPE_GROUPS = {
-    "large": ("cv", "av", "bb", "bbv", "bc", "bg", "bbg"),
+    "large": ("cv", "av", "bb", "bbv", "bc", "bg", "bbg", "aabg"),
     "medium": ("cvl", "ca", "cav", "cl", "clt", "kp", "cg"),
     "small": ("dd", "asdg", "aadg", "bm", "ss", "sc", "ssg", "ap"),
 }
@@ -85,6 +86,7 @@ ROLE_TYPE_GROUPS = {
         "bc",
         "bg",
         "bbg",
+        "aabg",
         "kp",
         "asdg",
         "ssg",

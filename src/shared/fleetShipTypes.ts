@@ -46,6 +46,7 @@ const SHIP_TYPE_FILTER_PRIORITY: readonly string[] = Object.freeze([
   'aadg',
   'cg',
   'bg',
+  'aabg',
 ]);
 
 export const SHIP_TYPE_FILTER_ORDER: readonly string[] = Object.freeze([

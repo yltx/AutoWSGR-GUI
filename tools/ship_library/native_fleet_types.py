@@ -24,7 +24,13 @@ def _discover_native_fleet_types() -> tuple[tuple[str, str], ...]:
     return tuple(vessel_types)
 
 
-NATIVE_FLEET_TYPES = _discover_native_fleet_types()
+# autowsgr_native 0.3.0 尚未提供「防战」，由本项目本地补充；
+# native 发版提供该舰种后应删除本覆盖表，恢复纯 native 发现。
+LOCAL_FLEET_TYPES: tuple[tuple[str, str], ...] = (
+    ('aabg', '防战'),
+)
+
+NATIVE_FLEET_TYPES = _discover_native_fleet_types() + LOCAL_FLEET_TYPES
 NATIVE_FLEET_TYPE_LABELS = MappingProxyType(dict(NATIVE_FLEET_TYPES))
 
 
