@@ -141,6 +141,7 @@ export class ConfigView {
   private bathroomCount = element<HTMLInputElement>('cfg-bathroom-count');
   private destroyShipWorkMode = element<HTMLSelectElement>('cfg-destroy-ship-mode');
   private destroyShipTypes = element<HTMLElement>('cfg-destroy-ship-types');
+  private destroyShipHint = element<HTMLElement>('cfg-destroy-ship-hint');
   private removeEquipmentMode = element<HTMLInputElement>('cfg-remove-equipment-mode');
   private planRoot = element<HTMLInputElement>('cfg-plan-root');
 
@@ -164,6 +165,7 @@ export class ConfigView {
     });
     this.updateMode.addEventListener('change', () => this.updateUpdateButtons());
     this.backendStartupMode.addEventListener('change', () => this.updateBackendRepoVisibility());
+    this.destroyShipWorkMode.addEventListener('change', () => this.updateDestroyShipRuleUi());
     this.cudaPath.addEventListener('input', () => {
       const hasPath = this.cudaPath.value.trim().length > 0;
       this.setCudaStatus(
@@ -321,6 +323,7 @@ export class ConfigView {
     )) {
       checkbox.checked = vo.destroyShipTypes.includes(checkbox.value);
     }
+    this.updateDestroyShipRuleUi();
 
     this.updateDebugAdvancedVisibility();
     this.updateBackendRepoVisibility();
@@ -454,6 +457,24 @@ export class ConfigView {
     const show = this.debugMode.checked && this.backendStartupMode.checked;
     this.backendRepoWrap.style.display = show ? '' : 'none';
     this.backendRepoPath.required = show;
+  }
+
+  /** 按解装模式刷新舰种范围说明，并在不启用时禁用舰种复选框。 */
+  private updateDestroyShipRuleUi(): void {
+    const mode = Math.trunc(this.clamp(this.destroyShipWorkMode.value, 0, 2, 0));
+    const hints = [
+      '未启用舰种过滤，将解装全部舰种。',
+      '仅解装勾选的舰种，未勾选的保留。',
+      '解装未勾选的舰种，勾选的舰种保留。',
+    ];
+    this.destroyShipHint.textContent = hints[mode];
+    const disabled = mode === 0;
+    this.destroyShipTypes.classList.toggle('is-disabled', disabled);
+    for (const checkbox of Array.from(
+      this.destroyShipTypes.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
+    )) {
+      checkbox.disabled = disabled;
+    }
   }
 
   getLootPlans(): LootAutomationPlan[] {

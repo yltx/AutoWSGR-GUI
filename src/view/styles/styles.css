@@ -7084,6 +7084,10 @@ input[type=checkbox]:focus-visible {
   margin: 0;
   accent-color: var(--accent);
 }
+.config-chip-list.is-disabled label {
+  color: var(--text-muted);
+  cursor: default;
+}
 
 .config-disabled-control {
   color: var(--text-muted);
