@@ -23,8 +23,10 @@ param(
     [ValidateSet('current-user', 'all-users')]
     [string]$Scope,
 
+    [AllowEmptyString()]
     [string]$HkcuSource,
 
+    [AllowEmptyString()]
     [string]$HklmSource,
 
     [string]$InstallDirectory,
@@ -2467,11 +2469,15 @@ try {
                     throw "$argumentName is not valid for prepare-upgrade"
                 }
             }
-            Invoke-PrepareUpgrade (
-                $TransactionRoot
-            ) $Target $Scope $HkcuSource $HklmSource (
-                $ExcludedProcessId
-            ) $GracefulExecutableName $GracefulTimeoutSeconds
+            Invoke-PrepareUpgrade `
+                -RootPath $TransactionRoot `
+                -TargetPath $Target `
+                -InstallScope $Scope `
+                -HkcuPath $HkcuSource `
+                -HklmPath $HklmSource `
+                -ExcludedId $ExcludedProcessId `
+                -GracefulName $GracefulExecutableName `
+                -GracefulTimeout $GracefulTimeoutSeconds
         }
         'commit-upgrade' {
             foreach ($argumentName in @('TransactionRoot', 'Target', 'Scope')) {

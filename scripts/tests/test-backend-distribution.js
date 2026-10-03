@@ -118,8 +118,6 @@ function runInstallerHelper(action, namedParameters) {
   const args = [
     '-NoProfile',
     '-NonInteractive',
-    '-ExecutionPolicy',
-    'Bypass',
     '-File',
     helperPath,
     '-Action',
@@ -134,6 +132,10 @@ function runInstallerHelper(action, namedParameters) {
   return spawnSync(windowsPowerShellExecutable(), args, {
     encoding: 'utf8',
     windowsHide: true,
+    env: {
+      ...process.env,
+      PSExecutionPolicyPreference: 'Bypass',
+    },
   });
 }
 
@@ -158,16 +160,21 @@ function prepareUpgradeParameters(
   hkcuSource = '',
   hklmSource = '',
 ) {
-  return {
+  const parameters = {
     TransactionRoot: transactionRoot,
     Target: target,
     Scope: scope,
-    HkcuSource: hkcuSource,
-    HklmSource: hklmSource,
     ExcludedProcessId: process.pid,
     GracefulExecutableName: 'AutoWSGR-GUI.exe',
     GracefulTimeoutSeconds: 0,
   };
+  if (hkcuSource) {
+    parameters.HkcuSource = hkcuSource;
+  }
+  if (hklmSource) {
+    parameters.HklmSource = hklmSource;
+  }
+  return parameters;
 }
 
 function commitUpgradeParameters(transactionRoot, target, scope) {
