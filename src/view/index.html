@@ -1689,9 +1689,9 @@
                   <div class="config-inline-options">
                     <select id="cfg-destroy-ship-mode" class="input"
                             data-animated-select-width="source">
-                      <option value="0">不启用</option>
-                      <option value="1">黑名单</option>
-                      <option value="2">白名单</option>
+                      <option value="0">不启用 · 全部解装</option>
+                      <option value="1">黑名单 · 仅解装勾选舰种</option>
+                      <option value="2">白名单 · 解装勾选以外舰种</option>
                     </select>
                     <label class="config-switch">
                       <input type="checkbox" id="cfg-remove-equipment-mode">
@@ -1724,6 +1724,7 @@
                     <label><input type="checkbox" value="导战">导战</label>
                     <label><input type="checkbox" value="其他">其他</label>
                   </div>
+                  <p id="cfg-destroy-ship-hint" class="config-hint"></p>
                 </div>
               </div>
               <div class="config-setting-row">

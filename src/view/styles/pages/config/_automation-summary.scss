@@ -82,6 +82,13 @@
     margin: 0;
     accent-color: var(--accent);
   }
+
+  &.is-disabled {
+    label {
+      color: var(--text-muted);
+      cursor: default;
+    }
+  }
 }
 
 .config-disabled-control {
